@@ -142,6 +142,46 @@ describe('bounded pending retention and release gate', () => {
     j.reject(owner, p.id);
     expect(j.chatPreview(owner, id)).toMatchObject({ status: 'settled', utterance: null, session_id: preview.sessionId });
   });
+  it.each([-1, 0, 1])('checks chat expiry after a deferred evidence read resolves at deadline offset %d ms', async offset => {
+    const j = journal(); const memory = new TestMemory(); let clock = new Date(now);
+    const workflow = new Workflow(j, memory, () => binding, () => clock);
+    const employment = { employer: 'SYNTHETIC TEST ONLY - Test', title: 'Test', duties: '', startDate: '2025-01-01', currentJob: true, endDate: null,
+      hoursPerWeek: 34, countryCode: 'CA', paid: 'yes', authorizedToWork: 'unknown', nocCode: null, nocReviewed: false };
+    const initial = await workflow.propose(owner, { baseRevision: 0, employment }); await workflow.confirm(owner, initial.id, { proposalRevision: 1 });
+    const chat = new ChatProposals(workflow, { async interpret() { return { kind: 'hours', hours: 36 }; } }, () => clock, true);
+    const result = await chat.propose(owner, { baseRevision: 1, message: utterance, syntheticTest: true });
+    if (result.kind !== 'proposal' || !result.proposal.chat) throw new Error('chat proposal expected');
+    const deadline = Date.parse(result.proposal.chat.expiresAt);
+    clock = new Date(deadline - 1000);
+    const started = Promise.withResolvers<void>(); const release = Promise.withResolvers<void>();
+    const read = memory.read.bind(memory);
+    vi.spyOn(memory, 'read').mockImplementationOnce(async (...args) => {
+      started.resolve(); await release.promise; return read(...args);
+    });
+    const confirmation = workflow.confirm(owner, result.proposal.id, { proposalRevision: 1 });
+    await started.promise;
+    clock = new Date(deadline + offset); release.resolve();
+    if (offset < 0) {
+      await expect(confirmation).resolves.toMatchObject({ status: 'committed' });
+      expect(memory.writes).toHaveLength(2);
+    } else {
+      await expect(confirmation).rejects.toMatchObject({ code: 'CHAT_EXPIRED' });
+      expect(memory.writes).toHaveLength(1);
+      expect(j.head(owner).revision).toBe(1);
+      expect(j.notifications(owner)).toHaveLength(1);
+      expect(j.active(owner)).toBe(false);
+    }
+  });
+  it('does not apply the chat deadline to a form proposal', async () => {
+    const j = journal(); const memory = new TestMemory(); let clock = new Date(now);
+    const workflow = new Workflow(j, memory, () => binding, () => clock);
+    const employment = { employer: 'SYNTHETIC TEST ONLY - Test', title: 'Test', duties: '', startDate: '2025-01-01', currentJob: true, endDate: null,
+      hoursPerWeek: 34, countryCode: 'CA', paid: 'yes', authorizedToWork: 'unknown', nocCode: null, nocReviewed: false };
+    const proposal = await workflow.propose(owner, { baseRevision: 0, employment });
+    clock = new Date(Date.parse(now) + 24 * 60 * 60 * 1000 + 1);
+    await expect(workflow.confirm(owner, proposal.id, { proposalRevision: 1 })).resolves.toMatchObject({ status: 'committed' });
+    expect(memory.writes).toHaveLength(1);
+  });
   it('keeps production/restricted composition off and hides the unavailable UI', () => {
     const j = journal(); const workflow = new Workflow(j, new TestMemory(), () => binding);
     expect(developmentChat({ amAccessMode: 'restricted' } as Config, workflow)).toBeUndefined();

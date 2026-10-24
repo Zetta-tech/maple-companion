@@ -87,14 +87,20 @@ export class Journal {
       return this.get(owner, id);
     });
   }
-  claim(owner: string, id: string, now: string): Operation {
+  claim(owner: string, id: string, now: string | (() => string)): Operation {
     return this.transaction(() => {
       const op = this.get(owner, id);
       if (op.status === 'committed') return op;
       if (op.status !== 'pending') throw new AppError(409, 'PROPOSAL_NOT_PENDING', 'This change is no longer awaiting confirmation.');
       if (this.active(owner)) throw new AppError(409, 'RECONCILIATION_REQUIRED', 'An earlier save is being checked. Do not submit it again.');
       if (this.head(owner).revision !== op.baseRevision) throw new AppError(409, 'STALE_REVISION', 'This proposal is outdated. Review a new change.');
-      this.db.prepare("UPDATE operations SET status='applying', confirmed_at=? WHERE id=? AND owner=?").run(now, id, owner);
+      // Sample runtime time after acquiring the transaction lock. The earlier
+      // evidence read and periodic cleanup can both straddle the chat deadline.
+      const claimedAt = typeof now === 'function' ? now() : now;
+      if (this.db.prepare('SELECT 1 FROM chat_previews WHERE owner=? AND proposal_id=? AND expires_at<=?').get(owner, id, claimedAt)) {
+        throw new AppError(409, 'CHAT_EXPIRED', 'This chat proposal has expired. Describe the correction again before confirming.');
+      }
+      this.db.prepare("UPDATE operations SET status='applying', confirmed_at=? WHERE id=? AND owner=?").run(claimedAt, id, owner);
       return this.get(owner, id);
     });
   }

@@ -45,7 +45,7 @@ export class Workflow {
     const now = this.now();
     // Revalidate existing proposals too; older versions may have accepted UTC's tomorrow.
     if (candidate.status === 'pending') validateEmployment(candidate.newValue, businessDate(now));
-    const op = this.journal.claim(owner, id, now.toISOString());
+    const op = this.journal.claim(owner, id, () => this.now().toISOString());
     if (op.status === 'committed') return op;
     try {
       const receipt = await this.memory.write(binding, envelopeFor(op));

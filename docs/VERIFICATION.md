@@ -124,3 +124,12 @@ The inspected Codex in-app browser was signed out at this checkpoint. The actual
 native proposal was exercised through the authorized synthetic backend harness;
 live authenticated browser chat submission/confirmation remains user-led and
 unverified. It must not be conflated with the user's earlier completed form test.
+
+PR5 review follow-up: a deferred evidence-read test reproduced confirmation at or
+after a chat proposal's 24-hour deadline. The journal now checks owner-bound chat
+expiry inside the claim transaction, using runtime time sampled after acquiring
+the lock. A late confirmation is rejected before any memory write. Boundary tests
+cover one millisecond before, exactly at, and one millisecond after expiry, plus an
+unchanged form proposal. All **337 tests**, typechecking and build pass. This fix
+used only local test adapters; it did not call AM, change the active synthetic
+fixture or restart the user's running app.
