@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AssessmentView } from '../shared/assessment.js';
 import type { PolicySummary } from '../shared/policy.js';
+import { businessDate } from '../shared/business-date.js';
+import { watchAssessmentRefresh } from './assessment-refresh.js';
 
 type ApiRequest = <T>(path: string, body?: unknown) => Promise<T>;
 const labels = { met: 'Met', not_met: 'Not met', needs_information: 'Needs information' };
@@ -11,21 +13,27 @@ export function AssessmentPanel({ request, revision, onAssessed }: { request: Ap
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const generation = useRef(0);
   const load = useCallback(async () => {
-    const [available, records] = await Promise.all([
-      request<{ policies: PolicySummary[] }>('/api/policies'),
-      request<{ assessments: AssessmentView[] }>('/api/assessments'),
-    ]);
-    setPolicies(available.policies);
-    setAssessments(records.assessments);
+    const attempt = ++generation.current;
+    // Clear judgments before the asynchronous check, including on resume and date rollover.
+    setAssessments([]); setPolicies([]); setLoading(true); setError('');
+    try {
+      const [available, records] = await Promise.all([
+        request<{ policies: PolicySummary[] }>('/api/policies'),
+        request<{ assessments: AssessmentView[] }>('/api/assessments'),
+      ]);
+      if (attempt !== generation.current) return;
+      setPolicies(available.policies);
+      setAssessments(records.assessments);
+    } catch (reason) {
+      if (attempt === generation.current) setError(reason instanceof Error ? reason.message : 'Checks could not be loaded.');
+    } finally { if (attempt === generation.current) setLoading(false); }
   }, [request]);
   useEffect(() => {
-    let active = true;
-    // Hide previous conclusions as soon as the owner's verified facts change or become unavailable.
-    setAssessments([]); setLoading(true); setError('');
-    load().catch(reason => { if (active) setError(reason instanceof Error ? reason.message : 'Checks could not be loaded.'); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    void load();
+    const stop = watchAssessmentRefresh(() => { void load(); }, window, document);
+    return () => { stop(); generation.current++; };
   }, [load, revision]);
   async function run(policyId: string) {
     setBusy(true); setError('');
@@ -43,9 +51,16 @@ export function AssessmentPanel({ request, revision, onAssessed }: { request: Ap
     {assessments.map(assessment => <article className="review" key={assessment.id}>
       <h3>{assessment.policy.title}</h3><p className="muted">Checked {assessment.assessmentDate} · saved revision {assessment.profileRevision} · policy version {assessment.policy.version}</p>
       <p><a href={assessment.policy.sourceUrl} target="_blank" rel="noreferrer">Official source</a> · effective {assessment.policy.effectiveFrom}</p>
-      {assessment.freshness === 'current' && revision === assessment.profileRevision
-        ? <ul>{assessment.results.map(result => <li key={result.criterionId}><strong>{labels[result.status]}</strong> — {result.title}</li>)}</ul>
-        : <p className="notice">{assessment.freshness === 'unverified' || revision === null ? 'Saved facts could not be verified. These results are temporarily unavailable.' : 'Facts, policy or assessment date changed. Run a new check for current results.'}</p>}
+      <AssessmentConclusion assessment={assessment} revision={revision} />
     </article>)}
   </section>;
+}
+
+export function AssessmentConclusion({ assessment, revision }: { assessment: AssessmentView; revision: number | null }) {
+  // A delayed response or browser timer must not restore yesterday's judgment.
+  const current = assessment.freshness === 'current' && revision === assessment.profileRevision
+    && assessment.assessmentDate === businessDate(new Date());
+  return current
+    ? <ul>{assessment.results.map(result => <li key={result.criterionId}><strong>{labels[result.status]}</strong> - {result.title}</li>)}</ul>
+    : <p className="notice">{assessment.freshness === 'unverified' || revision === null ? 'Saved facts could not be verified. These results are temporarily unavailable.' : 'Facts, policy or assessment date changed. Run a new check for current results.'}</p>;
 }

@@ -65,6 +65,42 @@ afterEach(() => {
 });
 
 describe('exact proposal and confirmation lifecycle', () => {
+  it.each([
+    { ...employment, startDate: '2026-10-25' },
+    { ...employment, currentJob: false, endDate: '2026-10-25' },
+  ])('rejects tomorrow in Toronto even after UTC midnight: %j', async value => {
+    const { workflow, memory, journal, setTime } = setup();
+    setTime('2026-10-25T01:00:00.000Z');
+    await expect(pending(workflow, alice, value)).rejects.toMatchObject({ name: 'ZodError' });
+    expect(journal.list(alice)).toEqual([]);
+    expect(memory.writes).toEqual([]);
+  });
+
+  it('revalidates a legacy pending proposal before any remote write at Toronto rollover', async () => {
+    const { workflow, memory, journal, setTime } = setup();
+    const time = '2026-10-25T01:00:00.000Z';
+    setTime(time);
+    const proposal = journal.propose(alice, 0, null, { ...employment, startDate: '2026-10-25' }, time);
+    await expect(workflow.confirm(alice, proposal.id, confirmation)).rejects.toMatchObject({ name: 'ZodError' });
+    expect(journal.get(alice, proposal.id).status).toBe('pending');
+    expect(memory.writes).toEqual([]);
+    expect(journal.notifications(alice)).toEqual([]);
+    // The date-only input remains unchanged and becomes valid at Toronto midnight.
+    setTime('2026-10-25T04:00:00.000Z');
+    expect((await workflow.confirm(alice, proposal.id, confirmation)).status).toBe('committed');
+    expect((await workflow.read(alice)).employment?.startDate).toBe('2026-10-25');
+  });
+
+  it('withholds legacy committed evidence that starts tomorrow in Toronto', async () => {
+    const { workflow, memory, setTime } = setup();
+    setTime('2026-10-25T04:00:00.000Z');
+    const proposal = await pending(workflow, alice, { ...employment, startDate: '2026-10-25' });
+    await workflow.confirm(alice, proposal.id, confirmation);
+    setTime('2026-10-25T01:00:00.000Z');
+    await expect(workflow.read(alice)).rejects.toMatchObject({ code: 'MEMORY_UNAVAILABLE' });
+    expect(memory.writes).toHaveLength(1);
+  });
+
   it('keeps an older active recovery operation visible beyond the history limit', async () => {
     const { workflow, journal } = setup();
     const first = await pending(workflow);

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 // matching content: even a failing CI log must not disclose a credential.
 const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean);
 const forbiddenPath = /(^|\/)(\.env(?:\..*)?|\.local)(\/|$)|\.(?:sqlite(?:-wal|-shm)?|db|log)$/i;
-const credential = /sk_(?:test|live)_[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/;
+const credential = /sk_(?:test|live)_[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|\bsp-[A-Za-z0-9_-]{8,}-[A-Za-z0-9_-]{16,}\b|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/;
 let failures = 0;
 for (const file of files) {
   if (forbiddenPath.test(file) && file !== '.env.example') {

@@ -1,17 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { AssessmentRecord, AssessmentView } from '../shared/assessment.js';
+import { businessDate as assessmentDate } from '../shared/business-date.js';
+import { validateEmployment } from '../shared/employment.js';
 import { AppError } from './errors.js';
 import type { Journal } from './journal.js';
 import type { Workflow } from './workflow.js';
 import { PolicyRegistry, evaluatePolicy } from './policies.js';
 
 const requestSchema = z.strictObject({ policyId: z.string().min(1).max(120) });
-export function assessmentDate(now: Date): string {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
-  const part = (type: string) => parts.find(value => value.type === type)!.value;
-  return `${part('year')}-${part('month')}-${part('day')}`;
-}
+export { assessmentDate };
 
 export class Assessments {
   constructor(private journal: Journal, private workflow: Workflow, readonly policies: PolicyRegistry = new PolicyRegistry(), private now = () => new Date()) {}
@@ -25,6 +23,9 @@ export class Assessments {
     const snapshot = await this.workflow.read(owner);
     const verifiedAt = this.now();
     if (assessmentDate(verifiedAt) !== date) throw new AppError(409, 'ASSESSMENT_DATE_CHANGED', 'The assessment date changed. Run the check again.');
+    let employment;
+    try { employment = snapshot.employment === null ? null : validateEmployment(snapshot.employment, date); }
+    catch { throw new AppError(503, 'ASSESSMENT_EVIDENCE_INVALID', 'Saved employment dates could not be verified for this assessment date.'); }
     const head = this.journal.head(owner);
     if (head.revision !== snapshot.revision || this.journal.active(owner)) throw new AppError(409, 'STALE_REVISION', 'Your information changed. Run the check again.');
     const policy = selected.policy;
@@ -33,7 +34,7 @@ export class Assessments {
       assessmentDate: date, createdAt: verifiedAt.toISOString(),
       policy: { id: policy.id, version: policy.version, program: policy.program, title: policy.title, digest: selected.digest,
         sourceUrl: policy.source.url, sourceBodySha256: policy.source.bodySha256, effectiveFrom: policy.effectiveFrom, effectiveTo: policy.effectiveTo },
-      results: evaluatePolicy(selected, snapshot.employment),
+      results: evaluatePolicy(selected, employment),
     };
     const stored = this.journal.saveAssessment(owner, record);
     return this.view(stored, 'current');
@@ -49,9 +50,14 @@ export class Assessments {
   private async verify(owner: string, records: AssessmentRecord[]): Promise<AssessmentView[]> {
     if (!records.length) return [];
     let currentRevision: number;
-    try { currentRevision = (await this.workflow.read(owner)).revision; }
+    let date: string;
+    try {
+      const snapshot = await this.workflow.read(owner);
+      date = assessmentDate(this.now());
+      if (snapshot.employment !== null) validateEmployment(snapshot.employment, date);
+      currentRevision = snapshot.revision;
+    }
     catch { return records.map(record => this.view(record, 'unverified')); }
-    const date = assessmentDate(this.now());
     const head = this.journal.head(owner);
     return records.map(record => {
       let currentPolicy = false;
