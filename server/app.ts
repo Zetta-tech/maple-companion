@@ -5,12 +5,12 @@ import { rateLimit } from 'express-rate-limit';
 import { z, ZodError } from 'zod';
 import { resolve } from 'node:path';
 import { AppError } from './errors.js';
-import type { Config } from './config.js';
+import type { AuthConfig, Config } from './config.js';
 import { Workflow, confirmationSchema } from './workflow.js';
 import { Assessments } from './assessments.js';
 
 export type Authentication = { middleware: RequestHandler; owner: (req: express.Request) => string | null };
-export function clerkAuthentication(config: Config): Authentication {
+export function clerkAuthentication(config: AuthConfig): Authentication {
   return {
     middleware: clerkMiddleware({ publishableKey: config.publishableKey, secretKey: config.secretKey, jwtKey: config.jwtKey, authorizedParties: [config.origin] }),
     owner(req) {
@@ -21,28 +21,30 @@ export function clerkAuthentication(config: Config): Authentication {
 }
 
 /** Dependency injection exists for unit tests; index.ts always constructs the real Clerk/AM adapters. */
-export function createApp(options: { config?: Config; configurationError?: AppError; workflow?: Workflow; assessments?: Assessments; authentication?: Authentication; webRoot?: string }) {
+export function createApp(options: { config?: Config; authConfig?: AuthConfig; configurationError?: AppError; workflow?: Workflow; assessments?: Assessments; authentication?: Authentication; webRoot?: string }) {
   const app = express();
+  const authConfig = options.authConfig ?? options.config;
   app.disable('x-powered-by');
   // Clerk components need their own JS/connect hosts; tighten to actual instance hosts before deployment.
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   app.get('/health/ready', (_req, res) => {
-    res.status(options.config ? 200 : 503).json({ configured: !!options.config, liveIntegrationsVerified: false });
+    const configured = !!options.config && !!options.workflow;
+    res.status(configured ? 200 : 503).json({ configured, authConfigured: !!authConfig, liveIntegrationsVerified: false });
   });
   app.get('/api/config', (_req, res, next) => {
-    if (!options.config) return next(options.configurationError ?? new AppError(503, 'CONFIGURATION_REQUIRED', 'Maple is not configured yet. No data was saved.'));
-    res.json({ clerkPublishableKey: options.config.publishableKey });
+    if (!authConfig) return next(options.configurationError ?? new AppError(503, 'CONFIGURATION_REQUIRED', 'Maple is not configured yet. No data was saved.'));
+    res.json({ clerkPublishableKey: authConfig.publishableKey });
   });
   app.use('/api', (req, _res, next) => {
-    if (!options.config || !options.workflow) return next(options.configurationError ?? new AppError(503, 'CONFIGURATION_REQUIRED', 'Maple is not configured yet. No data was saved.'));
+    if (!authConfig) return next(options.configurationError ?? new AppError(503, 'CONFIGURATION_REQUIRED', 'Maple is not configured yet. No data was saved.'));
     const origin = req.get('Origin');
-    if ((!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !origin) || (origin && origin !== options.config.origin) || req.get('Sec-Fetch-Site') === 'cross-site') {
+    if ((!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !origin) || (origin && origin !== authConfig.origin) || req.get('Sec-Fetch-Site') === 'cross-site') {
       return next(new AppError(403, 'ORIGIN_REJECTED', 'Open Maple at its configured address to make changes.'));
     }
     next();
   });
-  const auth = options.authentication ?? (options.config ? clerkAuthentication(options.config) : undefined);
+  const auth = options.authentication ?? (authConfig ? clerkAuthentication(authConfig) : undefined);
   if (auth) app.use('/api', auth.middleware);
   app.use('/api', (req, res, next) => {
     const owner = auth?.owner(req);
@@ -53,6 +55,14 @@ export function createApp(options: { config?: Config; configurationError?: AppEr
   app.use('/api', rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false,
     keyGenerator: (_req, res) => String(res.locals.owner),
     handler: (_req, _res, next) => next(new AppError(429, 'RATE_LIMITED', 'Please wait a moment before trying again.')) }));
+  // Only verified identity is exposed here. No AM call, journal write or automatic
+  // provisioning occurs during first sign-in, even if a Context is not ready.
+  app.get('/api/session', (_req, res) => res.json({ ownerId: res.locals.owner,
+    workspaceReady: !!options.config && !!options.workflow && options.config.bindings.has(res.locals.owner) }));
+  app.use('/api', (_req, _res, next) => {
+    if (!options.config || !options.workflow) return next(options.configurationError ?? new AppError(503, 'CONFIGURATION_REQUIRED', 'Your private workspace is not configured yet. No data was saved.'));
+    next();
+  });
   app.use('/api', express.json({ limit: '32kb', strict: true }));
   const workflow = () => options.workflow!;
   const assessments = options.assessments ?? (options.workflow ? new Assessments(options.workflow.journal, options.workflow) : undefined);

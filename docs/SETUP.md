@@ -13,6 +13,13 @@ Clerk `<SignIn routing="hash">` at `/`, with Express authentication on `/api`.
 There is no hand-built OAuth callback route. Use the redirect URI shown by Clerk
 when configuring Google; don't invent `/callback`.
 
+Clerk setup is sufficient to open sign-in before the AM binding exists. After the
+user signs in themselves, the local app reads `/api/session`, which returns only
+their server-verified account ID and workspace readiness. Use that account ID in
+the private mapping below. This route does not contact AM, provision an account,
+write a journal entry or create a Context. Other private data routes still fail
+closed when their required configuration is missing.
+
 For the built local app use `APP_ORIGIN=http://localhost:3000`. For Vite hot reload,
 use `http://localhost:5173` instead; it proxies `/api` to Express port 3000. Clerk's
 publishable and secret keys must belong to the same instance/environment. A later

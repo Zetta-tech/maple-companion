@@ -13,9 +13,13 @@ npm run check
 npm run dev
 ```
 
-Open `http://localhost:3000` after `npm run build`. Without approved configuration the page reports sign-in unavailable and API calls fail closed. For frontend hot reload, run `npm run dev:web` separately and configure the approved `APP_ORIGIN` as `http://localhost:5173`.
+Open `http://localhost:3000` after `npm run build`. Clerk configuration enables sign-in before AM is configured. A signed-in user can see their verified account ID to complete the private mapping; memory access remains blocked until their workspace is ready. Missing Clerk configuration reports sign-in unavailable. For frontend hot reload, run `npm run dev:web` separately and configure the approved `APP_ORIGIN` as `http://localhost:5173`.
 
 The server binds only to loopback. No deployment automation is installed. Do not copy real credentials into this repository or chat.
+
+Pull requests run secret-free GitHub Actions checks for typecheck, tests, build,
+tracked-file hygiene and the production dependency audit. Actions are pinned to
+full commit SHAs with read-only permissions; no service credentials are required.
 
 ## Implementation and next steps
 

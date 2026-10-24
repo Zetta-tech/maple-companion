@@ -4,15 +4,17 @@ import { z } from 'zod';
 import type { Binding } from './am.js';
 import { AppError } from './errors.js';
 
-const required = ['APP_ORIGIN', 'CLERK_PUBLISHABLE_KEY', 'CLERK_SECRET_KEY', 'MAPLE_AM_BINDINGS_FILE', 'MAPLE_JOURNAL_PATH'] as const;
-export type Config = { origin: string; publishableKey: string; secretKey: string; jwtKey?: string; journalPath: string; policyFile?: string; bindings: Map<string, Binding> };
+const authRequired = ['APP_ORIGIN', 'CLERK_PUBLISHABLE_KEY', 'CLERK_SECRET_KEY'] as const;
+const required = [...authRequired, 'MAPLE_AM_BINDINGS_FILE', 'MAPLE_JOURNAL_PATH'] as const;
+export type AuthConfig = { origin: string; publishableKey: string; secretKey: string; jwtKey?: string };
+export type Config = AuthConfig & { journalPath: string; policyFile?: string; bindings: Map<string, Binding> };
 const bindingSchema = z.array(z.strictObject({
   ownerId: z.string().regex(/^user_[a-zA-Z0-9]+$/), endpoint: z.string(), context: z.string().regex(/^[a-zA-Z0-9_-]+$/),
   readKeyEnv: z.string().regex(/^AM_[A-Z0-9_]+_READ_KEY$/), writeKeyEnv: z.string().regex(/^AM_[A-Z0-9_]+_WRITE_KEY$/),
 })).min(1);
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env, read = (path: string) => readFileSync(path, 'utf8')): Config {
-  const missing = required.filter(key => !env[key]?.trim());
+export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig {
+  const missing = authRequired.filter(key => !env[key]?.trim());
   if (missing.length) throw new AppError(503, 'CONFIGURATION_REQUIRED', `Configuration required: ${missing.join(', ')}. No data was saved.`);
   try {
     const origin = new URL(env.APP_ORIGIN!);
@@ -29,6 +31,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, read = (path: s
         if (publicKey.asymmetricKeyType !== 'rsa' || (publicKey.asymmetricKeyDetails?.modulusLength ?? 0) < 2048) throw new Error();
       } catch { throw new AppError(503, 'CLERK_JWT_KEY_INVALID', 'CLERK_JWT_KEY must be a complete RSA public PEM key, or left blank. No data was saved.'); }
     }
+    return { origin: origin.origin, publishableKey: env.CLERK_PUBLISHABLE_KEY!, secretKey: env.CLERK_SECRET_KEY!, jwtKey };
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError(503, 'CONFIGURATION_INVALID', 'Server configuration is invalid. No data was saved.');
+  }
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env, read = (path: string) => readFileSync(path, 'utf8')): Config {
+  const missing = required.filter(key => !env[key]?.trim());
+  if (missing.length) throw new AppError(503, 'CONFIGURATION_REQUIRED', `Configuration required: ${missing.join(', ')}. No data was saved.`);
+  const auth = loadAuthConfig(env);
+  try {
     // Runtime durability is mandatory; in-memory journals exist only in automated tests.
     if (env.MAPLE_JOURNAL_PATH === ':memory:' || /^file:/i.test(env.MAPLE_JOURNAL_PATH!)) throw new Error();
     const bindings = new Map<string, Binding>();
@@ -45,7 +59,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, read = (path: s
       contexts.add(entry.context); endpoints.add(endpoint.origin); keys.add(readKey); keys.add(writeKey);
       bindings.set(entry.ownerId, { ownerId: entry.ownerId, endpoint: endpoint.origin, context: entry.context, readKey, writeKey });
     }
-    return { origin: origin.origin, publishableKey: env.CLERK_PUBLISHABLE_KEY!, secretKey: env.CLERK_SECRET_KEY!, jwtKey,
+    return { ...auth,
       journalPath: env.MAPLE_JOURNAL_PATH!, policyFile: env.MAPLE_REVIEWED_POLICIES_FILE?.trim() || undefined, bindings };
   } catch (error) {
     if (error instanceof AppError) throw error;

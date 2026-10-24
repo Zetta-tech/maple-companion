@@ -1,12 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
-import { loadConfig, bindingFor } from '../server/config.js';
+import { loadAuthConfig, loadConfig, bindingFor } from '../server/config.js';
 
 const binding = { ownerId: 'user_A', endpoint: 'https://alice.memory.example.test', context: 'private-a', readKeyEnv: 'AM_A_READ_KEY', writeKeyEnv: 'AM_A_WRITE_KEY' };
 const env = { APP_ORIGIN: 'http://localhost:3000', CLERK_PUBLISHABLE_KEY: 'pk_test_fixture', CLERK_SECRET_KEY: 'sk_test_fixture',
   MAPLE_AM_BINDINGS_FILE: 'test-bindings', MAPLE_JOURNAL_PATH: '.local/test-operations.sqlite',
   AM_A_READ_KEY: 'fixture-read-only', AM_A_WRITE_KEY: 'fixture-write-only' };
 describe('fail-closed configuration', () => {
+  it('validates sign-in before any AM binding or journal is available', () => {
+    const authOnly = { APP_ORIGIN: env.APP_ORIGIN, CLERK_PUBLISHABLE_KEY: env.CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY: env.CLERK_SECRET_KEY };
+    expect(loadAuthConfig(authOnly)).toMatchObject({ origin: env.APP_ORIGIN, publishableKey: env.CLERK_PUBLISHABLE_KEY });
+    expect(() => loadConfig(authOnly)).toThrow('MAPLE_AM_BINDINGS_FILE');
+    expect(() => loadAuthConfig({ ...authOnly, CLERK_JWT_KEY: 'invalid' })).toThrow('complete RSA public PEM');
+  });
   it('accepts blank optional JWT verification configuration as absent', () => {
     expect(loadConfig({ ...env, CLERK_JWT_KEY: '  ' }, () => JSON.stringify([binding])).jwtKey).toBeUndefined();
   });

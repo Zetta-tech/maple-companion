@@ -35,6 +35,45 @@ function app() {
 }
 
 describe('real Clerk verification and HTTP boundaries, with locally generated test JWTs', () => {
+  it('allows sign-in bootstrap and verified self-identification while AM remains unavailable', async () => {
+    const application = createApp({ authConfig: config });
+    const bootstrap = await request(application).get('/api/config');
+    expect(bootstrap.status).toBe(200);
+    expect(bootstrap.body).toEqual({ clerkPublishableKey: config.publishableKey });
+    expect(bootstrap.headers['cache-control']).toBe('no-store');
+    const result = await request(application).get('/api/session?ownerId=user_B').set('x-owner-id', 'user_B').auth(token(), { type: 'bearer' });
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ ownerId: 'user_A', workspaceReady: false });
+    expect(result.headers['cache-control']).toBe('no-store');
+    expect((await request(application).get('/health/ready')).status).toBe(503);
+    for (const path of ['/api/employment', '/api/proposals', '/api/notifications', '/api/assessments']) {
+      expect((await request(application).get(path).auth(token(), { type: 'bearer' })).status).toBe(503);
+    }
+    expect((await request(application).post('/api/proposals').set('Origin', origin).auth(token(), { type: 'bearer' }).send({})).status).toBe(503);
+  });
+  it('does not expose any identity to missing or forged sessions during setup', async () => {
+    const application = createApp({ authConfig: config });
+    for (const jwt of [undefined, token({}, true)]) {
+      const req = request(application).get('/api/session');
+      if (jwt) req.auth(jwt, { type: 'bearer' });
+      const result = await req;
+      expect(result.status).toBe(401);
+      expect(result.body).not.toHaveProperty('ownerId');
+      expect(JSON.stringify(result.body)).not.toContain(config.secretKey);
+    }
+    expect((await request(application).get('/api/session').set('Origin', 'https://attacker.example').auth(token(), { type: 'bearer' })).status).toBe(403);
+  });
+  it('keeps an authenticated unmapped user out of a configured workspace', async () => {
+    const journal = new Journal(':memory:'); journals.push(journal);
+    const bindings = new Map([['user_A', { ownerId: 'user_A', endpoint: 'https://a.example.test', context: 'ctx_a', readKey: 'test-read', writeKey: 'test-write' }]]);
+    const application = createApp({ config: { ...config, bindings }, workflow: new Workflow(journal, new TestMemory(), owner => {
+      const binding = bindings.get(owner); if (!binding) throw new Error('unexpected storage access'); return binding;
+    }) });
+    expect((await request(application).get('/api/session').auth(token(), { type: 'bearer' })).body).toEqual({ ownerId: 'user_A', workspaceReady: true });
+    expect((await request(application).get('/api/session').auth(token({ sub: 'user_B', sid: 'sess_B' }), { type: 'bearer' })).body)
+      .toEqual({ ownerId: 'user_B', workspaceReady: false });
+    expect(journal.list('user_B')).toEqual([]);
+  });
   it('isolates real authenticated HTTP assessments and notifications, and refuses owner injection', async () => {
     const journal = new Journal(':memory:'); journals.push(journal);
     const memory = new TestMemory();
