@@ -8,6 +8,7 @@ import './styles.css';
 import { AssessmentPanel } from './AssessmentPanel.js';
 import { HoursChat } from './HoursChat.js';
 import { HoursReviewNote } from './HoursReviewNote.js';
+import type { HoursAnswer, HoursClarification } from '../shared/chat.js';
 
 type Snapshot = { revision: number; employment: Employment | null };
 type Proposal = {
@@ -17,7 +18,7 @@ type Proposal = {
   status: string;
   oldValue: Employment | null;
   newValue: Employment;
-  chat?: { utterance: string; expiresAt: string; periodSource: 'message' | 'interpretation' };
+  chat?: { utterance: string; expiresAt: string; periodSource: 'message' | 'interpretation'; clarificationAnswer?: 'actual_weekly_work' };
 };
 type Notification = { id: string; operationId: string | null; assessmentId: string | null; kind: 'saved' | 'assessed'; createdAt: string; revision: number };
 type ApiErrorBody = { error?: { code?: string; message?: string } };
@@ -146,6 +147,7 @@ function Workspace() {
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [chatAvailable, setChatAvailable] = useState(false);
   const [chatFallback, setChatFallback] = useState(false);
+  const [chatClarification, setChatClarification] = useState<HoursClarification | null>(null);
 
   const request = useCallback(async <T,>(path: string, body?: unknown): Promise<T> => {
     const token = await getToken();
@@ -170,9 +172,10 @@ function Workspace() {
       request<Snapshot>('/api/employment'),
       request<{ proposals: Proposal[] }>('/api/proposals'),
       request<{ notifications: Notification[] }>('/api/notifications'),
-      request<{ available: boolean }>('/api/chat/status'),
+      request<{ available: boolean; clarification: HoursClarification | null }>('/api/chat/status'),
     ]);
     setChatAvailable(chat.status === 'fulfilled' && chat.value.available);
+    setChatClarification(chat.status === 'fulfilled' ? chat.value.clarification : null);
     if (changes.status === 'fulfilled') setProposals(changes.value.proposals);
     if (inbox.status === 'fulfilled') setNotifications(inbox.value.notifications);
 
@@ -240,9 +243,10 @@ function Workspace() {
     if (!snapshot || !canEdit) return false;
     setBusy(true); setError(''); setMessage(''); setChatFallback(false);
     try {
-      const result = await request<{ kind: string; proposal?: Proposal; message?: string; formHref?: string }>('/api/chat/proposals', {
+      const result = await request<{ kind: string; proposal?: Proposal; message?: string; formHref?: string; clarification?: HoursClarification }>('/api/chat/proposals', {
         baseRevision: snapshot.revision, message: text, syntheticTest: true,
       });
+      setChatClarification(result.clarification ?? null);
       if (result.kind === 'proposal' && result.proposal) {
         const proposal = result.proposal;
         setProposals(current => [proposal, ...current.filter(item => item.id !== proposal.id)]);
@@ -259,6 +263,25 @@ function Workspace() {
       // Refresh possible pending state after a lost response; never replay.
       try { await load(); } catch { /* Existing load applies successful status reads. */ }
       return false;
+    } finally { setBusy(false); }
+  }
+
+  async function answerChat(answer: HoursAnswer) {
+    if (!chatClarification || !canEdit) return;
+    setBusy(true); setError(''); setMessage('');
+    try {
+      const result = await request<{ kind: string; proposal?: Proposal; message?: string }>(`/api/chat/clarifications/${encodeURIComponent(chatClarification.id)}`, { answer });
+      setChatClarification(null);
+      if (result.kind === 'proposal' && result.proposal) {
+        const proposal = result.proposal;
+        setProposals(current => [proposal, ...current.filter(item => item.id !== proposal.id)]);
+        setReviewId(proposal.id);
+        setMessage('Your clarification prepared a change for review. Your employment record has not changed.');
+        requestAnimationFrame(() => document.getElementById('review-heading')?.focus());
+      } else setMessage(result.message ?? 'Your employment record is unchanged.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Your answer could not be processed. Refresh status before trying again.');
+      try { await load(); } catch { /* Recover pending state without replaying. */ }
     } finally { setBusy(false); }
   }
 
@@ -314,7 +337,7 @@ function Workspace() {
     <div className="page-heading"><div><p className="eyebrow">Your information</p><h1>Let’s start with your work.</h1><p>Record one job, then review the details before saving.</p></div><button type="button" className="secondary" disabled={busy || loading} onClick={refresh}>{busy ? 'Please wait…' : 'Refresh status'}</button></div>
     {error && <div className="notice error" role="alert">{error}</div>}
     {message && <div className="notice" role="status">{message}{chatFallback && <> <a href="#employment-heading">Employment form</a></>}</div>}
-    <HoursChat available={chatAvailable} disabled={!canEdit} busy={busy} onPropose={proposeChat} />
+    <HoursChat available={chatAvailable} disabled={!canEdit} busy={busy} onPropose={proposeChat} clarification={chatClarification} onAnswer={answerChat} />
     {review?.chat && review.newValue?.hoursPerWeek !== null && <HoursReviewNote {...review.chat} oldHours={review.oldValue?.hoursPerWeek ?? null} newHours={review.newValue.hoursPerWeek} />}
     {loading && <p role="status">Loading your saved information…</p>}
     {!loading && !snapshot && <p className="muted">Your saved information is unavailable. Use Refresh status to reconnect before editing.</p>}

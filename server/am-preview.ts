@@ -18,13 +18,13 @@ const responseSchema = z.object({
   typeof row !== 'object' || row === null || !('id' in row) || row.id === '')), 'Unexpected record identifier');
 export type MemoryPreview = z.infer<typeof responseSchema>;
 export class PreviewUnavailable extends Error {
-  constructor(readonly state: 'failed' | 'uncertain' | 'blocked' = 'failed') { super('The proposed correction could not be interpreted safely.'); }
+  constructor(readonly state: 'failed' | 'uncertain' | 'blocked' = 'failed', readonly httpStatus: number | null = null) { super('The proposed correction could not be interpreted safely.'); }
 }
 
 /** Constructed only in the explicit synthetic development trial; see docs/CHAT_PREVIEW.md. */
 export function createMemoryPreview(fetchImpl: typeof fetch = globalThis.fetch) {
   return async (binding: Binding, text: string, onSession: (sessionId: string) => void = () => {}): Promise<MemoryPreview> => {
-    let sent = false; let received = false;
+    let sent = false; let received = false; let httpStatus: number | null = null;
     try {
       const message = textSchema.parse(text);
       const origin = new URL(binding.endpoint);
@@ -40,6 +40,7 @@ export function createMemoryPreview(fetchImpl: typeof fetch = globalThis.fetch) 
           || body.infer !== 'preview' || body.text !== message || JSON.stringify(body.scopes) !== '[["maple/approved"]]') throw new Error();
         sent = true;
         const response = await fetchImpl(input, { ...init, redirect: 'error' });
+        httpStatus = response.status;
         if (Number(response.headers.get('Content-Length') ?? 0) > 64 * 1024) { await response.body?.cancel(); throw new Error(); }
         if (!response.body) return response;
         const reader = response.body.getReader();
@@ -62,6 +63,6 @@ export function createMemoryPreview(fetchImpl: typeof fetch = globalThis.fetch) 
       const metadata = z.object({ sessionId: z.string().max(128).regex(/^[A-Za-z0-9:_-]*$/) }).safeParse(wire);
       if (metadata.success && metadata.data.sessionId) onSession(metadata.data.sessionId);
       return responseSchema.parse(wire);
-    } catch { throw new PreviewUnavailable(received ? 'blocked' : sent ? 'uncertain' : 'failed'); }
+    } catch { throw new PreviewUnavailable(received ? 'blocked' : sent ? 'uncertain' : 'failed', httpStatus); }
   };
 }

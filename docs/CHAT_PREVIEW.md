@@ -76,7 +76,7 @@ be inferred without an uncertainty marker. See [the actual results](SEMANTIC_EVA
 ## Semantic-first weekly-hours increment
 
 The exact-sentence input gate has been removed. After authentication, binding,
-synthetic-fixture, revision and trial-budget checks, the unchanged bounded message
+synthetic-fixture, revision and concurrent-change checks, the unchanged bounded message
 reaches the real AM preview. The only supplied background is the current weekly
 total from the receipt-verified record, clearly separated from the user's message.
 There is no desired answer or rewriting into a phrase template. User input remains
@@ -101,22 +101,37 @@ clarification for valid but complex wording (including number words) and can mis
 subtle ambiguity. They do not replace the model, human review or broader quality
 evaluation. Production chat remains disabled.
 
-If a candidate clearly expresses weekly hours while the message omitted the
-period, a pending proposal labels that interpretation and asks **Update weekly
-hours from X to Y?** The user reviews the original message and exact old/new values
-before the existing separate confirmation. No extra confirmation dialog is needed
-just to obtain interpretation. The display annotation is derived from the immutable
-pending wording and proposed quantity. Explicit weekly evidence must attach to that
+If the candidate or original message omits a clear weekly period, Maple now asks
+a specific question before creating a proposal. An availability/capacity signal in
+the native output or original wording asks whether the user means actual weekly
+work or availability. This post-preview defense also catches the observed case in
+which AM dropped "can" and returned a weekly-work value. It uses conservative
+capacity markers, not an accepted-sentence whitelist or a general intent guarantee.
+
+The owner chooses actual weekly work, availability only, or a different/unclear
+period. Only the first prepares **Update weekly hours from X to Y?** for the
+existing separate confirmation. The other answers create no proposal and change
+no approved facts. Answering calls no model. A known, bounded numeric candidate
+is required; unknown fields, ambiguity, negation and conflicting periods still
+hold. Unitless native values do not silently become weekly hours.
+
+The pending question survives reload, belongs to the original owner/revision,
+expires at the original 24-hour deadline and blocks overlapping chat requests.
+The server binds its answer to the stored candidate; the browser cannot supply a
+different number, owner or revision. Stale/expired/replayed answers cannot create
+a new proposal. Existing proposals keep their original review behavior. The
+display annotation is derived from immutable pending wording, the proposed
+quantity and any explicit clarification answer. Explicit weekly evidence must attach to that
 amount (for example, `37 hours per week` or `weekly hours are 37`); incidental or old
 mentions of weeks do not suppress the disclosure, including after journal reopen.
-If the unit cannot be linked confidently, review conservatively discloses the
-interpretation. These are measurement-fragment checks, not accepted input sentences.
+If the unit cannot be linked confidently, the new flow asks for clarification.
+These are measurement-fragment checks, not accepted input sentences.
 An empty model uncertainty array is never treated as consent.
 
 Explicit nonweekly/ambiguous cadences such as every other week, biweekly and
 fortnightly, or an unknown unit such as per shift, ask for clarification without
 conversion. This differs from an omitted unit that may be shown as an explicit
-weekly interpretation for review. The review always says it changes only weekly
+weekly interpretation that the user must clarify first. The review always says it changes only weekly
 hours; it does not claim to apply every change mentioned in the message. Recognized
 unsupported changes, including unpaid status, route to clarification/the form.
 Unrecognized omitted semantics remain a trial limitation, not proof of full-message
@@ -178,6 +193,30 @@ outcome stops, ordinary API burst protection and provider-error/no-retry handlin
 remain unchanged. Removing these quotas does not authorize automatic model calls.
 
 ## Remaining production decisions
+
+`chat_clarifications` is additive operational storage: chat request ID, owner,
+candidate hours, issue (`period` or `intent`), answer and answer time. The candidate
+is cleared when answered or at the original chat expiry. Answer codes/timestamps
+remain provenance. Existing tables and pending proposals are preserved. A read
+of the owner's chat status exposes only their pending question; no provider
+session, diagnostic evidence or identity details are included. The obsolete
+five-preview limit field has been removed from that status response.
+
+Private diagnostic metadata now distinguishes provider HTTP/transport/response
+failures, empty or ambiguous extraction, and Maple native-adapter/source-evidence
+rejection. `NATIVE_*` identifiers are Maple's analysis of the preview response, not
+error codes supplied by AM. `chat_diagnostics` is bound to the initiating owner and
+request and joined to the existing provider session reference. It has no HTTP
+read route and is excluded from proposal payloads.
+
+Only recognized field labels, small numeric candidate lists, unit categories and
+extraction counts are retained; no new raw-input/model-prose, identity-name,
+credential or provider-error-body log is added. Candidate evidence is cleared at
+the original chat's 24-hour deadline by the existing expiry sweep/access path.
+Reason codes, provider error status, request/session references and timestamps
+remain operational audit metadata. Offline cleanup still waits for the next app
+run, and SQL redaction does not promise forensic erasure. This adds no request
+quota and does not authorize automatic calls or alter confirmation behavior.
 
 Production still needs a reviewed provider retention/cleanup policy, broader
 semantic-quality evaluation, least-privilege credentials and hosted multi-user

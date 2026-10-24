@@ -22,4 +22,17 @@ Clerk consumes the same CSS tokens through its supported `appearance.variables` 
 - Screenshot limitation: IAB's baseline and final capture calls returned `Unable to capture screenshot`, including visible and bounded-capture attempts. No before/after image or pixel-level visual verification is claimed. No alternate browser was used. A screenshot pass remains necessary before promoting this draft.
 - Live Clerk sign-in/account popovers and OS-rendered native popups were not visually verified because this task forbids provider calls. The appearance object passes the installed Clerk SDK's TypeScript checks. Run an authenticated visual pass before release.
 
-The backend, authentication flow, data handling, active checkout and port 3000 are unchanged. This change is based on `main` at `9889cc2`; PR #6 remains separate and unmerged. No deployment or merge is included.
+The preceding checks describe the isolated theme commit `0765312`. Its production
+files were integrated into the active companion checkout with the user's approval;
+the external fixture harness was not imported. The combined change also contains
+the separately documented hours clarification and private diagnostics. It is based
+on PR #6's branch while that review remains open. No deployment or merge is included.
+
+Combined verification: 480 tests, typecheck and build pass. On the real
+`http://localhost:3000` app, Codex IAB verified the live Clerk sign-in surface,
+both theme states, computed page/card colors and no horizontal overflow at the
+current desktop viewport. The toggle was left in dark mode. This IAB session was
+signed out; no sign-in, pending proposal action or live extraction was attempted.
+Screenshot capture again returned `Unable to capture screenshot`; authenticated
+workspace/popover pixel verification remains unclaimed. Theme preference is
+origin/browser-specific, so the separate port 5178 preference does not transfer.

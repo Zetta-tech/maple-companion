@@ -250,3 +250,5 @@ code { overflow-wrap: anywhere; }
   button.theme-toggle { width: 44px; padding-inline: 0; }
   .theme-toggle span { display: none; }
 }
+.clarification-actions { display: flex; flex-wrap: wrap; gap: .65rem; }
+.clarification-actions button { white-space: normal; text-align: left; }

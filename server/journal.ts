@@ -7,11 +7,13 @@ import type { Envelope, Receipt } from './am.js';
 import { AppError } from './errors.js';
 import type { AssessmentRecord } from '../shared/assessment.js';
 import { weeklyPeriodWasStated } from './hours-evidence.js';
+import { previewEvidenceSchema, previewReasonSchema, type PreviewEvidence, type PreviewReason } from './preview-diagnostics.js';
+import type { HoursClarification, HoursAnswer } from '../shared/chat.js';
 
 export type OperationStatus = 'pending' | 'applying' | 'uncertain' | 'committed' | 'rejected' | 'stale';
 export type Operation = { id: string; ownerId: string; proposalRevision: 1; baseRevision: number; status: OperationStatus;
   oldValue: Employment | null; newValue: Employment | null; createdAt: string; confirmedAt: string | null;
-  previousFactId: string | null; receipt: Receipt | null; chat?: { utterance: string; expiresAt: string; periodSource: 'message' | 'interpretation' } };
+  previousFactId: string | null; receipt: Receipt | null; chat?: { utterance: string; expiresAt: string; periodSource: 'message' | 'interpretation'; clarificationAnswer?: 'actual_weekly_work' } };
 export type Head = { revision: number; receipt: Receipt | null };
 export type ChatPreviewRecord = { id: string; owner: string; base_revision: number; utterance: string | null; created_at: string; expires_at: string;
   status: string; endpoint: string | null; context: string | null; session_id: string | null; proposal_id: string | null };
@@ -46,6 +48,10 @@ export class Journal {
       CREATE TABLE IF NOT EXISTS chat_previews (id TEXT PRIMARY KEY, owner TEXT NOT NULL, base_revision INTEGER NOT NULL,
         utterance TEXT, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, status TEXT NOT NULL,
         endpoint TEXT, context TEXT, session_id TEXT, proposal_id TEXT);
+      CREATE TABLE IF NOT EXISTS chat_diagnostics (id TEXT PRIMARY KEY, owner TEXT NOT NULL, reason TEXT NOT NULL,
+        evidence_json TEXT, provider_status INTEGER, updated_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS chat_clarifications (id TEXT PRIMARY KEY, owner TEXT NOT NULL,
+        hours REAL, issue TEXT NOT NULL, answer TEXT, answered_at TEXT);
       CREATE UNIQUE INDEX IF NOT EXISTS one_chat_interpretation ON chat_previews(owner) WHERE status='interpreting';`);
   }
   close() { this.db.close(); }
@@ -67,13 +73,14 @@ export class Journal {
       const chat = this.db.prepare("SELECT utterance,expires_at FROM chat_previews WHERE owner=? AND proposal_id=? AND status='proposed' AND utterance IS NOT NULL").get(owner, id) as { utterance: string; expires_at: string } | undefined;
       if (chat) result.chat = { utterance: chat.utterance, expiresAt: chat.expires_at,
         periodSource: weeklyPeriodWasStated(chat.utterance, result.newValue?.hoursPerWeek ?? null) ? 'message' : 'interpretation' };
+      if (result.chat && this.db.prepare("SELECT 1 FROM chat_clarifications c JOIN chat_previews p ON p.id=c.id AND p.owner=c.owner WHERE c.owner=? AND p.proposal_id=? AND c.answer='actual_weekly_work'").get(owner, id)) result.chat.clarificationAnswer = 'actual_weekly_work';
     }
     return result;
   }
   list(owner: string): Operation[] {
     return (this.db.prepare("SELECT id FROM operations WHERE owner=? ORDER BY CASE WHEN status IN ('applying','uncertain') THEN 0 WHEN status='pending' THEN 1 ELSE 2 END, created_at DESC LIMIT 100").all(owner) as { id: string }[]).map(row => this.get(owner, row.id));
   }
-  propose(owner: string, baseRevision: number, oldValue: Employment | null, newValue: Employment, now: string, chatRequestId?: string): Operation {
+  propose(owner: string, baseRevision: number, oldValue: Employment | null, newValue: Employment, now: string, chatRequestId?: string, clarified = false): Operation {
     return this.transaction(() => {
       if (this.active(owner)) throw new AppError(409, 'RECONCILIATION_REQUIRED', 'An earlier save is being checked. No new change was saved.');
       const head = this.head(owner);
@@ -81,7 +88,12 @@ export class Journal {
       const id = randomUUID();
       if (chatRequestId) {
         const chat = this.chatPreview(owner, chatRequestId);
-        if (chat.status !== 'interpreting' || chat.base_revision !== baseRevision || chat.expires_at <= now) throw new AppError(409, 'CHAT_EXPIRED', 'This chat request can no longer create a proposal.');
+        if (chat.status !== (clarified ? 'clarifying' : 'interpreting') || chat.base_revision !== baseRevision || chat.expires_at <= now) throw new AppError(409, 'CHAT_EXPIRED', 'This chat request can no longer create a proposal.');
+        if (clarified) {
+          const question = this.hoursClarification(owner, chatRequestId, now);
+          if (question.hours !== newValue.hoursPerWeek || this.db.prepare("SELECT 1 FROM operations WHERE owner=? AND status='pending'").get(owner)) throw new AppError(409, 'CHANGE_PENDING', 'Your pending changes need review first.');
+          this.db.prepare("UPDATE chat_clarifications SET hours=NULL,answer='actual_weekly_work',answered_at=? WHERE owner=? AND id=?").run(now, owner, chatRequestId);
+        }
         this.db.prepare("UPDATE chat_previews SET status='proposed',proposal_id=? WHERE owner=? AND id=?").run(id, owner, chatRequestId);
       }
       this.db.prepare("INSERT INTO operations VALUES (?, ?, ?, 'pending', ?, ?, ?, NULL, ?, NULL)")
@@ -145,6 +157,8 @@ export class Journal {
   }
   /** Local content redaction/expiry only. No AM session or other row is deleted. */
   expireChat(owner: string, now: string) {
+    this.db.prepare('UPDATE chat_clarifications SET hours=NULL WHERE owner=? AND id IN (SELECT id FROM chat_previews WHERE owner=? AND expires_at<=?)').run(owner, owner, now);
+    this.db.prepare('UPDATE chat_diagnostics SET evidence_json=NULL WHERE owner=? AND id IN (SELECT id FROM chat_previews WHERE owner=? AND expires_at<=?)').run(owner, owner, now);
     this.db.prepare("UPDATE operations SET status='stale',old_json=NULL,new_json=NULL WHERE owner=? AND status='pending' AND id IN (SELECT proposal_id FROM chat_previews WHERE owner=? AND expires_at<=?)").run(owner, owner, now);
     this.clearSettledChat(owner);
     this.db.prepare("UPDATE chat_previews SET utterance=NULL,status=CASE WHEN status IN ('blocked','uncertain') THEN status ELSE 'expired' END WHERE owner=? AND expires_at<=? AND utterance IS NOT NULL").run(owner, now);
@@ -164,7 +178,7 @@ export class Journal {
       this.expireChat(owner, now);
       if (this.db.prepare("SELECT 1 FROM chat_previews WHERE owner=? AND status IN ('blocked','uncertain')").get(owner)) throw new AppError(503, 'CHAT_REVIEW_REQUIRED', 'A previous preview needs review. No new preview was sent. You can use the employment form.');
       if (this.active(owner) || this.db.prepare("SELECT 1 FROM operations WHERE owner=? AND status='pending'").get(owner)
-        || this.db.prepare("SELECT 1 FROM chat_previews WHERE owner=? AND status='interpreting'").get(owner)) throw new AppError(409, 'CHANGE_PENDING', 'Finish or discard the current change before starting another.');
+        || this.db.prepare("SELECT 1 FROM chat_previews WHERE owner=? AND status IN ('interpreting','clarifying')").get(owner)) throw new AppError(409, 'CHANGE_PENDING', 'Finish or discard the current change before starting another.');
       if (this.head(owner).revision !== baseRevision) throw new AppError(409, 'STALE_REVISION', 'Your information changed. Reload before continuing.');
       if (!utterance.trim() || utterance.length > 500) throw new Error('Invalid chat request');
       const id = randomUUID(); const expiresAt = new Date(Date.parse(now) + 24 * 60 * 60 * 1000).toISOString();
@@ -177,6 +191,48 @@ export class Journal {
     if (record.status !== 'interpreting' || (record.endpoint && (record.endpoint !== endpoint || record.context !== context))
       || (record.session_id && record.session_id !== sessionId)) throw new AppError(409, 'CHAT_REMOTE_CONFLICT', 'The preview metadata needs review.');
     this.db.prepare('UPDATE chat_previews SET endpoint=?,context=?,session_id=? WHERE owner=? AND id=?').run(endpoint, context, sessionId, owner, id);
+  }
+  askHours(owner: string, id: string, hours: number, issue: HoursClarification['issue'], now: string): HoursClarification {
+    return this.transaction(() => {
+      const chat = this.chatPreview(owner, id);
+      if (chat.status !== 'interpreting' || chat.expires_at <= now || this.head(owner).revision !== chat.base_revision || this.active(owner)) throw new AppError(409, 'CHAT_EXPIRED', 'This clarification is no longer current.');
+      if (!Number.isFinite(hours) || hours <= 0 || hours > 168 || !['period', 'intent'].includes(issue)) throw new Error('Invalid clarification');
+      this.db.prepare('INSERT INTO chat_clarifications VALUES (?, ?, ?, ?, NULL, NULL)').run(id, owner, hours, issue);
+      this.db.prepare("UPDATE chat_previews SET status='clarifying' WHERE owner=? AND id=?").run(owner, id);
+      return this.hoursClarification(owner, id, now);
+    });
+  }
+  hoursClarification(owner: string, id: string, now: string): HoursClarification {
+    const row = this.db.prepare(`SELECT c.id,c.hours,c.issue,p.expires_at AS expiresAt FROM chat_clarifications c
+      JOIN chat_previews p ON p.id=c.id AND p.owner=c.owner WHERE c.owner=? AND c.id=?
+      AND p.status='clarifying' AND c.hours IS NOT NULL AND p.expires_at>?`).get(owner, id, now) as HoursClarification | undefined;
+    if (!row) throw new AppError(404, 'CLARIFICATION_NOT_FOUND', 'This clarification is unavailable or has expired.');
+    return row;
+  }
+  pendingHoursClarification(owner: string, now: string): HoursClarification | null {
+    const row = this.db.prepare("SELECT id FROM chat_previews WHERE owner=? AND status='clarifying' AND expires_at>? ORDER BY created_at DESC LIMIT 1").get(owner, now) as {id: string} | undefined;
+    return row ? this.hoursClarification(owner, row.id, now) : null;
+  }
+  declineHours(owner: string, id: string, answer: HoursAnswer, now: string) {
+    this.transaction(() => {
+      this.hoursClarification(owner, id, now);
+      this.db.prepare('UPDATE chat_clarifications SET hours=NULL,answer=?,answered_at=? WHERE owner=? AND id=?').run(answer, now, owner, id);
+      this.db.prepare("UPDATE chat_previews SET status='held',utterance=NULL WHERE owner=? AND id=?").run(owner, id);
+    });
+  }
+  /** Private operational diagnostics; never included in proposal/session HTTP payloads. */
+  recordChatDiagnostic(owner: string, id: string, reason: PreviewReason, evidence?: PreviewEvidence, httpStatus: number | null = null, onlyIfAbsent = false) {
+    const record = this.chatPreview(owner, id);
+    const now = new Date().toISOString();
+    const safeReason = previewReasonSchema.parse(reason);
+    const safeEvidence = evidence && record.expires_at > now ? JSON.stringify(previewEvidenceSchema.parse(evidence)) : null;
+    if (httpStatus !== null && (!Number.isInteger(httpStatus) || httpStatus < 100 || httpStatus > 599)) throw new Error('Invalid provider status');
+    if (onlyIfAbsent && this.db.prepare('SELECT 1 FROM chat_diagnostics WHERE owner=? AND id=?').get(owner, id)) return;
+    this.db.prepare(`INSERT INTO chat_diagnostics VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET reason=excluded.reason,
+      evidence_json=CASE WHEN ? THEN NULL ELSE COALESCE(excluded.evidence_json,chat_diagnostics.evidence_json) END,
+      provider_status=COALESCE(excluded.provider_status,chat_diagnostics.provider_status),updated_at=excluded.updated_at
+      WHERE chat_diagnostics.owner=excluded.owner`).run(id, owner, safeReason, safeEvidence, httpStatus, now, Number(record.expires_at <= now));
   }
   finishChat(owner: string, id: string, status: 'held' | 'failed' | 'blocked' | 'uncertain') {
     this.chatPreview(owner, id);
