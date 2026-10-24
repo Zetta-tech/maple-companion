@@ -72,3 +72,34 @@ under the user's synthetic-test authorization. It did not bypass the browser wit
 a fake session or claim to verify the live Clerk JWT-to-form path. Production
 readiness, least-privilege credential enforcement and multi-user hosted isolation
 remain unproven.
+
+Subsequent synthetic supersession checkpoint: the same retained fixture was changed
+from 30 to 32 hours through a second exact proposal and explicit confirmation. The
+remote history retained both records with the actual supersedes/supersededBy chain,
+the prior record's closed validity and matching local receipts/provenance. Repeated
+confirmation added no remote write or notification.
+
+User-led UI checkpoint: the user then reviewed 32 -> 34, confirmed the save and
+reported 34 surviving refresh, logout, cleared cookies and fresh sign-in. This is
+explicitly user-reported browser validation, not an agent-created login session.
+A separate read-only AM check at 2026-10-24T20:05:45Z corroborated current revision 3,
+34 hours, null ongoing end date, three remote history records linked to their
+receipts, an unchanged local head and three saved notifications. No new write was
+performed by that check. The earlier signup/supersession limitations above are
+historical checkpoints; hosted multi-user and least-privilege tests remain unrun.
+
+Chat extraction checkpoint: one authorized tagged synthetic AM preview returned no
+observed graph or turn changes but did create a persistent, empty session. Further
+probes stopped; no deletion was performed and the approved revision 3 record was
+unchanged. Live chat remains disabled. The prepared proposal-only coordinator is
+tested with an explicitly test-only interpreter; those tests do not validate live
+model semantics. See [the contract result and remaining decision](CHAT_PREVIEW.md).
+
+At this chat-boundary checkpoint, `npm run check` passed: typechecking, **301 tests
+across 10 files**, and the production build. HTTP tests use the actual Clerk
+middleware with locally generated synthetic JWTs; memory and interpreter doubles
+are test-only. New negative tests cover no automatic saves, ambiguous/negated/
+hypothetical messages, malformed model output, owner injection, unmapped owners,
+stale revisions before/after interpretation, replay/uncertain writes, disabled
+runtime chat, and distinct classifier/storage failures. No enabled chat UI or
+live-model correction-to-confirmation path is claimed by these checks.

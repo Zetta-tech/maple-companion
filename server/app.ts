@@ -8,6 +8,7 @@ import { AppError } from './errors.js';
 import { bindingFor, type AuthConfig, type Config } from './config.js';
 import { Workflow, confirmationSchema } from './workflow.js';
 import { Assessments } from './assessments.js';
+import type { ChatProposals } from './chat-proposals.js';
 
 export type Authentication = { middleware: RequestHandler; owner: (req: express.Request) => string | null };
 export function clerkAuthentication(config: AuthConfig): Authentication {
@@ -21,7 +22,7 @@ export function clerkAuthentication(config: AuthConfig): Authentication {
 }
 
 /** Dependency injection exists for unit tests; index.ts always constructs the real Clerk/AM adapters. */
-export function createApp(options: { config?: Config; authConfig?: AuthConfig; configurationError?: AppError; workflow?: Workflow; assessments?: Assessments; authentication?: Authentication; webRoot?: string }) {
+export function createApp(options: { config?: Config; authConfig?: AuthConfig; configurationError?: AppError; workflow?: Workflow; assessments?: Assessments; chatProposals?: ChatProposals; authentication?: Authentication; webRoot?: string }) {
   const app = express();
   const authConfig = options.authConfig ?? options.config;
   app.disable('x-powered-by');
@@ -73,6 +74,13 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   app.get('/api/employment', async (_req, res) => res.json(await workflow().read(res.locals.owner)));
   app.get('/api/proposals', (_req, res) => res.json({ proposals: workflow().journal.list(res.locals.owner) }));
   app.post('/api/proposals', async (req, res) => res.status(201).json(await workflow().propose(res.locals.owner, req.body)));
+  // index.ts deliberately supplies no interpreter: hosted preview created a
+  // session during its contract probe. Enabling chat requires a reviewed change.
+  app.post('/api/chat/proposals', async (req, res) => {
+    if (!options.chatProposals) throw new AppError(503, 'CHAT_NOT_AVAILABLE', 'Chat corrections are not available yet. No change was saved.');
+    const result = await options.chatProposals.propose(res.locals.owner, req.body);
+    res.status(result.kind === 'proposal' ? 201 : 200).json(result);
+  });
   app.post('/api/proposals/:id/confirm', async (req, res) => res.json(await workflow().confirm(res.locals.owner, id(req.params.id), req.body)));
   app.post('/api/proposals/:id/reject', (req, res) => {
     confirmationSchema.parse(req.body);

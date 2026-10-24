@@ -10,6 +10,7 @@ import { TestMemory } from './support/test-memory.js';
 import { Assessments } from '../server/assessments.js';
 import { PolicyRegistry, policyDigest } from '../server/policies.js';
 import { syntheticPolicy } from './support/test-policy.js';
+import { ChatProposals } from '../server/chat-proposals.js';
 
 const origin = 'http://localhost:3000';
 const keys = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -38,6 +39,41 @@ function app() {
 }
 
 describe('real Clerk verification and HTTP boundaries, with locally generated test JWTs', () => {
+  it('keeps chat unavailable without an explicitly constructed interpreter', async () => {
+    const application = app();
+    const body = { baseRevision: 0, message: 'I work 36 hours per week.' };
+    const missing = await request(application).post('/api/chat/proposals').set('Origin', origin).send(body);
+    expect(missing.status).toBe(401);
+    const mapped = await request(application).post('/api/chat/proposals').set('Origin', origin).auth(token(), { type: 'bearer' }).send(body);
+    expect(mapped.status).toBe(503); expect(mapped.body.error.code).toBe('CHAT_NOT_AVAILABLE');
+    expect(mapped.headers['cache-control']).toBe('no-store');
+    const unmapped = await request(application).post('/api/chat/proposals').set('Origin', origin).auth(token({ sub: 'user_unmapped' }), { type: 'bearer' }).send(body);
+    expect(unmapped.status).toBe(503); expect(unmapped.body.error.code).toBe('CONTEXT_NOT_PROVISIONED');
+  });
+  it('binds chat proposals to the actual Clerk subject and requires a separate confirmation request', async () => {
+    const journal = new Journal(':memory:'); journals.push(journal);
+    const memory = new TestMemory();
+    const workflow = new Workflow(journal, memory, owner => bindingFor(config, owner), () => new Date('2026-10-24T15:00:00Z'));
+    const employment = { employer: 'Synthetic employer', title: 'Synthetic role', duties: '', startDate: '2025-01-01', currentJob: true,
+      endDate: null, hoursPerWeek: 34, countryCode: 'CA', paid: 'yes', authorizedToWork: 'unknown', nocCode: null, nocReviewed: false };
+    const initial = await workflow.propose('user_A', { baseRevision: 0, employment });
+    await workflow.confirm('user_A', initial.id, { proposalRevision: 1 });
+    const interpretedOwners: string[] = [];
+    const chatProposals = new ChatProposals(workflow, { async interpret(owner) { interpretedOwners.push(owner); return { kind: 'hours', hours: 36 }; } });
+    const application = createApp({ config, workflow, chatProposals });
+    const post = (path: string, body: object, jwt = token()) => request(application).post(path).set('Origin', origin).set('x-owner-id', 'user_B').auth(jwt, { type: 'bearer' }).send(body);
+    const body = { baseRevision: 1, message: 'I now work 36 hours per week.' };
+    expect((await post('/api/chat/proposals', { ...body, ownerId: 'user_B' })).status).toBe(400);
+    const result = await post('/api/chat/proposals?ownerId=user_B', body);
+    expect(result.status).toBe(201); expect(result.body.kind).toBe('proposal');
+    expect(result.body.proposal).toMatchObject({ ownerId: 'user_A', status: 'pending', baseRevision: 1, oldValue: employment, newValue: { ...employment, hoursPerWeek: 36 } });
+    expect(interpretedOwners).toEqual(['user_A']); expect(memory.writes).toHaveLength(1);
+    expect(journal.notifications('user_A')).toHaveLength(1);
+    expect((await post(`/api/proposals/${result.body.proposal.id}/confirm`, { proposalRevision: 1 }, token({ sub: 'user_B' }))).status).toBe(404);
+    expect((await post(`/api/proposals/${result.body.proposal.id}/confirm`, { proposalRevision: 1 })).status).toBe(200);
+    expect(memory.writes).toHaveLength(2); expect(journal.notifications('user_A')).toHaveLength(2);
+    expect(journal.list('user_B')).toEqual([]);
+  });
   it('denies all workspace routes after an owner binding is removed, retaining private records', async () => {
     const bindings = new Map([['user_A', { ownerId: 'user_A', endpoint: 'https://a.example.test', context: 'ctx_a', readKey: 'test-read', writeKey: 'test-write' }]]);
     const instance = { ...config, bindings };
@@ -64,7 +100,7 @@ describe('real Clerk verification and HTTP boundaries, with locally generated te
       expect(result.body.error.code).toBe('CONTEXT_NOT_PROVISIONED');
       expect(result.headers['cache-control']).toBe('no-store');
     }
-    for (const path of ['/api/proposals', `/api/proposals/${pending.id}/confirm`, `/api/proposals/${pending.id}/reject`, `/api/proposals/${pending.id}/reconcile`, '/api/assessments']) {
+    for (const path of ['/api/proposals', '/api/chat/proposals', `/api/proposals/${pending.id}/confirm`, `/api/proposals/${pending.id}/reject`, `/api/proposals/${pending.id}/reconcile`, '/api/assessments']) {
       const result = await request(application).post(path).set('Origin', origin).auth(token(), { type: 'bearer' }).send({});
       expect(result.status, path).toBe(503);
       expect(result.body.error.code).toBe('CONTEXT_NOT_PROVISIONED');
