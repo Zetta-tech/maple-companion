@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { employmentSchema, type Employment } from '../shared/employment.js';
 import './styles.css';
 import { AssessmentPanel } from './AssessmentPanel.js';
+import { HoursChat } from './HoursChat.js';
 
 type Snapshot = { revision: number; employment: Employment | null };
 type Proposal = {
@@ -14,6 +15,7 @@ type Proposal = {
   status: string;
   oldValue: Employment | null;
   newValue: Employment;
+  chat?: { utterance: string; expiresAt: string };
 };
 type Notification = { id: string; operationId: string | null; assessmentId: string | null; kind: 'saved' | 'assessed'; createdAt: string; revision: number };
 type ApiErrorBody = { error?: { code?: string; message?: string } };
@@ -140,6 +142,8 @@ function Workspace() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [reviewId, setReviewId] = useState<string | null>(null);
+  const [chatAvailable, setChatAvailable] = useState(false);
+  const [chatFallback, setChatFallback] = useState(false);
 
   const request = useCallback(async <T,>(path: string, body?: unknown): Promise<T> => {
     const token = await getToken();
@@ -150,7 +154,7 @@ function Workspace() {
         method: body === undefined ? 'GET' : 'POST',
         headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(25_000),
+        cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(path === '/api/chat/proposals' ? 45_000 : 25_000),
       });
     } catch { throw new RequestError('The connection was interrupted. Refresh the change status before trying again.', 'CONNECTION_INTERRUPTED'); }
     return readResponse<T>(response);
@@ -160,11 +164,13 @@ function Workspace() {
     // An uncertain write deliberately blocks the authoritative snapshot. Operational
     // statuses must still load so a restarted client can reach reconciliation.
     setSnapshot(null);
-    const [nextSnapshot, changes, inbox] = await Promise.allSettled([
+    const [nextSnapshot, changes, inbox, chat] = await Promise.allSettled([
       request<Snapshot>('/api/employment'),
       request<{ proposals: Proposal[] }>('/api/proposals'),
       request<{ notifications: Notification[] }>('/api/notifications'),
+      request<{ available: boolean }>('/api/chat/status'),
     ]);
+    setChatAvailable(chat.status === 'fulfilled' && chat.value.available);
     if (changes.status === 'fulfilled') setProposals(changes.value.proposals);
     if (inbox.status === 'fulfilled') setNotifications(inbox.value.notifications);
 
@@ -228,6 +234,32 @@ function Workspace() {
     } finally { setBusy(false); }
   }
 
+  async function proposeChat(text: string): Promise<boolean> {
+    if (!snapshot || !canEdit) return false;
+    setBusy(true); setError(''); setMessage(''); setChatFallback(false);
+    try {
+      const result = await request<{ kind: string; proposal?: Proposal; message?: string; formHref?: string }>('/api/chat/proposals', {
+        baseRevision: snapshot.revision, message: text, syntheticTest: true,
+      });
+      if (result.kind === 'proposal' && result.proposal) {
+        const proposal = result.proposal;
+        setProposals(current => [proposal, ...current.filter(item => item.id !== proposal.id)]);
+        setReviewId(proposal.id);
+        setMessage('Your chat correction is ready for review. Your employment record has not changed.');
+        requestAnimationFrame(() => document.getElementById('review-heading')?.focus());
+        return true;
+      }
+      setMessage(result.message ?? 'No change was proposed. Please use the employment form.');
+      setChatFallback(result.kind === 'unavailable' && result.formHref === '#employment-heading');
+      return false;
+    } catch (reason) {
+      setError(`Your employment record was not changed by this chat request. ${reason instanceof Error ? reason.message : 'The preview could not be completed.'}`);
+      // Refresh possible pending state after a lost response; never replay.
+      try { await load(); } catch { /* Existing load applies successful status reads. */ }
+      return false;
+    } finally { setBusy(false); }
+  }
+
   async function decide(proposal: Proposal, decision: 'confirm' | 'reject') {
     setBusy(true); setError(''); setMessage('');
     try {
@@ -279,7 +311,9 @@ function Workspace() {
   return <Shell account={<div className="account"><UserButton /></div>}>
     <div className="page-heading"><div><p className="eyebrow">Your information</p><h1>Let’s start with your work.</h1><p>Record one job, then review the details before saving.</p></div><button type="button" className="secondary" disabled={busy || loading} onClick={refresh}>{busy ? 'Please wait…' : 'Refresh status'}</button></div>
     {error && <div className="notice error" role="alert">{error}</div>}
-    {message && <div className="notice" role="status">{message}</div>}
+    {message && <div className="notice" role="status">{message}{chatFallback && <> <a href="#employment-heading">Employment form</a></>}</div>}
+    <HoursChat available={chatAvailable} disabled={!canEdit} busy={busy} onPropose={proposeChat} />
+    {review?.chat && <aside className="notice"><strong>Your proposed correction</strong><p>{review.chat.utterance}</p><p className="hint">Review the exact values below. This proposal expires {new Date(review.chat.expiresAt).toLocaleString()}.</p></aside>}
     {loading && <p role="status">Loading your saved information…</p>}
     {!loading && !snapshot && <p className="muted">Your saved information is unavailable. Use Refresh status to reconnect before editing.</p>}
 

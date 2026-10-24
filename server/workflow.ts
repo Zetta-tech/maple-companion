@@ -11,6 +11,7 @@ export class Workflow {
   constructor(readonly journal: Journal, private memory: MemoryPort, private resolve: (ownerId: string) => Binding, private now = () => new Date()) {}
   async read(owner: string) {
     const binding = this.resolve(owner);
+    this.journal.expireChat(owner, this.now().toISOString());
     if (this.journal.active(owner)) throw new AppError(409, 'RECONCILIATION_REQUIRED', 'A save is still being checked. Current information is temporarily unavailable.');
     const head = this.journal.head(owner);
     if (!head.receipt) return { revision: 0, employment: null };
@@ -26,13 +27,13 @@ export class Workflow {
       throw new AppError(503, 'MEMORY_UNAVAILABLE', 'Your saved information could not be verified. Please try again later.');
     }
   }
-  async propose(owner: string, body: unknown) {
+  async propose(owner: string, body: unknown, chatRequestId?: string) {
     const input = proposalSchema.parse(body);
     const now = this.now();
     const employment = validateEmployment(input.employment, businessDate(now));
     const current = await this.read(owner);
     if (input.baseRevision !== current.revision) throw new AppError(409, 'STALE_REVISION', 'Your information changed. Reload before reviewing a change.');
-    return this.journal.propose(owner, input.baseRevision, current.employment, employment, now.toISOString());
+    return this.journal.propose(owner, input.baseRevision, current.employment, employment, now.toISOString(), chatRequestId);
   }
   async confirm(owner: string, id: string, body: unknown) {
     confirmationSchema.parse(body);

@@ -39,6 +39,17 @@ function app() {
 }
 
 describe('real Clerk verification and HTTP boundaries, with locally generated test JWTs', () => {
+  it('refuses a supplied chat interpreter in restricted/production composition', async () => {
+    const journal = new Journal(':memory:'); journals.push(journal);
+    const workflow = new Workflow(journal, new TestMemory(), owner => bindingFor(config, owner));
+    let invoked = false;
+    const chatProposals = new ChatProposals(workflow, { async interpret() { invoked = true; return { kind: 'hours', hours: 36 }; } });
+    const application = createApp({ config, workflow, chatProposals });
+    const status = await request(application).get('/api/chat/status').auth(token(), { type: 'bearer' });
+    expect(status.body.available).toBe(false);
+    const result = await request(application).post('/api/chat/proposals').set('Origin', origin).auth(token(), { type: 'bearer' }).send({ baseRevision: 0, message: 'I work 36 hours per week.', syntheticTest: true });
+    expect(result.status).toBe(503); expect(result.body.error.code).toBe('CHAT_NOT_AVAILABLE'); expect(invoked).toBe(false);
+  });
   it('keeps chat unavailable without an explicitly constructed interpreter', async () => {
     const application = app();
     const body = { baseRevision: 0, message: 'I work 36 hours per week.' };
@@ -60,16 +71,17 @@ describe('real Clerk verification and HTTP boundaries, with locally generated te
     await workflow.confirm('user_A', initial.id, { proposalRevision: 1 });
     const interpretedOwners: string[] = [];
     const chatProposals = new ChatProposals(workflow, { async interpret(owner) { interpretedOwners.push(owner); return { kind: 'hours', hours: 36 }; } });
-    const application = createApp({ config, workflow, chatProposals });
+    const trialConfig: Config = { ...config, amAccessMode: 'single-user-development', bindings: new Map([['user_A', config.bindings.get('user_A')!]]) };
+    const application = createApp({ config: trialConfig, workflow, chatProposals });
     const post = (path: string, body: object, jwt = token()) => request(application).post(path).set('Origin', origin).set('x-owner-id', 'user_B').auth(jwt, { type: 'bearer' }).send(body);
-    const body = { baseRevision: 1, message: 'I now work 36 hours per week.' };
+    const body = { baseRevision: 1, message: 'I now work 36 hours per week.', syntheticTest: true };
     expect((await post('/api/chat/proposals', { ...body, ownerId: 'user_B' })).status).toBe(400);
     const result = await post('/api/chat/proposals?ownerId=user_B', body);
     expect(result.status).toBe(201); expect(result.body.kind).toBe('proposal');
     expect(result.body.proposal).toMatchObject({ ownerId: 'user_A', status: 'pending', baseRevision: 1, oldValue: employment, newValue: { ...employment, hoursPerWeek: 36 } });
     expect(interpretedOwners).toEqual(['user_A']); expect(memory.writes).toHaveLength(1);
     expect(journal.notifications('user_A')).toHaveLength(1);
-    expect((await post(`/api/proposals/${result.body.proposal.id}/confirm`, { proposalRevision: 1 }, token({ sub: 'user_B' }))).status).toBe(404);
+    expect((await post(`/api/proposals/${result.body.proposal.id}/confirm`, { proposalRevision: 1 }, token({ sub: 'user_B' }))).status).toBe(503);
     expect((await post(`/api/proposals/${result.body.proposal.id}/confirm`, { proposalRevision: 1 })).status).toBe(200);
     expect(memory.writes).toHaveLength(2); expect(journal.notifications('user_A')).toHaveLength(2);
     expect(journal.list('user_B')).toEqual([]);
@@ -94,7 +106,7 @@ describe('real Clerk verification and HTTP boundaries, with locally generated te
     bindings.delete('user_A');
     const session = await request(application).get('/api/session').auth(token(), { type: 'bearer' });
     expect(session.body).toEqual({ ownerId: 'user_A', workspaceReady: false });
-    for (const path of ['/api/employment', '/api/proposals', '/api/notifications', '/api/policies', '/api/assessments', `/api/assessments/${assessed.id}`]) {
+    for (const path of ['/api/employment', '/api/proposals', '/api/notifications', '/api/policies', '/api/chat/status', '/api/assessments', `/api/assessments/${assessed.id}`]) {
       const result = await request(application).get(path).auth(token(), { type: 'bearer' });
       expect(result.status, path).toBe(503);
       expect(result.body.error.code).toBe('CONTEXT_NOT_PROVISIONED');
