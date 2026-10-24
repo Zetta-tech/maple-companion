@@ -96,7 +96,37 @@ function AuthenticatedApp() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   if (!isLoaded) return <Shell><p className="loading" role="status">Loading secure sign-in…</p></Shell>;
   if (!isSignedIn) return <Shell><div className="sign-in-layout"><section className="intro"><p className="eyebrow">A little clarity for your next step</p><h1>Your story.<br />Your say.</h1><p>Keep your employment information up to date. You will review every change before it is saved.</p><p className="muted">Sign in to continue to your private workspace.</p></section><section className="sign-in" aria-label="Sign in"><SignIn routing="hash" /></section></div></Shell>;
-  return <Workspace key={userId} />;
+  return <SessionGate key={userId} />;
+}
+
+function SessionGate() {
+  const { getToken } = useAuth();
+  const [session, setSession] = useState<{ ownerId: string; workspaceReady: boolean } | null>(null);
+  const [failure, setFailure] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setSession(null); setFailure('');
+    (async () => {
+      const token = await getToken();
+      if (!token) throw new Error('Your session has ended. Sign in again to continue.');
+      const response = await fetch('/api/session', { headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(15_000) });
+      const next = await readResponse<{ ownerId: string; workspaceReady: boolean }>(response);
+      if (active) setSession(next);
+    })().catch((reason: unknown) => { if (active) setFailure(reason instanceof Error ? reason.message : 'Your sign-in could not be verified.'); });
+    return () => { active = false; };
+  }, [getToken, attempt]);
+  if (session?.workspaceReady) return <Workspace />;
+  return <Shell account={<div className="account"><UserButton /></div>}><section className="narrow intro">
+    <p className="eyebrow">Your private workspace</p>
+    <h1>{session ? "You're signed in." : 'Verifying your sign-in.'}</h1>
+    {session ? <><p>Your account is ready. Your private workspace still needs to be connected before you can load or save information.</p>
+      <p>Your account ID: <code>{session.ownerId}</code></p>
+      <p className="muted">Use this account ID to finish your private workspace setup.</p></>
+      : failure ? <div className="notice error" role="alert"><p>{failure}</p></div> : <p role="status">Checking your account securely.</p>}
+    {(session || failure) && <button type="button" className="secondary" onClick={() => setAttempt(value => value + 1)}>Check connection</button>}
+  </section></Shell>;
 }
 
 function Workspace() {

@@ -22,6 +22,12 @@ Context, or install broad credentials to make the test proceed.
 - Keep the local app bound to loopback with the matching `APP_ORIGIN`. Only use
   Codex's in-app browser for UI validation. Do not deploy to obtain a test URL.
 
+User-led sign-in may happen first using the configured Clerk public interface.
+The signed-in setup page displays the authenticated account ID from `/api/session`
+before any AM mapping is installed. The UI does not load memory while workspace
+readiness is false. This is not authorization for AM reads/writes or automatic
+Context provisioning.
+
 ## First run after approval
 
 1. Read each key's `GET /api/v1/{context}/me` and inspect effective grants privately.
