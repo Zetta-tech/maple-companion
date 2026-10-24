@@ -1,36 +1,19 @@
 import { z } from 'zod';
 import { AppError } from './errors.js';
 import type { Workflow } from './workflow.js';
+import { hoursEvidence } from './hours-evidence.js';
 
-const inputSchema = z.strictObject({ baseRevision: z.number().int().nonnegative(), message: z.string().trim().min(1).max(500), syntheticTest: z.literal(true) });
+const inputSchema = z.strictObject({ baseRevision: z.number().int().nonnegative(), message: z.string().min(1).max(500).refine(value => value.trim().length > 0), syntheticTest: z.literal(true) });
 const interpretationSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('hours'), hours: z.number().finite().gt(0).lte(168) }),
   z.strictObject({ kind: z.literal('clarify') }),
+  z.strictObject({ kind: z.literal('no_change') }),
 ]);
 export type HoursInterpretation = z.infer<typeof interpretationSchema>;
 /** A provider suggests only a value. It cannot choose an owner, revision or operation. */
-export interface HoursInterpreter { interpret(owner: string, message: string, requestId: string): Promise<unknown> }
+export interface HoursInterpreter { interpret(owner: string, message: string, requestId: string, currentHoursPerWeek: number | null): Promise<unknown> }
 export const CLASSIFIER_FALLBACK = 'We are facing technical difficulties, please update your information directly here';
-const clarify = { kind: 'clarify' as const, message: 'Please state one weekly-hours correction, for example: I now work 36 hours per week. Use the employment form for other details.' };
-
-/**
- * Deliberately limited baseline: accept a complete explicit statement/request,
- * never select one number out of a larger conversation. This is a semantic
- * guard, not a replacement model. The interpreter must independently agree.
- */
-export function explicitWeeklyHours(message: string): number | null {
-  const number = '(\\d{1,3}(?:\\.\\d{1,2})?)';
-  const patterns = [
-    new RegExp(`^I (?:now )?work ${number} hours (?:per|a) week[.!]?$`, 'i'),
-    new RegExp(`^My weekly hours are (?:now )?${number}[.!]?$`, 'i'),
-    new RegExp(`^(?:Please )?(?:change|update|set) my weekly hours to ${number}[.!]?$`, 'i'),
-  ];
-  for (const pattern of patterns) {
-    const match = message.trim().match(pattern);
-    if (match) { const hours = Number(match[1]); return hours > 0 && hours <= 168 ? hours : null; }
-  }
-  return null;
-}
+const clarify = { kind: 'clarify' as const, message: 'The preview did not establish one clear weekly-hours correction. Please clarify your current hours or use the employment form. Employer, job title and other fields are not supported in this chat trial.' };
 
 /** Runtime construction is limited to explicit single-user synthetic development. */
 export class ChatProposals {
@@ -55,13 +38,10 @@ export class ChatProposals {
     const current = await this.current(owner, input.baseRevision);
     if (!current.employment) return { kind: 'clarify' as const, message: 'Save an employment record using the form before proposing a correction in chat.' };
     if (this.syntheticOnly && !current.employment.employer.startsWith('SYNTHETIC TEST ONLY - ')) throw new AppError(403, 'SYNTHETIC_RECORD_REQUIRED', 'Chat is available only for the labelled fictional test record. No preview was sent.');
-    const hours = explicitWeeklyHours(input.message);
-    if (hours === null) return clarify;
-    if (current.employment.hoursPerWeek === hours) return { kind: 'unchanged' as const, message: 'Those weekly hours are already saved. No change was proposed.' };
     const requestId = this.workflow.journal.beginChat(owner, input.baseRevision, input.message, this.now().toISOString());
     let interpretation: HoursInterpretation;
     try {
-      interpretation = interpretationSchema.parse(await this.interpreter.interpret(owner, input.message, requestId));
+      interpretation = interpretationSchema.parse(await this.interpreter.interpret(owner, input.message, requestId, current.employment.hoursPerWeek));
     } catch {
       this.workflow.journal.finishChat(owner, requestId, 'failed');
       // A failed classifier is not proof that storage is healthy. No form link
@@ -71,7 +51,18 @@ export class ChatProposals {
     }
     try { await this.current(owner, input.baseRevision); }
     catch (error) { this.workflow.journal.finishChat(owner, requestId, 'failed'); throw error; }
-    if (interpretation.kind !== 'hours' || interpretation.hours !== hours) { this.workflow.journal.finishChat(owner, requestId, 'held'); return clarify; }
+    if (interpretation.kind !== 'hours') {
+      this.workflow.journal.finishChat(owner, requestId, 'held');
+      return interpretation.kind === 'no_change'
+        ? { kind: 'unchanged' as const, message: 'The preview identified no weekly-hours change. Your employment record is unchanged.' } : clarify;
+    }
+    const hours = interpretation.hours;
+    const evidenceIssue = hoursEvidence(input.message, hours);
+    if (evidenceIssue) { this.workflow.journal.finishChat(owner, requestId, 'held'); return { kind: 'clarify' as const, message: evidenceIssue }; }
+    if (current.employment.hoursPerWeek === hours) {
+      this.workflow.journal.finishChat(owner, requestId, 'held');
+      return { kind: 'unchanged' as const, message: 'Those weekly hours are already saved. No change was proposed.' };
+    }
     // propose() reads/rechecks the current revision after the model await. There
     // is intentionally no confirmation or approved-fact write here.
     try {

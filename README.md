@@ -30,5 +30,6 @@ full commit SHAs with read-only permissions; no service credentials are required
 - [Verified AM interfaces and live-validation blockers](docs/AM_CONTRACT.md)
 - [Source attribution and policy integration plan](docs/SOURCES.md)
 - [Verification record](docs/VERIFICATION.md)
+- [Native chat boundaries and semantic evaluation](docs/CHAT_PREVIEW.md)
 
 Only one employment record is supported in this first slice. Reviewed criterion checks can produce private met/not met/needs-information results with official-source and version metadata. The production policy registry starts empty; no immigration rule has been invented or promoted. This does not calculate complete program eligibility, FSW selection scores or CRS. The private notification centre records confirmed saves and completed checks. Policy ingestion and live-memory validation remain gated.

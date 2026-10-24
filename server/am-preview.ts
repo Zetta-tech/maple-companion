@@ -2,7 +2,8 @@ import { AgentMemory } from '@surrealdb/memory';
 import { z } from 'zod';
 import type { Binding } from './am.js';
 
-const textSchema = z.string().trim().min(1).max(500);
+// User input remains capped at 500; this bound includes server-added context.
+const textSchema = z.string().min(1).max(1024).refine(value => value.trim().length > 0);
 const responseSchema = z.object({
   // A returned session is operational metadata in the explicit development trial.
   mode: z.literal('preview'), preview: z.literal(true), sessionId: z.string().max(128).regex(/^[A-Za-z0-9:_-]*$/),

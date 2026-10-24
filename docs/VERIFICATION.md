@@ -133,3 +133,38 @@ cover one millisecond before, exactly at, and one millisecond after expiry, plus
 unchanged form proposal. All **337 tests**, typechecking and build pass. This fix
 used only local test adapters; it did not call AM, change the active synthetic
 fixture or restart the user's running app.
+
+User-led chat checkpoint: the user confirmed the native 34 -> 36 proposal, then
+submitted a new supported weekly-hours correction and confirmed 36 -> 38. Separate
+read-only checks corroborated revisions 4 and 5 respectively, with exactly one saved
+notification for each revision. Revision 5 / 38 hours is the latest verified
+approved fixture. The reported phrases "I know work 38 hours" and "I now work 38
+hours" were rejected by Maple's old input prefilter before AM was invoked. That was
+an application limitation, not evidence of an AM interpretation failure.
+
+Semantic-first increment: the exact-sentence prerequisite is removed. Bounded
+natural input now reaches AM preview unchanged, with separately labelled current
+approved hours as background. Only a supported, validated candidate can become a
+pending proposal. A weekly period inferred from context is disclosed in the exact
+review question; no candidate is automatically saved. Post-interpretation evidence
+checks hold conflicts and explicit negative/hypothetical wording even when a
+test response incorrectly returns a positive candidate. These lexical checks are
+conservative defenses, not a complete intent classifier or a production guarantee.
+
+`npm run check` passed **368 tests across 13 files**, typechecking and build. New
+offline coverage replays sanitized responses from the four-call diagnostic through
+the SDK adapter and coordinator, preserving source text and approved context,
+holding conflicting entity references, and verifying inferred-unit review/reload,
+separate confirmation, and replay protection. It also covers the user's reported
+phrasing, other paraphrases, unsupported fields, missing/conflicting units and
+numbers, negation, hypothetical/future wording, and input bounds. UI review wording
+is checked by server-rendered component assertions; this is not a new live
+authenticated browser test. Existing owner, stale-revision, atomic expiry,
+uncertain-outcome, production-disablement and trial-limit tests remain passing.
+
+This implementation made **zero additional live AM calls**. The earlier diagnostic
+made exactly four synthetic previews and observed four empty sessions with no
+approved fact or journal changes; its evidence and limitations are recorded in
+[SEMANTIC_EVALUATION.md](SEMANTIC_EVALUATION.md). Those four observations are distinct
+from the offline tests. The normal five-preview daily limit and production gate are
+unchanged. No policy was activated and no credential, Context or grant was changed.

@@ -89,3 +89,7 @@ The four cases are a small diagnostic, not a quality guarantee. Further variatio
 or provider limitations must be measured rather than inferred from this sample.
 Provider retention remains unresolved; production chat remains disabled. JEV
 comparison requires its own future configured access and evaluation.
+
+The subsequent development-only implementation follows this routing in
+[CHAT_PREVIEW.md](CHAT_PREVIEW.md). Its offline regression coverage is recorded in
+[VERIFICATION.md](VERIFICATION.md); it adds no live observations to this matrix.

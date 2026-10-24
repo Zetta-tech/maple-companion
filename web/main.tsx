@@ -6,6 +6,7 @@ import { employmentSchema, type Employment } from '../shared/employment.js';
 import './styles.css';
 import { AssessmentPanel } from './AssessmentPanel.js';
 import { HoursChat } from './HoursChat.js';
+import { HoursReviewNote } from './HoursReviewNote.js';
 
 type Snapshot = { revision: number; employment: Employment | null };
 type Proposal = {
@@ -15,7 +16,7 @@ type Proposal = {
   status: string;
   oldValue: Employment | null;
   newValue: Employment;
-  chat?: { utterance: string; expiresAt: string };
+  chat?: { utterance: string; expiresAt: string; periodSource: 'message' | 'interpretation' };
 };
 type Notification = { id: string; operationId: string | null; assessmentId: string | null; kind: 'saved' | 'assessed'; createdAt: string; revision: number };
 type ApiErrorBody = { error?: { code?: string; message?: string } };
@@ -313,7 +314,7 @@ function Workspace() {
     {error && <div className="notice error" role="alert">{error}</div>}
     {message && <div className="notice" role="status">{message}{chatFallback && <> <a href="#employment-heading">Employment form</a></>}</div>}
     <HoursChat available={chatAvailable} disabled={!canEdit} busy={busy} onPropose={proposeChat} />
-    {review?.chat && <aside className="notice"><strong>Your proposed correction</strong><p>{review.chat.utterance}</p><p className="hint">Review the exact values below. This proposal expires {new Date(review.chat.expiresAt).toLocaleString()}.</p></aside>}
+    {review?.chat && review.newValue?.hoursPerWeek !== null && <HoursReviewNote {...review.chat} oldHours={review.oldValue?.hoursPerWeek ?? null} newHours={review.newValue.hoursPerWeek} />}
     {loading && <p role="status">Loading your saved information…</p>}
     {!loading && !snapshot && <p className="muted">Your saved information is unavailable. Use Refresh status to reconnect before editing.</p>}
 

@@ -33,7 +33,7 @@ describe('experimental AM preview transport', () => {
     await expect(createMemoryPreview(transport)(binding, 'Synthetic test.')).rejects.toThrow('interpreted safely');
     expect(transport).toHaveBeenCalledTimes(1);
   });
-  it.each(['', ' '.repeat(5), 'x'.repeat(501)])('does not transmit invalid text %#', async text => {
+  it.each(['', ' '.repeat(5), 'x'.repeat(1025)])('does not transmit invalid text %#', async text => {
     const transport = vi.fn<typeof fetch>();
     await expect(createMemoryPreview(transport)(binding, text)).rejects.toBeInstanceOf(PreviewUnavailable);
     expect(transport).not.toHaveBeenCalled();
