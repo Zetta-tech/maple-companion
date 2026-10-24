@@ -1,0 +1,107 @@
+import { generateKeyPairSync, sign } from 'node:crypto';
+import { afterEach, describe, expect, it } from 'vitest';
+import request from 'supertest';
+import { createApp } from '../server/app.js';
+import { Journal } from '../server/journal.js';
+import { Workflow } from '../server/workflow.js';
+import type { Config } from '../server/config.js';
+import type { MemoryPort } from '../server/am.js';
+import { TestMemory } from './support/test-memory.js';
+import { Assessments } from '../server/assessments.js';
+import { PolicyRegistry, policyDigest } from '../server/policies.js';
+import { syntheticPolicy } from './support/test-policy.js';
+
+const origin = 'http://localhost:3000';
+const keys = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const wrongKeys = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const config: Config = { origin, publishableKey: `pk_test_${Buffer.from('maple.clerk.accounts.dev$').toString('base64')}`,
+  secretKey: 'sk_test_fixture_not_a_real_key', jwtKey: keys.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+  journalPath: ':memory:', bindings: new Map() };
+const journals: Journal[] = [];
+afterEach(() => { journals.splice(0).forEach(journal => journal.close()); });
+function token(overrides: Record<string, unknown> = {}, wrongSignature = false) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid: 'fixture' })).toString('base64url');
+  const body = Buffer.from(JSON.stringify({ iss: 'https://maple.clerk.accounts.dev', sub: 'user_A', sid: 'sess_A',
+    azp: origin, iat: now - 10, nbf: now - 10, exp: now + 60, ...overrides })).toString('base64url');
+  const payload = `${header}.${body}`;
+  return `${payload}.${sign('RSA-SHA256', Buffer.from(payload), wrongSignature ? wrongKeys.privateKey : keys.privateKey).toString('base64url')}`;
+}
+function app() {
+  const journal = new Journal(':memory:'); journals.push(journal);
+  const unusedMemory: MemoryPort = { async read() { throw new Error('unexpected'); }, async write() { throw new Error('unexpected'); }, async reconcile() { throw new Error('unexpected'); } };
+  const workflow = new Workflow(journal, unusedMemory, ownerId => ({ ownerId, endpoint: `https://${ownerId}.am.example.test`, context: `private-${ownerId}`, readKey: 'test-read', writeKey: 'test-write' }));
+  return createApp({ config, workflow }); // Actual Clerk middleware, no auth test double.
+}
+
+describe('real Clerk verification and HTTP boundaries, with locally generated test JWTs', () => {
+  it('isolates real authenticated HTTP assessments and notifications, and refuses owner injection', async () => {
+    const journal = new Journal(':memory:'); journals.push(journal);
+    const memory = new TestMemory();
+    const now = () => new Date('2026-10-24T15:00:00Z');
+    const workflow = new Workflow(journal, memory, ownerId => ({ ownerId, endpoint: `https://${ownerId.toLowerCase().replace('_', '-')}.example.test`, context: `private-${ownerId}`, readKey: `test-read-${ownerId}`, writeKey: `test-write-${ownerId}` }), now);
+    const policy = syntheticPolicy();
+    const assessments = new Assessments(journal, workflow, new PolicyRegistry([policy], [policyDigest(policy)]), now);
+    const application = createApp({ config, workflow, assessments });
+    const a = token(); const b = token({ sub: 'user_B', sid: 'sess_B' });
+    const post = (path: string, jwt: string, body: object) => request(application).post(path).set('Origin', origin).auth(jwt, { type: 'bearer' }).send(body);
+    const employment = { employer: 'Test-only employer', title: 'Test role', duties: '', startDate: '2025-01-01', currentJob: true,
+      endDate: null, hoursPerWeek: 35, countryCode: 'CA', paid: 'yes', authorizedToWork: 'unknown', nocCode: null, nocReviewed: false };
+    const proposed = await post('/api/proposals', a, { baseRevision: 0, employment });
+    expect(proposed.status).toBe(201);
+    expect((await post(`/api/proposals/${proposed.body.id}/confirm`, b, { proposalRevision: 1 })).status).toBe(404);
+    expect((await post(`/api/proposals/${proposed.body.id}/confirm`, a, { proposalRevision: 1 })).status).toBe(200);
+    const assessed = await post('/api/assessments', a, { policyId: policy.id });
+    expect(assessed.status).toBe(200);
+    expect(assessed.body.freshness).toBe('current');
+    expect((await post('/api/assessments', b, { policyId: policy.id, ownerId: 'user_A' })).status).toBe(400);
+    const foreign = await request(application).get(`/api/assessments/${assessed.body.id}`).auth(b, { type: 'bearer' });
+    expect(foreign.status).toBe(404);
+    expect((await request(application).get('/api/assessments?ownerId=user_A').auth(b, { type: 'bearer' })).body).toEqual({ assessments: [] });
+    expect((await request(application).get('/api/notifications?ownerId=user_A').auth(b, { type: 'bearer' })).body).toEqual({ notifications: [] });
+    const inbox = await request(application).get('/api/notifications').auth(a, { type: 'bearer' });
+    expect(inbox.body.notifications.map((value: { kind: string }) => value.kind).sort()).toEqual(['assessed', 'saved']);
+    const repeated = await post('/api/assessments', a, { policyId: policy.id });
+    expect(repeated.body.id).toBe(assessed.body.id);
+    expect((await request(application).get('/api/notifications').auth(a, { type: 'bearer' })).body.notifications).toHaveLength(2);
+    expect(inbox.headers['cache-control']).toBe('no-store');
+  });
+  it('denies missing and invalid tokens and ignores owner headers', async () => {
+    expect((await request(app()).get('/api/employment').set('x-owner-id', 'user_A')).status).toBe(401);
+    expect((await request(app()).get('/api/employment').auth('invalid-token', { type: 'bearer' })).status).toBe(401);
+  });
+  it('accepts a signed valid session token through the actual Clerk SDK', async () => {
+    const result = await request(app()).get('/api/employment').auth(token(), { type: 'bearer' });
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ revision: 0, employment: null });
+    expect(result.headers['cache-control']).toBe('no-store');
+  });
+  it.each([
+    [{ exp: 1 }, false], [{ azp: 'https://attacker.example' }, false], [{ nbf: Math.floor(Date.now()/1000) + 3600 }, false], [{}, true],
+  ])('denies expired, wrong-party, future or forged JWT %#', async (claims, wrong) => {
+    expect((await request(app()).get('/api/employment').auth(token(claims, wrong), { type: 'bearer' })).status).toBe(401);
+  });
+  it('rejects unsafe origin before any mutation', async () => {
+    const application = app();
+    for (const badOrigin of [undefined, 'https://attacker.example']) {
+      const req = request(application).post('/api/proposals').auth(token(), { type: 'bearer' });
+      if (badOrigin) req.set('Origin', badOrigin);
+      expect((await req.send({})).status).toBe(403);
+    }
+  });
+  it('does not let a valid user read another user’s operations or notifications', async () => {
+    const application = app();
+    const result = await request(application).get('/api/proposals?ownerId=user_B').auth(token(), { type: 'bearer' });
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({ proposals: [] });
+    expect((await request(application).get('/api/notifications').auth(token({ sub: 'user_B', sid: 'sess_B' }), { type: 'bearer' })).body).toEqual({ notifications: [] });
+  });
+  it('fails clearly without configuration and never exposes secrets', async () => {
+    const application = createApp({});
+    expect((await request(application).get('/health/ready')).status).toBe(503);
+    const result = await request(application).get('/api/employment');
+    expect(result.status).toBe(503);
+    expect(result.body.error.code).toBe('CONFIGURATION_REQUIRED');
+    expect(JSON.stringify(result.body)).not.toContain(config.secretKey);
+  });
+});

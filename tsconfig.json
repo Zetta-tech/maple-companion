@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "ES2024", "module": "NodeNext", "moduleResolution": "NodeNext",
+    "strict": true, "noUncheckedIndexedAccess": true, "esModuleInterop": true,
+    "skipLibCheck": true, "types": ["node"], "outDir": "dist", "rootDir": ".", "jsx": "react-jsx"
+  },
+  "include": ["server/**/*.ts", "shared/**/*.ts", "tests/**/*.ts", "web/**/*.tsx", "vite.config.ts"]
+}
