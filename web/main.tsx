@@ -337,7 +337,8 @@ function Workspace() {
     <div className="page-heading"><div><p className="eyebrow">Your information</p><h1>Let’s start with your work.</h1><p>Record one job, then review the details before saving.</p></div><button type="button" className="secondary" disabled={busy || loading} onClick={refresh}>{busy ? 'Please wait…' : 'Refresh status'}</button></div>
     {error && <div className="notice error" role="alert">{error}</div>}
     {message && <div className="notice" role="status">{message}{chatFallback && <> <a href="#employment-heading">Employment form</a></>}</div>}
-    <HoursChat available={chatAvailable} disabled={!canEdit} busy={busy} onPropose={proposeChat} clarification={chatClarification} onAnswer={answerChat} />
+    <HoursChat available={chatAvailable} disabled={!canEdit} busy={busy} onPropose={proposeChat} clarification={chatClarification} onAnswer={answerChat}
+      blockedBy={unresolved.some(proposal => ['applying', 'uncertain'].includes(proposal.status)) ? 'save' : unresolved.length ? 'pending' : !loading && snapshot === null ? 'unavailable' : undefined} />
     {review?.chat && review.newValue?.hoursPerWeek !== null && <HoursReviewNote {...review.chat} oldHours={review.oldValue?.hoursPerWeek ?? null} newHours={review.newValue.hoursPerWeek} />}
     {loading && <p role="status">Loading your saved information…</p>}
     {!loading && !snapshot && <p className="muted">Your saved information is unavailable. Use Refresh status to reconnect before editing.</p>}

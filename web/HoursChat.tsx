@@ -1,24 +1,31 @@
 import { useState, type FormEvent } from 'react';
 import { clarificationQuestion, type HoursAnswer, type HoursClarification } from '../shared/chat.js';
 
-export function HoursChat({ available, disabled, busy, onPropose, clarification, onAnswer }: {
+export function HoursChat({ available, disabled, busy, onPropose, clarification, onAnswer, blockedBy }: {
   available: boolean; disabled: boolean; busy: boolean; onPropose: (message: string) => Promise<boolean>;
   clarification?: HoursClarification | null; onAnswer?: (answer: HoursAnswer) => Promise<void>;
+  blockedBy?: 'pending' | 'save' | 'unavailable';
 }) {
   const [message, setMessage] = useState('');
   const [synthetic, setSynthetic] = useState(false);
   if (!available) return null;
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (disabled || !synthetic || !message.trim()) return;
+    if (disabled || clarification || !synthetic || !message.trim()) return;
     if (await onPropose(message)) setMessage('');
   }
   return <section className="hours-chat" aria-labelledby="chat-heading">
     <p className="eyebrow">Synthetic test · weekly hours only</p>
     <h2 id="chat-heading">Describe an hours correction</h2>
     <p>Describe a correction to your current weekly hours in your own words. AM previews the meaning before Maple prepares a change for you to review. Nothing is saved to your employment record until you confirm it.</p>
+    {blockedBy && <p className="notice" id="chat-blocked-reason" role="status">
+      {blockedBy === 'pending' ? 'Chat is paused because a change is awaiting your review. Finish or discard that change before entering another correction. '
+        : blockedBy === 'save' ? 'Chat is paused while an earlier save needs checking. Check its status before entering another correction. '
+          : 'Chat is paused because your saved information could not be verified. Use Refresh status before entering a correction.'}
+      {blockedBy !== 'unavailable' && <a href="#changes-heading">Go to Changes to review</a>}
+    </p>}
     {clarification && onAnswer && <HoursClarificationCard value={clarification} disabled={disabled || busy} onAnswer={onAnswer} />}
-    <form onSubmit={submit}><fieldset disabled={disabled || !!clarification}>
+    <form onSubmit={submit}><fieldset disabled={disabled || !!clarification} aria-describedby={blockedBy ? 'chat-blocked-reason' : clarification ? 'hours-clarification-heading' : undefined}>
       <legend className="visually-hidden">A fictional weekly-hours correction</legend>
       <label>Your correction<textarea name="chatMessage" rows={2} maxLength={500} value={message} required
         onChange={event => setMessage(event.target.value)} placeholder="I now work 36 hours per week." /></label>
