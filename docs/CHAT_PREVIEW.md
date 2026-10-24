@@ -106,8 +106,21 @@ period, a pending proposal labels that interpretation and asks **Update weekly
 hours from X to Y?** The user reviews the original message and exact old/new values
 before the existing separate confirmation. No extra confirmation dialog is needed
 just to obtain interpretation. The display annotation is derived from the immutable
-pending wording; absence of a weekly-period mention triggers the disclosure on
-reload too. An empty model uncertainty array is never treated as consent.
+pending wording and proposed quantity. Explicit weekly evidence must attach to that
+amount (for example, `37 hours per week` or `weekly hours are 37`); incidental or old
+mentions of weeks do not suppress the disclosure, including after journal reopen.
+If the unit cannot be linked confidently, review conservatively discloses the
+interpretation. These are measurement-fragment checks, not accepted input sentences.
+An empty model uncertainty array is never treated as consent.
+
+Explicit nonweekly/ambiguous cadences such as every other week, biweekly and
+fortnightly, or an unknown unit such as per shift, ask for clarification without
+conversion. This differs from an omitted unit that may be shown as an explicit
+weekly interpretation for review. The review always says it changes only weekly
+hours; it does not claim to apply every change mentioned in the message. Recognized
+unsupported changes, including unpaid status, route to clarification/the form.
+Unrecognized omitted semantics remain a trial limitation, not proof of full-message
+understanding.
 
 ## Runtime boundaries
 

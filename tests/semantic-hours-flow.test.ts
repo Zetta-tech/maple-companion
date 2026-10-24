@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join, resolve } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryPreview } from '../server/am-preview.js';
@@ -16,10 +19,18 @@ const employment = { employer: 'SYNTHETIC TEST ONLY - Test', title: 'Test', duti
   hoursPerWeek: 38, countryCode: 'CA', paid: 'yes', authorizedToWork: 'unknown', nocCode: null, nocReviewed: false };
 const now = () => new Date('2026-10-24T20:00:00.000Z');
 const journals: Journal[] = [];
-afterEach(() => { journals.splice(0).forEach(j => j.close()); });
+const directories: string[] = [];
+afterEach(() => {
+  journals.splice(0).forEach(j => j.close());
+  for (const path of directories.splice(0)) {
+    const absolute = resolve(path);
+    if (dirname(absolute) !== resolve(tmpdir()) || !basename(absolute).startsWith('maple-hours-test-')) throw new Error('Unsafe test cleanup path');
+    rmSync(absolute, { recursive: true, force: true });
+  }
+});
 
-async function setup(response: unknown) {
-  const journal = new Journal(':memory:'); journals.push(journal);
+async function setup(response: unknown, path = ':memory:') {
+  const journal = new Journal(path); journals.push(journal);
   const memory = new TestMemory(); const workflow = new Workflow(journal, memory, () => binding, now);
   const initial = await workflow.propose(owner, { baseRevision: 0, employment }); await workflow.confirm(owner, initial.id, { proposalRevision: 1 });
   const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => new Response(JSON.stringify(response)));
@@ -67,6 +78,10 @@ describe('semantic-first hours flow using captured AM responses and test-only st
     'I will work 37 hours per week next month.', 'I work 37 or 40 hours per week.', 'I work 37 hours per day.',
     'I work 37 hours per week and per month.', 'My weekly salary is 37 dollars.', 'I work thirty-seven hours per week.',
     'I work 37 hours per week; change my job title too.',
+    'I work 37 hours every other week.', 'I work 37 hours biweekly.', 'I work 37 hours bi-weekly.',
+    'I work 37 hours fortnightly.', 'I work 37 hours every second week.', 'I work 37 hours in alternating weeks.',
+    'I work 37 hours twice per week.', 'I work 37 hours per shift.', 'I work 37 hours every pay period.',
+    'I now work 37 hours per week and I am unpaid.',
   ])('holds contradictory or insufficient source evidence even if the model returns a positive candidate: %s', async message => {
     const { chat, fetchImpl, memory, journal } = await setup(nativeSemanticFixtures[1]!.response);
     expect((await chat.propose(owner, { baseRevision: 1, message, syntheticTest: true })).kind).toBe('clarify');
@@ -111,12 +126,43 @@ describe('semantic-first hours flow using captured AM responses and test-only st
 });
 
 describe('explicit inferred-unit review', () => {
+  it.each([
+    { message: 'After weeks of negotiation, I now work 37 hours.', source: 'interpretation' },
+    { message: 'The old weekly arrangement ended; I now work 37 hours.', source: 'interpretation' },
+    { message: 'The old hours per week entry is obsolete; I now work 37 hours.', source: 'interpretation' },
+    { message: 'I work 37 hours per week.', source: 'message' },
+    { message: 'I work 37 hours each week.', source: 'message' },
+    { message: 'I work 37 hours weekly.', source: 'message' },
+    { message: 'My weekly hours are 37.', source: 'message' },
+    { message: 'I work 37 weekly hours.', source: 'message' },
+  ])('preserves quantity-linked period provenance across journal reopen: $message', async ({ message, source }) => {
+    const directory = mkdtempSync(join(tmpdir(), 'maple-hours-test-')); directories.push(directory);
+    const path = join(directory, 'journal.sqlite');
+    const { chat, journal, memory, fetchImpl } = await setup(nativeSemanticFixtures[1]!.response, path);
+    const result = await chat.propose(owner, { baseRevision: 1, message, syntheticTest: true });
+    if (result.kind !== 'proposal') throw new Error('proposal expected');
+    expect(result.proposal.chat?.periodSource).toBe(source);
+    journal.close(); journals.splice(journals.indexOf(journal), 1);
+    const reopened = new Journal(path); journals.push(reopened);
+    const stored = reopened.get(owner, result.proposal.id);
+    expect(stored.chat).toEqual(result.proposal.chat);
+    const html = renderToStaticMarkup(createElement(HoursReviewNote, {
+      ...stored.chat!, oldHours: stored.oldValue!.hoursPerWeek, newHours: stored.newValue!.hoursPerWeek!,
+    }));
+    expect(html).toContain('Update weekly hours from 38 to 37?');
+    expect(html.includes('could not clearly link a weekly period')).toBe(source === 'interpretation');
+    expect(html).toContain('changes only weekly hours');
+    expect(reopened.head(owner).revision).toBe(1);
+    expect(reopened.notifications(owner)).toHaveLength(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(1); expect(memory.writes).toHaveLength(1);
+  });
+
   it.each(['message', 'interpretation'] as const)('shows the exact weekly change with %s period evidence and no automatic save control', periodSource => {
     const html = renderToStaticMarkup(createElement(HoursReviewNote, {
       utterance: 'I now work 37 hours', oldHours: 38, newHours: 37, periodSource, expiresAt: '2026-10-25T20:00:00Z',
     }));
     expect(html).toContain('Update weekly hours from 38 to 37?');
     expect(html).toContain('Your saved record stays unchanged'); expect(html).not.toContain('<button');
-    expect(html.includes('did not state a weekly period')).toBe(periodSource === 'interpretation');
+    expect(html.includes('could not clearly link a weekly period')).toBe(periodSource === 'interpretation');
   });
 });

@@ -66,7 +66,7 @@ export class Journal {
     if (result.status === 'pending') {
       const chat = this.db.prepare("SELECT utterance,expires_at FROM chat_previews WHERE owner=? AND proposal_id=? AND status='proposed' AND utterance IS NOT NULL").get(owner, id) as { utterance: string; expires_at: string } | undefined;
       if (chat) result.chat = { utterance: chat.utterance, expiresAt: chat.expires_at,
-        periodSource: weeklyPeriodWasStated(chat.utterance) ? 'message' : 'interpretation' };
+        periodSource: weeklyPeriodWasStated(chat.utterance, result.newValue?.hoursPerWeek ?? null) ? 'message' : 'interpretation' };
     }
     return result;
   }

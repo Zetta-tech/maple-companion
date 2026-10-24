@@ -168,3 +168,21 @@ approved fact or journal changes; its evidence and limitations are recorded in
 [SEMANTIC_EVALUATION.md](SEMANTIC_EVALUATION.md). Those four observations are distinct
 from the offline tests. The normal five-preview daily limit and production gate are
 unchanged. No policy was activated and no credential, Context or grant was changed.
+
+PR6 review follow-up reproduced two offline defects: an incidental `weeks` mention
+hid inferred-unit disclosure, and a positive-looking weekly candidate could pass
+despite a source cadence such as `every other week` or `biweekly`. Neither was an
+observed live AM failure. Unit provenance now must attach to the proposed quantity;
+uncertain linkage keeps the disclosure. Explicit nonweekly/ambiguous cadences and
+unknown units ask for clarification without conversion. The review states that
+only weekly hours change, and recognized unsupported unpaid-status changes are held.
+
+All **386 tests**, typechecking and build pass. Added regressions cover incidental
+and old period mentions, explicit measurement units, nonweekly/unknown cadences,
+and omitted unsupported status. Eight review cases close and reopen temporary
+SQLite journals and render the reloaded review note, verifying provenance survives
+reload without approving a write. These tests use captured or constructed provider
+responses and test-only storage. No live AM request, user fixture/configuration
+edit, or preview-server restart was performed for this follow-up. Broader semantic
+omissions remain a documented limitation; this is not full-message interpretation
+validation or production activation.
