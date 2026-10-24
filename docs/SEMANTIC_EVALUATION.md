@@ -11,7 +11,7 @@ by Maple's syntax gate before AM; they do not establish an AM language limitatio
 
 ## Budget and execution
 
-The existing local trial permits five attempts per UTC day and 50 journaled
+At the time of this diagnostic, the local trial permitted five attempts per UTC day and 50 journaled
 attempts in total. At 21:46 UTC, four attempts were in the owner's chat journal.
 The separately recorded empty-session reproduction added one more live preview
 that day. Counting that probe gives five known attempts and zero remaining daily

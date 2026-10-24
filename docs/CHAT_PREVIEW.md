@@ -170,10 +170,12 @@ backups or provider infrastructure. No metadata row or AM session is automatical
 deleted. Returned session identifiers remain available for a separately approved
 cleanup review; no response bodies or credentials are stored in this table.
 
-The prototype allows one in-flight interpretation per owner, no new interpretation
-while a change awaits review, five attempts per UTC day and fifty total metadata
-records per owner. Held/failed attempts count. Reaching a limit stops chat and
-leaves the form available. These are explicit trial bounds, not a scaling design.
+The prototype allows one in-flight interpretation per owner and no new
+interpretation while a change awaits review. Daily and lifetime development-testing
+quotas were removed; existing audit rows are preserved, not reset or deleted.
+Metadata retention is separate from request admission. Authorization, uncertain
+outcome stops, ordinary API burst protection and provider-error/no-retry handling
+remain unchanged. Removing these quotas does not authorize automatic model calls.
 
 ## Remaining production decisions
 

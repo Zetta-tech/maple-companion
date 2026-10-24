@@ -165,9 +165,6 @@ export class Journal {
       if (this.db.prepare("SELECT 1 FROM chat_previews WHERE owner=? AND status IN ('blocked','uncertain')").get(owner)) throw new AppError(503, 'CHAT_REVIEW_REQUIRED', 'A previous preview needs review. No new preview was sent. You can use the employment form.');
       if (this.active(owner) || this.db.prepare("SELECT 1 FROM operations WHERE owner=? AND status='pending'").get(owner)
         || this.db.prepare("SELECT 1 FROM chat_previews WHERE owner=? AND status='interpreting'").get(owner)) throw new AppError(409, 'CHANGE_PENDING', 'Finish or discard the current change before starting another.');
-      const count = this.db.prepare('SELECT COUNT(*) AS total, SUM(CASE WHEN created_at>=? THEN 1 ELSE 0 END) AS today FROM chat_previews WHERE owner=?')
-        .get(`${now.slice(0, 10)}T00:00:00.000Z`, owner) as { total: number; today: number | null };
-      if (count.total >= 50 || (count.today ?? 0) >= 5) throw new AppError(429, 'CHAT_TRIAL_LIMIT', 'The synthetic chat trial limit has been reached. You can use the employment form.');
       if (this.head(owner).revision !== baseRevision) throw new AppError(409, 'STALE_REVISION', 'Your information changed. Reload before continuing.');
       if (!utterance.trim() || utterance.length > 500) throw new Error('Invalid chat request');
       const id = randomUUID(); const expiresAt = new Date(Date.parse(now) + 24 * 60 * 60 * 1000).toISOString();

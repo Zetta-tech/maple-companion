@@ -186,3 +186,18 @@ responses and test-only storage. No live AM request, user fixture/configuration
 edit, or preview-server restart was performed for this follow-up. Broader semantic
 omissions remain a documented limitation; this is not full-message interpretation
 validation or production activation.
+
+User-led testing then reached the old daily quota. One additional preview was
+recorded as held, with a provider session and no pending proposal; the next request
+was rejected before preview by the five-attempt check. Held responses/reasons were
+not retained, so the first interpretation's exact reason cannot be reconstructed.
+A single read-only AM check corroborated unchanged revision 5 / 38 hours and five
+saved notifications. No preview was made for this diagnosis.
+
+At the user's request, daily and lifetime development-testing quotas are removed,
+without replacing them or resetting/deleting audit records. Overlap, pending-change,
+uncertain-outcome, authorization, approval, revision and provider no-retry guards
+remain. Targeted native/coordinator/transport checks pass **97 tests**, including
+admission beyond both former thresholds with history intact and ongoing overlap/
+uncertain-outcome rejection. Typechecking and build pass. No new model experiment,
+credential change or production activation is part of this change.

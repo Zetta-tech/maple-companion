@@ -105,19 +105,20 @@ describe('bounded pending retention and release gate', () => {
     expect(j.chatPreview('user_B', b).status).toBe('interpreting');
     expect(() => j.beginChat(owner, 0, utterance, now)).toThrow('needs review');
   });
-  it('bounds simultaneous calls and daily/lifetime trial attempts without deleting metadata records', () => {
+  it('preserves overlap protection and all history without daily or lifetime testing quotas', () => {
     const j = journal();
     const first = j.beginChat(owner, 0, utterance, now);
     expect(() => j.beginChat(owner, 0, utterance, now)).toThrow('current change');
     j.finishChat(owner, first, 'held');
-    for (let i = 0; i < 4; i++) j.finishChat(owner, j.beginChat(owner, 0, utterance, now), 'held');
-    expect(() => j.beginChat(owner, 0, utterance, now)).toThrow('trial limit');
-    expect(j.db.prepare('SELECT COUNT(*) AS total FROM chat_previews WHERE owner=?').get(owner)).toEqual({ total: 5 });
-    for (let day = 25; day < 34; day++) {
-      const date = new Date(Date.UTC(2026, 9, day)).toISOString();
-      for (let i = 0; i < 5; i++) j.finishChat(owner, j.beginChat(owner, 0, utterance, date), 'held');
-    }
-    expect(() => j.beginChat(owner, 0, utterance, '2026-12-01T00:00:00.000Z')).toThrow('trial limit');
+    // Cross both former thresholds using metadata only: no interpreter/provider.
+    for (let i = 1; i <= 50; i++) j.finishChat(owner, j.beginChat(owner, 0, utterance, now), 'held');
+    expect(j.db.prepare('SELECT COUNT(*) AS total FROM chat_previews WHERE owner=?').get(owner)).toEqual({ total: 51 });
+    expect(j.chatPreview(owner, first)).toMatchObject({ status: 'held', utterance: null });
+    const next = j.beginChat(owner, 0, utterance, now);
+    expect(() => j.beginChat(owner, 0, utterance, now)).toThrow('current change');
+    j.finishChat(owner, next, 'uncertain');
+    expect(() => j.beginChat(owner, 0, utterance, now)).toThrow('needs review');
+    expect(j.head(owner)).toEqual({ revision: 0, receipt: null });
   });
   it('expires pending content before confirmation, keeps metadata, and makes no remote write', async () => {
     const j = journal(); const memory = new TestMemory(); let clock = new Date(now);
@@ -189,5 +190,6 @@ describe('bounded pending retention and release gate', () => {
     const markup = renderToStaticMarkup(createElement(HoursChat, { available: true, disabled: false, busy: false, onPropose: async () => true }));
     expect(markup).toContain('Prepare proposal'); expect(markup).toContain('fictional test data');
     expect(markup).not.toContain('Confirm and save'); expect(markup).toContain('disabled');
+    expect(markup).not.toContain('previews per day');
   });
 });

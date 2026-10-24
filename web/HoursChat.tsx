@@ -23,7 +23,7 @@ export function HoursChat({ available, disabled, busy, onPropose }: {
         <span>This describes fictional test data.</span></label>
       <button type="submit" disabled={!synthetic || !message.trim() || disabled}>{busy ? 'Please wait.' : 'Prepare proposal'}</button>
     </fieldset></form>
-    <p className="hint">Weekly hours are the only supported field. Review any inferred weekly period carefully. Uncertain wording or conflicting values need clarification; use the employment form for employer, title or other details. Up to five previews per day.</p>
+    <p className="hint">Weekly hours are the only supported field. Review any inferred weekly period carefully. Uncertain wording or conflicting values need clarification; use the employment form for employer, title or other details.</p>
     <p className="hint">AM may retain an empty preview session. Pending proposals expire after 24 hours. Their wording is cleared when saved, discarded or by the app’s expiry cleanup. This is not a zero-retention service.</p>
   </section>;
 }
