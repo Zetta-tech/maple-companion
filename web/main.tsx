@@ -2,6 +2,7 @@
 import { ClerkProvider, SignIn, UserButton, useAuth } from '@clerk/react';
 import { StrictMode, useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ThemeProvider, ThemeToggle, clerkAppearance } from './Theme.js';
 import { employmentSchema, type Employment } from '../shared/employment.js';
 import './styles.css';
 import { AssessmentPanel } from './AssessmentPanel.js';
@@ -65,7 +66,7 @@ function displayValue(employment: Employment | null, field: keyof Employment): s
 function Shell({ children, account }: { children: ReactNode; account?: ReactNode }) {
   return <>
     <a className="skip-link" href="#main">Skip to content</a>
-    <header className="site-header"><a className="brand" href="/" aria-label="Maple home">maple<span aria-hidden="true">.</span></a><span className="header-note">Your immigration companion</span>{account}</header>
+    <header className="site-header"><a className="brand" href="/" aria-label="Maple home">maple<span aria-hidden="true">.</span></a><span className="header-note">Your immigration companion</span><div className="header-actions"><ThemeToggle />{account}</div></header>
     <main id="main">{children}</main>
     <footer>Your information stays yours to review. Employment details alone do not determine immigration eligibility.</footer>
   </>;
@@ -92,7 +93,7 @@ function Bootstrap() {
   if (!publishableKey) return <Shell><section className="narrow intro"><p className="eyebrow">Welcome to Maple</p><h1>Your next step starts with you.</h1>{failure
     ? <div className="notice error" role="alert"><p>{failure}</p><button type="button" className="secondary" onClick={() => setAttempt((value) => value + 1)}>Try again</button></div>
     : <p role="status">Connecting to secure sign-in…</p>}</section></Shell>;
-  return <ClerkProvider publishableKey={publishableKey}><AuthenticatedApp /></ClerkProvider>;
+  return <ClerkProvider publishableKey={publishableKey} appearance={clerkAppearance}><AuthenticatedApp /></ClerkProvider>;
 }
 
 function AuthenticatedApp() {
@@ -335,4 +336,4 @@ function AnswerField({ label, value, onChange }: { label: string; value: Employm
 
 const root = document.getElementById('root');
 if (!root) throw new Error('The application root is missing.');
-createRoot(root).render(<StrictMode><Bootstrap /></StrictMode>);
+createRoot(root).render(<StrictMode><ThemeProvider><Bootstrap /></ThemeProvider></StrictMode>);
