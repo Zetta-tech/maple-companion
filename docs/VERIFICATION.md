@@ -133,3 +133,71 @@ cover one millisecond before, exactly at, and one millisecond after expiry, plus
 unchanged form proposal. All **337 tests**, typechecking and build pass. This fix
 used only local test adapters; it did not call AM, change the active synthetic
 fixture or restart the user's running app.
+
+User-led chat checkpoint: the user confirmed the native 34 -> 36 proposal, then
+submitted a new supported weekly-hours correction and confirmed 36 -> 38. Separate
+read-only checks corroborated revisions 4 and 5 respectively, with exactly one saved
+notification for each revision. Revision 5 / 38 hours is the latest verified
+approved fixture. The reported phrases "I know work 38 hours" and "I now work 38
+hours" were rejected by Maple's old input prefilter before AM was invoked. That was
+an application limitation, not evidence of an AM interpretation failure.
+
+Semantic-first increment: the exact-sentence prerequisite is removed. Bounded
+natural input now reaches AM preview unchanged, with separately labelled current
+approved hours as background. Only a supported, validated candidate can become a
+pending proposal. A weekly period inferred from context is disclosed in the exact
+review question; no candidate is automatically saved. Post-interpretation evidence
+checks hold conflicts and explicit negative/hypothetical wording even when a
+test response incorrectly returns a positive candidate. These lexical checks are
+conservative defenses, not a complete intent classifier or a production guarantee.
+
+`npm run check` passed **368 tests across 13 files**, typechecking and build. New
+offline coverage replays sanitized responses from the four-call diagnostic through
+the SDK adapter and coordinator, preserving source text and approved context,
+holding conflicting entity references, and verifying inferred-unit review/reload,
+separate confirmation, and replay protection. It also covers the user's reported
+phrasing, other paraphrases, unsupported fields, missing/conflicting units and
+numbers, negation, hypothetical/future wording, and input bounds. UI review wording
+is checked by server-rendered component assertions; this is not a new live
+authenticated browser test. Existing owner, stale-revision, atomic expiry,
+uncertain-outcome, production-disablement and trial-limit tests remain passing.
+
+This implementation made **zero additional live AM calls**. The earlier diagnostic
+made exactly four synthetic previews and observed four empty sessions with no
+approved fact or journal changes; its evidence and limitations are recorded in
+[SEMANTIC_EVALUATION.md](SEMANTIC_EVALUATION.md). Those four observations are distinct
+from the offline tests. The normal five-preview daily limit and production gate are
+unchanged. No policy was activated and no credential, Context or grant was changed.
+
+PR6 review follow-up reproduced two offline defects: an incidental `weeks` mention
+hid inferred-unit disclosure, and a positive-looking weekly candidate could pass
+despite a source cadence such as `every other week` or `biweekly`. Neither was an
+observed live AM failure. Unit provenance now must attach to the proposed quantity;
+uncertain linkage keeps the disclosure. Explicit nonweekly/ambiguous cadences and
+unknown units ask for clarification without conversion. The review states that
+only weekly hours change, and recognized unsupported unpaid-status changes are held.
+
+All **386 tests**, typechecking and build pass. Added regressions cover incidental
+and old period mentions, explicit measurement units, nonweekly/unknown cadences,
+and omitted unsupported status. Eight review cases close and reopen temporary
+SQLite journals and render the reloaded review note, verifying provenance survives
+reload without approving a write. These tests use captured or constructed provider
+responses and test-only storage. No live AM request, user fixture/configuration
+edit, or preview-server restart was performed for this follow-up. Broader semantic
+omissions remain a documented limitation; this is not full-message interpretation
+validation or production activation.
+
+User-led testing then reached the old daily quota. One additional preview was
+recorded as held, with a provider session and no pending proposal; the next request
+was rejected before preview by the five-attempt check. Held responses/reasons were
+not retained, so the first interpretation's exact reason cannot be reconstructed.
+A single read-only AM check corroborated unchanged revision 5 / 38 hours and five
+saved notifications. No preview was made for this diagnosis.
+
+At the user's request, daily and lifetime development-testing quotas are removed,
+without replacing them or resetting/deleting audit records. Overlap, pending-change,
+uncertain-outcome, authorization, approval, revision and provider no-retry guards
+remain. Targeted native/coordinator/transport checks pass **97 tests**, including
+admission beyond both former thresholds with history intact and ongoing overlap/
+uncertain-outcome rejection. Typechecking and build pass. No new model experiment,
+credential change or production activation is part of this change.

@@ -58,14 +58,69 @@ Both sessions returned zero turns, with no additional page. Before/after graph
 snapshots were untruncated and unchanged; approved receipt reads and the local head
 still showed revision 3 at 34 hours with three saved notifications. Candidate
 entity names/categories varied; model identity and category never route a write
-or establish approval. No further probes were performed.
+or establish approval. This was the end of that initial continuation.
 
-Total: **three extraction/preview requests** across all checkpoints, three observed
+At that checkpoint: **three extraction/preview requests**, three observed
 empty sessions, no new confirmed employment record. The two continuation probes
 used seven and eight bounded GETs respectively. The response did not report price
 or token usage; actual cost is unknown. Test-only reports remain ignored locally.
 The first observed session was imported into owner-bound operational bookkeeping
 without making a new provider call or retaining its original input there.
+
+The user subsequently confirmed 36 through the UI, then made and confirmed a
+supported chat correction to 38. Independent receipt reads verified revisions 4
+and 5. A later separately authorized four-call diagnostic demonstrated useful
+natural-language extraction, while also showing that missing weekly units could
+be inferred without an uncertainty marker. See [the actual results](SEMANTIC_EVALUATION.md).
+
+## Semantic-first weekly-hours increment
+
+The exact-sentence input gate has been removed. After authentication, binding,
+synthetic-fixture, revision and trial-budget checks, the unchanged bounded message
+reaches the real AM preview. The only supplied background is the current weekly
+total from the receipt-verified record, clearly separated from the user's message.
+There is no desired answer or rewriting into a phrase template. User input remains
+limited to 500 characters; the 1,024-character transport cap includes this server
+context. Normal app limits are unchanged. The diagnostic allowance is not a runtime
+option or a way around those limits.
+
+Only the returned weekly-hours candidate is normalized. Keys/categories observed
+in the diagnostic are handled explicitly; an unfamiliar subject hint, unknown
+field, multiple candidates or unresolved period is held. Model entity names are
+not authenticated identities and never select the owner or Context. Empty
+extractions propose no change. Instructions are never executed or saved as facts;
+instructions accompanying a candidate, uncertainty, corrections, relations or
+actions cause a hold.
+
+After interpretation, separate evidence checks require a matching numeric amount
+in the original message and hold conflicting periods/numbers, unsupported fields,
+account selectors and explicit negative, non-current, question or conditional
+markers even if a model drops them. These checks are conservative lexical defenses,
+not another accepted-sentence whitelist or a proof of meaning. They can require
+clarification for valid but complex wording (including number words) and can miss
+subtle ambiguity. They do not replace the model, human review or broader quality
+evaluation. Production chat remains disabled.
+
+If a candidate clearly expresses weekly hours while the message omitted the
+period, a pending proposal labels that interpretation and asks **Update weekly
+hours from X to Y?** The user reviews the original message and exact old/new values
+before the existing separate confirmation. No extra confirmation dialog is needed
+just to obtain interpretation. The display annotation is derived from the immutable
+pending wording and proposed quantity. Explicit weekly evidence must attach to that
+amount (for example, `37 hours per week` or `weekly hours are 37`); incidental or old
+mentions of weeks do not suppress the disclosure, including after journal reopen.
+If the unit cannot be linked confidently, review conservatively discloses the
+interpretation. These are measurement-fragment checks, not accepted input sentences.
+An empty model uncertainty array is never treated as consent.
+
+Explicit nonweekly/ambiguous cadences such as every other week, biweekly and
+fortnightly, or an unknown unit such as per shift, ask for clarification without
+conversion. This differs from an omitted unit that may be shown as an explicit
+weekly interpretation for review. The review always says it changes only weekly
+hours; it does not claim to apply every change mentioned in the message. Recognized
+unsupported changes, including unpaid status, route to clarification/the form.
+Unrecognized omitted semantics remain a trial limitation, not proof of full-message
+understanding.
 
 ## Runtime boundaries
 
@@ -76,12 +131,10 @@ without making a new provider call or retaining its original input there.
   attempts for that owner. Unknown transport outcomes also stop further attempts;
   startup recovery does not replay them. No automatic AM deletion occurs.
 - `ChatProposals` takes a pluggable interpreter, rechecks approved AM evidence and
-  revision, and permits only a single explicit weekly-hours correction. The
-  interpreter can suggest a value, never an owner, scope, revision or approval.
-  Negation, hypotheticals, conflicting numbers, other fields and unsupported
-  phrasing ask for clarification without invoking it. This deliberately limited
-  language gate is documented, not presented as general language understanding.
-- The deterministic gate and interpreter must agree. Only `hoursPerWeek` changes;
+  revision, and permits only a single validated weekly-hours correction. The
+  interpreter sees natural phrasing before evidence validation and can suggest a
+  value, never an owner, scope, revision or approval.
+- Only `hoursPerWeek` changes;
   all other fields come from the current receipt-verified employment record. The
   existing workflow creates an exact pending proposal. Only the existing separate
   confirmation route can commit it. Pending wording is local operational metadata,
@@ -117,10 +170,12 @@ backups or provider infrastructure. No metadata row or AM session is automatical
 deleted. Returned session identifiers remain available for a separately approved
 cleanup review; no response bodies or credentials are stored in this table.
 
-The prototype allows one in-flight interpretation per owner, no new interpretation
-while a change awaits review, five attempts per UTC day and fifty total metadata
-records per owner. Held/failed attempts count. Reaching a limit stops chat and
-leaves the form available. These are explicit trial bounds, not a scaling design.
+The prototype allows one in-flight interpretation per owner and no new
+interpretation while a change awaits review. Daily and lifetime development-testing
+quotas were removed; existing audit rows are preserved, not reset or deleted.
+Metadata retention is separate from request admission. Authorization, uncertain
+outcome stops, ordinary API burst protection and provider-error/no-retry handling
+remain unchanged. Removing these quotas does not authorize automatic model calls.
 
 ## Remaining production decisions
 

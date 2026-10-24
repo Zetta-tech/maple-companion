@@ -6,11 +6,12 @@ import type { Employment } from '../shared/employment.js';
 import type { Envelope, Receipt } from './am.js';
 import { AppError } from './errors.js';
 import type { AssessmentRecord } from '../shared/assessment.js';
+import { weeklyPeriodWasStated } from './hours-evidence.js';
 
 export type OperationStatus = 'pending' | 'applying' | 'uncertain' | 'committed' | 'rejected' | 'stale';
 export type Operation = { id: string; ownerId: string; proposalRevision: 1; baseRevision: number; status: OperationStatus;
   oldValue: Employment | null; newValue: Employment | null; createdAt: string; confirmedAt: string | null;
-  previousFactId: string | null; receipt: Receipt | null; chat?: { utterance: string; expiresAt: string } };
+  previousFactId: string | null; receipt: Receipt | null; chat?: { utterance: string; expiresAt: string; periodSource: 'message' | 'interpretation' } };
 export type Head = { revision: number; receipt: Receipt | null };
 export type ChatPreviewRecord = { id: string; owner: string; base_revision: number; utterance: string | null; created_at: string; expires_at: string;
   status: string; endpoint: string | null; context: string | null; session_id: string | null; proposal_id: string | null };
@@ -64,7 +65,8 @@ export class Journal {
     const result = operation(row);
     if (result.status === 'pending') {
       const chat = this.db.prepare("SELECT utterance,expires_at FROM chat_previews WHERE owner=? AND proposal_id=? AND status='proposed' AND utterance IS NOT NULL").get(owner, id) as { utterance: string; expires_at: string } | undefined;
-      if (chat) result.chat = { utterance: chat.utterance, expiresAt: chat.expires_at };
+      if (chat) result.chat = { utterance: chat.utterance, expiresAt: chat.expires_at,
+        periodSource: weeklyPeriodWasStated(chat.utterance, result.newValue?.hoursPerWeek ?? null) ? 'message' : 'interpretation' };
     }
     return result;
   }
@@ -163,9 +165,6 @@ export class Journal {
       if (this.db.prepare("SELECT 1 FROM chat_previews WHERE owner=? AND status IN ('blocked','uncertain')").get(owner)) throw new AppError(503, 'CHAT_REVIEW_REQUIRED', 'A previous preview needs review. No new preview was sent. You can use the employment form.');
       if (this.active(owner) || this.db.prepare("SELECT 1 FROM operations WHERE owner=? AND status='pending'").get(owner)
         || this.db.prepare("SELECT 1 FROM chat_previews WHERE owner=? AND status='interpreting'").get(owner)) throw new AppError(409, 'CHANGE_PENDING', 'Finish or discard the current change before starting another.');
-      const count = this.db.prepare('SELECT COUNT(*) AS total, SUM(CASE WHEN created_at>=? THEN 1 ELSE 0 END) AS today FROM chat_previews WHERE owner=?')
-        .get(`${now.slice(0, 10)}T00:00:00.000Z`, owner) as { total: number; today: number | null };
-      if (count.total >= 50 || (count.today ?? 0) >= 5) throw new AppError(429, 'CHAT_TRIAL_LIMIT', 'The synthetic chat trial limit has been reached. You can use the employment form.');
       if (this.head(owner).revision !== baseRevision) throw new AppError(409, 'STALE_REVISION', 'Your information changed. Reload before continuing.');
       if (!utterance.trim() || utterance.length > 500) throw new Error('Invalid chat request');
       const id = randomUUID(); const expiresAt = new Date(Date.parse(now) + 24 * 60 * 60 * 1000).toISOString();
