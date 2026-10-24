@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { validateEmployment } from '../shared/employment.js';
+import { businessDate } from '../shared/business-date.js';
 import { MemoryStorageError, type Binding, type MemoryPort } from './am.js';
 import { AppError } from './errors.js';
 import { Journal, envelopeFor } from './journal.js';
@@ -19,7 +20,7 @@ export class Workflow {
       // Recheck after the await; a new commit invalidates this read.
       const current = this.journal.head(owner);
       if (this.journal.active(owner) || current.revision !== head.revision) throw new AppError(409, 'STALE_REVISION', 'Your information changed. Reload to continue.');
-      return { revision: head.revision, employment: validateEmployment(envelope.employment, this.now().toISOString().slice(0,10)) };
+      return { revision: head.revision, employment: validateEmployment(envelope.employment, businessDate(this.now())) };
     } catch (error) {
       if (error instanceof AppError) throw error;
       throw new AppError(503, 'MEMORY_UNAVAILABLE', 'Your saved information could not be verified. Please try again later.');
@@ -27,11 +28,11 @@ export class Workflow {
   }
   async propose(owner: string, body: unknown) {
     const input = proposalSchema.parse(body);
-    const now = this.now().toISOString();
-    const employment = validateEmployment(input.employment, now.slice(0,10));
+    const now = this.now();
+    const employment = validateEmployment(input.employment, businessDate(now));
     const current = await this.read(owner);
     if (input.baseRevision !== current.revision) throw new AppError(409, 'STALE_REVISION', 'Your information changed. Reload before reviewing a change.');
-    return this.journal.propose(owner, input.baseRevision, current.employment, employment, now);
+    return this.journal.propose(owner, input.baseRevision, current.employment, employment, now.toISOString());
   }
   async confirm(owner: string, id: string, body: unknown) {
     confirmationSchema.parse(body);
@@ -40,7 +41,10 @@ export class Workflow {
     if (candidate.status === 'committed') return candidate;
     // Verify current AM evidence before claiming; no successful read means no write.
     await this.read(owner);
-    const op = this.journal.claim(owner, id, this.now().toISOString());
+    const now = this.now();
+    // Revalidate existing proposals too; older versions may have accepted UTC's tomorrow.
+    if (candidate.status === 'pending') validateEmployment(candidate.newValue, businessDate(now));
+    const op = this.journal.claim(owner, id, now.toISOString());
     if (op.status === 'committed') return op;
     try {
       const receipt = await this.memory.write(binding, envelopeFor(op));

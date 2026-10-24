@@ -19,6 +19,7 @@ try {
   // This validates configuration only; it sends no provider request.
   authConfig = loadAuthConfig();
   config = loadConfig();
+  if (config.amAccessMode === 'single-user-development') console.warn('AM_SINGLE_USER_DEVELOPMENT_FULL_ACCESS');
   // Operator-controlled reviewed bundle only. No HTTP/model promotion route exists.
   const bundle = config.policyFile ? z.strictObject({ versions: z.array(z.unknown()), approvedDigests: z.array(z.string()) })
     .parse(JSON.parse(readFileSync(config.policyFile, 'utf8'))) : { versions: [], approvedDigests: [] };

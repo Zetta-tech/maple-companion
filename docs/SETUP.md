@@ -28,6 +28,51 @@ validation before deployment. [Clerk Express reference](https://clerk.com/docs/r
 
 ## Hosted Agent Memory
 
+### User-authorized single-user development trial
+
+The user chose to proceed with the existing full-access Context key for one
+fictional-data user. Separate service principals are later hardening, not a blocker
+to this explicitly selected trial. No production credential-isolation claim is
+made. The key remains server-only and can access the entire Context even though
+the app targets `maple/approved` and checks the confirmed fact receipts.
+
+This mode is disabled by default. To opt in locally, the user supplies:
+
+```dotenv
+NODE_ENV=development
+MAPLE_AM_ACCESS_MODE=single-user-development
+AM_USER_001_READ_KEY=
+AM_USER_001_WRITE_KEY=
+```
+
+For this trial, put the same Context key in both existing variables, locally,
+never in chat. These names identify transport roles, not restricted permissions.
+The single binding keeps the previously documented schema:
+
+```json
+[
+  {
+    "ownerId": "user_REPLACE_WITH_VERIFIED_CLERK_ID",
+    "endpoint": "https://REPLACE_WITH_CONTEXT_HOST",
+    "context": "REPLACE_WITH_CONTEXT_ID",
+    "readKeyEnv": "AM_USER_001_READ_KEY",
+    "writeKeyEnv": "AM_USER_001_WRITE_KEY"
+  }
+]
+```
+
+Runtime requires `NODE_ENV=development`, a loopback HTTP `APP_ORIGIN`, Clerk test
+keys and exactly one binding. Additional users cannot access any private data
+route. The default `restricted` mode still requires separate key references and
+rejects reused key values; it never implicitly enables the trial. The trial
+does not skip owner validation, proposal confirmation, revision checks, uncertain
+write handling or approved receipt verification. It does not enable chat, create
+scopes, call AM at startup or authorize paid calls by itself. The user must confirm
+local key setup before approved live validation proceeds. The completed bounded
+trial and its separately authorized ignored binding are recorded in [verification](VERIFICATION.md).
+
+### Restricted credentials for later hardening
+
 The user's current Create Context screen shows **Agent Memory Free, 0 of 1
 Context used**. Start with one private Context and one verified Clerk test user,
 using fictional employment data only. This is a single-user integration trial,
@@ -130,4 +175,6 @@ user; only reviewed public policies will later be shared.
 
 Users may perform console setup themselves. Agent creation of Contexts/keys,
 grants, OAuth/security changes and installation of real credentials needs separate
-action-time approval. No provisioning/configuration action has been attempted.
+action-time approval. Only the specifically authorized one-user binding and
+`maple/approved` scope have been installed during this trial; no keys or grants
+were created or changed by the agent.

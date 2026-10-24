@@ -1,9 +1,16 @@
 # First hosted validation: one private user Context
 
-Status: prepared, not executed. The current user-reported Free allowance is one
+Status: the user-approved one-record backend trial passed scope registration,
+exact confirmation, receipt readback, fresh-process reload and no-write replay.
+See [recorded evidence and limits](VERIFICATION.md). The full authenticated browser
+path, remote supersession and restricted-grant tests remain unrun. The current
+user-reported Free allowance is one
 Context. Use that Context for one Clerk development user and fictional employment
 data. Additional users remain unprovisioned. Do not upgrade the plan, share a user
-Context, or install broad credentials to make the test proceed.
+Context, or install broad credentials without explicit approval. The user has now
+explicitly selected the existing full-access key for this one-user development
+trial; the separate `single-user-development` configuration is described in
+[setup](SETUP.md). No credential restrictions can be claimed for that mode.
 
 ## Prerequisites and action boundaries
 
@@ -32,12 +39,17 @@ Context provisioning.
 
 1. Read each key's `GET /api/v1/{context}/me` and inspect effective grants privately.
    Record only pass/fail and grant names, not raw tokens or personal identifiers.
-   Stop if credentials can manage grants/scopes or access root/unapproved memory.
-2. Run approved negative authorization checks using synthetic probes: reader may
+   In restricted mode, stop if credentials can manage grants/scopes or access
+   root/unapproved memory. In the explicitly authorized development mode, record
+   the broad access honestly and keep the run limited to its one owner/Context.
+2. For restricted credentials, run approved negative authorization checks using synthetic probes: reader may
    read `maple/approved` but may not write; writer may write there but may not read
    or manage grants/scopes. Neither may access an unapproved scope. These probes
    may have effects if grants are wrong, so their target and disposable payload
    must be included in the live-test approval. Stop on an unexpected success.
+   With the full-access development key, these credential-denial claims are
+   deliberately untested and unsupported; do not run mutation probes expecting
+   denial. Test the application's additional-user and confirmation boundaries.
 3. Use the existing authorized test account to sign in at `/`. Verify unauthenticated
    requests fail, the accepted session belongs to the mapped owner, and responses
    remain private/no-store. Do not log session tokens or profile contents.
@@ -57,6 +69,11 @@ Context provisioning.
    reviewed checks. Do not create immigration requirements to manufacture a result.
    Private assessment behavior remains covered by synthetic automated tests until
    real policies are manually reviewed and explicitly promoted.
+
+The retained fixture is labelled `SYNTHETIC TEST ONLY - Maple Fixture 001` and must
+not be used as real immigration evidence. Its operation ID is in the ignored local
+trial report. Retire it through a separately approved targeted cleanup/transition
+before entering real facts; no permanent deletion is part of this trial.
 
 No raw conversational extraction is enabled. Live background-derived fact,
 supersession and grant behavior must be verified before expanding this boundary.

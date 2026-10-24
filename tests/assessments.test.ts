@@ -154,6 +154,19 @@ describe('private assessments of approved evidence', () => {
 });
 
 describe('assessment freshness and storage uncertainty', () => {
+  it('does not publish or retain a current conclusion using employment after its assessment date', async () => {
+    const { assessments, workflow, policy, commit, journal, setTime } = setup();
+    await commit();
+    const previous = await assessments.run(alice, { policyId: policy.id });
+    setTime('2026-10-25T01:00:00.000Z');
+    // Defend the assessment boundary even if an upstream reader accepted UTC's date.
+    vi.spyOn(workflow, 'read').mockResolvedValue({ revision: 1, employment: { ...employment, startDate: '2026-10-25' } });
+    await expect(assessments.run(alice, { policyId: policy.id })).rejects.toMatchObject({ code: 'ASSESSMENT_EVIDENCE_INVALID' });
+    expect(await assessments.get(alice, previous.id)).toMatchObject({ freshness: 'unverified', results: [] });
+    expect(journal.assessments(alice)).toHaveLength(1);
+    expect(journal.notifications(alice).filter(item => item.kind === 'assessed')).toHaveLength(1);
+  });
+
   it('marks prior results unverified during a storage failure and refuses new assessments', async () => {
     const { assessments, policy, commit, memory, journal } = setup();
     await commit();

@@ -7,6 +7,42 @@ const env = { APP_ORIGIN: 'http://localhost:3000', CLERK_PUBLISHABLE_KEY: 'pk_te
   MAPLE_AM_BINDINGS_FILE: 'test-bindings', MAPLE_JOURNAL_PATH: '.local/test-operations.sqlite',
   AM_A_READ_KEY: 'fixture-read-only', AM_A_WRITE_KEY: 'fixture-write-only' };
 describe('fail-closed configuration', () => {
+  const developmentBinding = { ...binding };
+  const developmentEnv = { ...env, NODE_ENV: 'development', MAPLE_AM_ACCESS_MODE: 'single-user-development',
+    AM_A_READ_KEY: 'fixture-full-access-key', AM_A_WRITE_KEY: 'fixture-full-access-key' };
+  it('supports one explicitly opted-in local test user with a full key in the existing read/write fields', () => {
+    const config = loadConfig(developmentEnv, () => JSON.stringify([developmentBinding]));
+    expect(config.amAccessMode).toBe('single-user-development');
+    expect(config.bindings.size).toBe(1);
+    expect(bindingFor(config, 'user_A').readKey).toBe(developmentEnv.AM_A_READ_KEY);
+    expect(bindingFor(config, 'user_A').writeKey).toBe(developmentEnv.AM_A_WRITE_KEY);
+    expect(() => bindingFor(config, 'user_B')).toThrow('not configured');
+  });
+  it.each([
+    { NODE_ENV: 'production' }, { NODE_ENV: undefined }, { NODE_ENV: 'test' },
+    { APP_ORIGIN: 'https://maple.example.test' }, { APP_ORIGIN: 'https://localhost:3000' },
+    { CLERK_PUBLISHABLE_KEY: 'pk_live_fixture', CLERK_SECRET_KEY: 'sk_live_fixture' },
+  ])('rejects a development trial outside its environment boundaries %#', overrides => {
+    expect(() => loadConfig({ ...developmentEnv, ...overrides }, () => JSON.stringify([developmentBinding])))
+      .toThrow('Single-user AM development requires');
+  });
+  it('rejects zero or multiple users in development mode, including separate contexts', () => {
+    const second = { ...developmentBinding, ownerId: 'user_B', context: 'private-b', endpoint: 'https://b.example.test' };
+    for (const entries of [[], [developmentBinding, second]]) {
+      expect(() => loadConfig(developmentEnv, () => JSON.stringify(entries))).toThrow('invalid');
+    }
+  });
+  it('never accepts the reused full key without the explicit development mode', () => {
+    for (const mode of [undefined, 'restricted', 'unrecognized']) {
+      expect(() => loadConfig({ ...developmentEnv, MAPLE_AM_ACCESS_MODE: mode }, () => JSON.stringify([developmentBinding]))).toThrow('invalid');
+    }
+    expect(loadConfig(env, () => JSON.stringify([binding])).amAccessMode).toBe('restricted');
+  });
+  it('requires both existing key fields and rejects unrecognized binding formats', () => {
+    expect(() => loadConfig({ ...developmentEnv, AM_A_WRITE_KEY: undefined }, () => JSON.stringify([developmentBinding])))
+      .toThrow('Configuration required: AM_A_READ_KEY, AM_A_WRITE_KEY.');
+    expect(() => loadConfig(developmentEnv, () => JSON.stringify([{ ...developmentBinding, keyEnv: 'AM_A_DEV_KEY' }]))).toThrow('invalid');
+  });
   it('validates sign-in before any AM binding or journal is available', () => {
     const authOnly = { APP_ORIGIN: env.APP_ORIGIN, CLERK_PUBLISHABLE_KEY: env.CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY: env.CLERK_SECRET_KEY };
     expect(loadAuthConfig(authOnly)).toMatchObject({ origin: env.APP_ORIGIN, publishableKey: env.CLERK_PUBLISHABLE_KEY });

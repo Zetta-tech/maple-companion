@@ -11,6 +11,13 @@ This adapter does not provision accounts,
 Contexts, keys, principals, or grants. Those actions need explicit approval.
 Credentials, Context selection, and approved scope are never model or HTTP input.
 
+Explicit development exception: after the user's direction to use their existing
+full-access key, `single-user-development` accepts the same server-only key in
+the existing read/write environment fields. It requires development environment, loopback origin,
+Clerk test keys and exactly one owner/Context. This is not restricted reader/writer
+access and cannot prove hosted credential isolation. Default configuration and
+all owner, approval, revision and receipt checks remain in force. See [setup](SETUP.md).
+
 ## Confirmed employment
 
 An exact confirmed employment envelope is serialized into one native AM attribute

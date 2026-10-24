@@ -5,7 +5,7 @@ import { rateLimit } from 'express-rate-limit';
 import { z, ZodError } from 'zod';
 import { resolve } from 'node:path';
 import { AppError } from './errors.js';
-import type { AuthConfig, Config } from './config.js';
+import { bindingFor, type AuthConfig, type Config } from './config.js';
 import { Workflow, confirmationSchema } from './workflow.js';
 import { Assessments } from './assessments.js';
 
@@ -30,7 +30,8 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   app.get('/health/ready', (_req, res) => {
     const configured = !!options.config && !!options.workflow;
-    res.status(configured ? 200 : 503).json({ configured, authConfigured: !!authConfig, liveIntegrationsVerified: false });
+    res.status(configured ? 200 : 503).json({ configured, authConfigured: !!authConfig,
+      memoryAccessMode: options.config?.amAccessMode ?? null, liveIntegrationsVerified: false });
   });
   app.get('/api/config', (_req, res, next) => {
     if (!authConfig) return next(options.configurationError ?? new AppError(503, 'CONFIGURATION_REQUIRED', 'Maple is not configured yet. No data was saved.'));
@@ -59,8 +60,10 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   // provisioning occurs during first sign-in, even if a Context is not ready.
   app.get('/api/session', (_req, res) => res.json({ ownerId: res.locals.owner,
     workspaceReady: !!options.config && !!options.workflow && options.config.bindings.has(res.locals.owner) }));
-  app.use('/api', (_req, _res, next) => {
+  app.use('/api', (_req, res, next) => {
     if (!options.config || !options.workflow) return next(options.configurationError ?? new AppError(503, 'CONFIGURATION_REQUIRED', 'Your private workspace is not configured yet. No data was saved.'));
+    // Binding removal closes every workspace route, including journal-only history.
+    bindingFor(options.config, res.locals.owner);
     next();
   });
   app.use('/api', express.json({ limit: '32kb', strict: true }));

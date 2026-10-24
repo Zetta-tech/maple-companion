@@ -7,9 +7,13 @@ import { AppError } from './errors.js';
 const authRequired = ['APP_ORIGIN', 'CLERK_PUBLISHABLE_KEY', 'CLERK_SECRET_KEY'] as const;
 const required = [...authRequired, 'MAPLE_AM_BINDINGS_FILE', 'MAPLE_JOURNAL_PATH'] as const;
 export type AuthConfig = { origin: string; publishableKey: string; secretKey: string; jwtKey?: string };
-export type Config = AuthConfig & { journalPath: string; policyFile?: string; bindings: Map<string, Binding> };
-const bindingSchema = z.array(z.strictObject({
+export type AmAccessMode = 'restricted' | 'single-user-development';
+export type Config = AuthConfig & { amAccessMode: AmAccessMode; journalPath: string; policyFile?: string; bindings: Map<string, Binding> };
+const identityFields = {
   ownerId: z.string().regex(/^user_[a-zA-Z0-9]+$/), endpoint: z.string(), context: z.string().regex(/^[a-zA-Z0-9_-]+$/),
+};
+const bindingSchema = z.array(z.strictObject({
+  ...identityFields,
   readKeyEnv: z.string().regex(/^AM_[A-Z0-9_]+_READ_KEY$/), writeKeyEnv: z.string().regex(/^AM_[A-Z0-9_]+_WRITE_KEY$/),
 })).min(1);
 
@@ -43,23 +47,34 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, read = (path: s
   if (missing.length) throw new AppError(503, 'CONFIGURATION_REQUIRED', `Configuration required: ${missing.join(', ')}. No data was saved.`);
   const auth = loadAuthConfig(env);
   try {
+    const amAccessMode = z.enum(['restricted', 'single-user-development']).parse(env.MAPLE_AM_ACCESS_MODE ?? 'restricted');
+    if (amAccessMode === 'single-user-development') {
+      const origin = new URL(auth.origin);
+      if (env.NODE_ENV !== 'development' || origin.protocol !== 'http:' || !['localhost', '127.0.0.1'].includes(origin.hostname)
+        || !auth.publishableKey.startsWith('pk_test_') || !auth.secretKey.startsWith('sk_test_')) {
+        throw new AppError(503, 'DEVELOPMENT_MODE_REJECTED', 'Single-user AM development requires NODE_ENV=development, a loopback HTTP origin and Clerk test keys. No data was saved.');
+      }
+    }
     // Runtime durability is mandatory; in-memory journals exist only in automated tests.
     if (env.MAPLE_JOURNAL_PATH === ':memory:' || /^file:/i.test(env.MAPLE_JOURNAL_PATH!)) throw new Error();
     const bindings = new Map<string, Binding>();
     const contexts = new Set<string>();
     const endpoints = new Set<string>();
     const keys = new Set<string>();
-    for (const entry of bindingSchema.parse(JSON.parse(read(env.MAPLE_AM_BINDINGS_FILE!)))) {
+    const rawBindings: unknown = JSON.parse(read(env.MAPLE_AM_BINDINGS_FILE!));
+    const entries = (amAccessMode === 'single-user-development' ? bindingSchema.length(1) : bindingSchema).parse(rawBindings);
+    for (const entry of entries) {
       const endpoint = new URL(entry.endpoint);
       if (endpoint.origin !== entry.endpoint || endpoint.protocol !== 'https:' || endpoint.username || endpoint.password) throw new Error();
       const readKey = env[entry.readKeyEnv]?.trim();
       const writeKey = env[entry.writeKeyEnv]?.trim();
-      if (!readKey || !writeKey) throw new AppError(503, 'CONFIGURATION_REQUIRED', `Configuration required: ${entry.readKeyEnv}, ${entry.writeKeyEnv}. No data was saved.`);
-      if (bindings.has(entry.ownerId) || contexts.has(entry.context) || endpoints.has(endpoint.origin) || readKey === writeKey || keys.has(readKey) || keys.has(writeKey)) throw new Error();
+      if (!readKey || !writeKey) throw new AppError(503, 'CONFIGURATION_REQUIRED', `Configuration required: ${[...new Set([entry.readKeyEnv, entry.writeKeyEnv])].join(', ')}. No data was saved.`);
+      if (bindings.has(entry.ownerId) || contexts.has(entry.context) || endpoints.has(endpoint.origin)
+        || (amAccessMode === 'restricted' && readKey === writeKey) || keys.has(readKey) || keys.has(writeKey)) throw new Error();
       contexts.add(entry.context); endpoints.add(endpoint.origin); keys.add(readKey); keys.add(writeKey);
       bindings.set(entry.ownerId, { ownerId: entry.ownerId, endpoint: endpoint.origin, context: entry.context, readKey, writeKey });
     }
-    return { ...auth,
+    return { ...auth, amAccessMode,
       journalPath: env.MAPLE_JOURNAL_PATH!, policyFile: env.MAPLE_REVIEWED_POLICIES_FILE?.trim() || undefined, bindings };
   } catch (error) {
     if (error instanceof AppError) throw error;
