@@ -65,20 +65,23 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
     if (!options.config || !options.workflow) return next(options.configurationError ?? new AppError(503, 'CONFIGURATION_REQUIRED', 'Your private workspace is not configured yet. No data was saved.'));
     // Binding removal closes every workspace route, including journal-only history.
     bindingFor(options.config, res.locals.owner);
+    options.workflow.journal.expireChat(res.locals.owner, new Date().toISOString());
     next();
   });
   app.use('/api', express.json({ limit: '32kb', strict: true }));
   const workflow = () => options.workflow!;
+  const chatProposals = options.config?.amAccessMode === 'single-user-development' ? options.chatProposals : undefined;
   const assessments = options.assessments ?? (options.workflow ? new Assessments(options.workflow.journal, options.workflow) : undefined);
   const id = (value: unknown) => z.uuid().parse(value);
   app.get('/api/employment', async (_req, res) => res.json(await workflow().read(res.locals.owner)));
   app.get('/api/proposals', (_req, res) => res.json({ proposals: workflow().journal.list(res.locals.owner) }));
   app.post('/api/proposals', async (req, res) => res.status(201).json(await workflow().propose(res.locals.owner, req.body)));
-  // index.ts deliberately supplies no interpreter: hosted preview created a
-  // session during its contract probe. Enabling chat requires a reviewed change.
+  app.get('/api/chat/status', (_req, res) => res.json({ available: !!chatProposals, syntheticOnly: true,
+    fields: ['hoursPerWeek'], previewLimitPerDay: 5, pendingRetentionHours: 24 }));
+  // index.ts only supplies an interpreter for the explicit development trial.
   app.post('/api/chat/proposals', async (req, res) => {
-    if (!options.chatProposals) throw new AppError(503, 'CHAT_NOT_AVAILABLE', 'Chat corrections are not available yet. No change was saved.');
-    const result = await options.chatProposals.propose(res.locals.owner, req.body);
+    if (!chatProposals) throw new AppError(503, 'CHAT_NOT_AVAILABLE', 'Chat corrections are not available yet. No change was saved.');
+    const result = await chatProposals.propose(res.locals.owner, req.body);
     res.status(result.kind === 'proposal' ? 201 : 200).json(result);
   });
   app.post('/api/proposals/:id/confirm', async (req, res) => res.json(await workflow().confirm(res.locals.owner, id(req.params.id), req.body)));

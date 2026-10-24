@@ -27,13 +27,24 @@ async function setup(seed = true) {
   const chat = new ChatProposals(workflow, { interpret });
   return { journal, memory, workflow, chat, interpret, owners };
 }
-const request = (message = 'I now work 36 hours per week.') => ({ baseRevision: 1, message });
+const request = (message = 'I now work 36 hours per week.') => ({ baseRevision: 1, message, syntheticTest: true });
 
 describe('chat correction proposal boundary (test interpreter only)', () => {
+  it('requires explicit fictional-data acknowledgement before any interpreter call', async () => {
+    const { chat, interpret } = await setup();
+    await expect(chat.propose('user_A', { baseRevision: 1, message: request().message })).rejects.toMatchObject({ name: 'ZodError' });
+    expect(interpret).not.toHaveBeenCalled();
+  });
+  it('refuses non-labelled records in the actual development composition policy', async () => {
+    const { workflow, interpret } = await setup();
+    const chat = new ChatProposals(workflow, { interpret }, () => new Date(), true);
+    await expect(chat.propose('user_A', request())).rejects.toMatchObject({ code: 'SYNTHETIC_RECORD_REQUIRED' });
+    expect(interpret).not.toHaveBeenCalled();
+  });
   it('creates an exact hours-only proposal, then uses existing explicit confirmation and replay protection', async () => {
     const { chat, workflow, journal, memory, interpret } = await setup();
     const result = await chat.propose('user_A', request());
-    expect(interpret).toHaveBeenCalledWith('user_A', request().message);
+    expect(interpret).toHaveBeenCalledWith('user_A', request().message, expect.any(String));
     if (result.kind !== 'proposal') throw new Error('proposal expected');
     expect(result.proposal).toMatchObject({ ownerId: 'user_A', baseRevision: 1, status: 'pending', oldValue: employment,
       newValue: { ...employment, hoursPerWeek: 36 } });
@@ -45,6 +56,7 @@ describe('chat correction proposal boundary (test interpreter only)', () => {
     expect(memory.writes).toHaveLength(2); expect(journal.notifications('user_A')).toHaveLength(2);
     expect((await workflow.read('user_A')).employment).toEqual({ ...employment, hoursPerWeek: 36 });
     expect(journal.list('user_B')).toEqual([]);
+    expect(journal.db.prepare('SELECT utterance,status FROM chat_previews WHERE owner=?').get('user_A')).toEqual({ utterance: null, status: 'settled' });
   });
 
   it.each([

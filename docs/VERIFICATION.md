@@ -103,3 +103,33 @@ hypothetical messages, malformed model output, owner injection, unmapped owners,
 stale revisions before/after interpretation, replay/uncertain writes, disabled
 runtime chat, and distinct classifier/storage failures. No enabled chat UI or
 live-model correction-to-confirmation path is claimed by these checks.
+
+Development-only native chat continuation: the user explicitly authorized empty
+preview-session metadata for synthetic testing. Runtime now uses the real AM
+preview adapter only in the existing single-user development mode. The restricted/
+production gate remains closed. Two additional real preview calls produced one
+held interpretation and then an exact pending 34 -> 36 hours proposal. All three
+observed preview sessions are recorded under the owner; no session was deleted.
+Untruncated state snapshots, approved receipt reads and the journal head remained
+unchanged at revision 3 / 34 hours; three saved notifications remain. No preview
+candidate became approved evidence. The successful proposal was not confirmed.
+
+`npm run check` now passes **333 tests across 11 files**, typechecking and build.
+Added checks cover native response normalization, semantic holds, metadata owner
+isolation, stopped/uncertain preview outcomes, recovery, trial limits, pending
+expiry/redaction, synthetic-record/acknowledgement gates, production disablement,
+and separate prepare/confirm UI controls. No new dependencies were added.
+
+The inspected Codex in-app browser was signed out at this checkpoint. The actual
+native proposal was exercised through the authorized synthetic backend harness;
+live authenticated browser chat submission/confirmation remains user-led and
+unverified. It must not be conflated with the user's earlier completed form test.
+
+PR5 review follow-up: a deferred evidence-read test reproduced confirmation at or
+after a chat proposal's 24-hour deadline. The journal now checks owner-bound chat
+expiry inside the claim transaction, using runtime time sampled after acquiring
+the lock. A late confirmation is rejected before any memory write. Boundary tests
+cover one millisecond before, exactly at, and one millisecond after expiry, plus an
+unchanged form proposal. All **337 tests**, typechecking and build pass. This fix
+used only local test adapters; it did not call AM, change the active synthetic
+fixture or restart the user's running app.

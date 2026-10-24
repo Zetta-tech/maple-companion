@@ -20,9 +20,9 @@ describe('experimental AM preview transport', () => {
   it.each([
     { ...preview, mode: 'full' }, { ...preview, preview: false }, { ...preview, preview: undefined },
     { ...preview, chunkId: 'unexpected-persistent-chunk' }, { ...preview, turnId: 'unexpected-persistent-turn' },
-    { ...preview, sessionId: 'returned-hosted-session' },
+    { ...preview, sessionId: '../../unexpected-path' },
     { ...preview, extraction: { ...preview.extraction, turnId: 'unexpected-nested-turn' } },
-    { ...preview, extraction: { ...preview.extraction, corrections: [{ entityId: 'unexpected-correction' }] } },
+    { ...preview, extraction: { ...preview.extraction, attributes: [{ id: 'unexpected-saved-fact' }] } },
   ])('fails closed on a response that does not prove the expected preview shape %#', async wire => {
     const transport = vi.fn<typeof fetch>().mockResolvedValue(response(wire));
     await expect(createMemoryPreview(transport)(binding, 'Synthetic test.')).rejects.toBeInstanceOf(PreviewUnavailable);
