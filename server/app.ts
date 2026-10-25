@@ -138,7 +138,15 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   app.get('/api/assessments', async (_req, res) => res.json({ assessments: await assessments!.list(res.locals.owner) }));
   app.get('/api/assessments/:id', async (req, res) => res.json(await assessments!.get(res.locals.owner, id(req.params.id))));
   app.use('/api', (_req, _res, next) => next(new AppError(404, 'NOT_FOUND', 'This endpoint was not found.')));
-  app.use(express.static(options.webRoot ?? resolve('dist/web')));
+  const webRoot = options.webRoot ?? resolve('dist/web');
+  // Deployment archives normalize mtimes. Equal-length HTML can otherwise keep
+  // the same stat ETag across releases while pointing at a different JS bundle.
+  const html = express.static(webRoot, {
+    etag: false, lastModified: false, cacheControl: false,
+    setHeaders: res => { res.setHeader('Cache-Control', 'no-store'); },
+  });
+  const assets = express.static(webRoot);
+  app.use((req, res, next) => (req.path === '/' || req.path.endsWith('.html') ? html : assets)(req, res, next));
   const errors: ErrorRequestHandler = (error, req, res, _next) => {
     // This marker comes only from our known server execution boundary, never an
     // exception's properties or a provider/proxy HTTP status.
