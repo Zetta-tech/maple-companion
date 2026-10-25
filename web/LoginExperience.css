@@ -2,7 +2,13 @@
 main:has(.login-experience) { max-width:none; padding:0; min-height:0; }
 body:has(.login-experience)::before { display:none; }
 body:has(.login-experience) {
-  background:linear-gradient(90deg,var(--surface-subtle) 0%,var(--surface-subtle) 46%,var(--paper) 54%,var(--paper) 100%);
+  --login-left-tone:#ececec;
+  --login-right-tone:#ffffff;
+  background:linear-gradient(90deg,var(--login-left-tone) 0%,var(--login-left-tone) 46%,var(--login-right-tone) 54%,var(--login-right-tone) 100%);
+}
+:root[data-theme="dark"] body:has(.login-experience) {
+  --login-left-tone:var(--surface-elevated);
+  --login-right-tone:var(--paper);
 }
 .login-experience {
   position:relative;
