@@ -4,9 +4,18 @@ import type { PolicySummary } from '../shared/policy.js';
 import { businessDate } from '../shared/business-date.js';
 import { watchAssessmentRefresh } from './assessment-refresh.js';
 import { cecReasonMessages } from '../shared/cec-evidence.js';
+import { ReviewEmploymentLink } from './ReviewEmploymentLink.js';
 
 type ApiRequest = <T>(path: string, body?: unknown) => Promise<T>;
 const labels = { met: 'Met', not_met: 'Not met', needs_information: 'Needs information' };
+
+export function AssessmentNextStep({ hasInputs, hasPolicies }: { hasInputs: boolean; hasPolicies: boolean }) {
+  return <div className="assessment-next-step"><h3>{hasInputs ? 'Review your work evidence' : 'Start with your employment'}</h3>
+    <p>{hasInputs ? 'Check the work interval and its conditions, then save any changes before running a requirement check.' : 'Save your employment and review the work interval you want Maple to check. Unknown answers can stay unknown.'}</p>
+    {!hasPolicies && <p className="hint">No reviewed requirement check is available yet. Saving your inputs does not activate a policy.</p>}
+    <ReviewEmploymentLink evidence={hasInputs}>{hasInputs ? 'Review work evidence' : 'Add employment information'}</ReviewEmploymentLink>
+  </div>;
+}
 
 export function AssessmentPanel({ request, revision, onAssessed, blocked = false }: { request: ApiRequest; revision: number | null; onAssessed: () => Promise<void>; blocked?: boolean }) {
   const [policies, setPolicies] = useState<PolicySummary[]>([]);
@@ -51,7 +60,7 @@ export function AssessmentPanel({ request, revision, onAssessed, blocked = false
     {blocked && <p className="notice" role="status">A conversation update is being checked. Review your assessment inputs after it finishes before relying on these results.</p>}
     {loading && <p role="status">Loading reviewed checks.</p>}
     {error && <p className="notice error" role="alert">{error}</p>}
-    {!blocked && !loading && !error && policies.length === 0 && <p>No reviewed requirement checks are available yet.</p>}
+    {!blocked && !loading && !error && assessments.length === 0 && <AssessmentNextStep hasInputs={revision !== null && revision > 0} hasPolicies={policies.length > 0} />}
     <ul className="change-list">{policies.map(policy => <li key={policy.digest}><div><strong>{policy.title}</strong><span className="status-label">{policy.program} · version {policy.version} · effective {policy.effectiveFrom}</span><a href={policy.sourceUrl} target="_blank" rel="noreferrer">Official source</a></div><button type="button" className="secondary" disabled={blocked || busy || revision === null} onClick={() => run(policy.id)}>Check my saved facts</button></li>)}</ul>
     {assessments.map(assessment => <article className="review" key={assessment.id}>
       <h3>{assessment.policy.title}</h3><p className="muted">Checked {assessment.assessmentDate} · saved revision {assessment.profileRevision} · policy version {assessment.policy.version}</p>

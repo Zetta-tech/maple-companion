@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { NATIVE_MESSAGE_MAX_LENGTH, nativeMessageTextSchema, nativeStatusText, type NativeMessageResult, type NativeProfile } from '../shared/native-chat.js';
 import { nativePendingAfterFailure } from './request.js';
 import { NativeAssessmentGate, sendWithAssessmentHold } from './native-assessment-gate.js';
+import { ReviewEmploymentLink } from './ReviewEmploymentLink.js';
 import './NativeMemoryPanel.css';
 
 const statusHeading = {
@@ -35,7 +36,7 @@ export function NativeMemoryView({ profile, history, loading = false }: {
           {profile.facts.length ? <dl className="memory-facts">{profile.facts.map((fact, index) => <div key={`${fact.key}-${index}`}><dt>{fact.key.replaceAll('_', ' ')}</dt><dd>{fact.value}</dd></div>)}</dl>
             : <div className="memory-placeholder"><strong>No details to show yet</strong><p>Your earlier messages may still be stored. Share an update, then refresh to check what is remembered.</p></div>}
           {profile.instructions.length > 0 && <details className="memory-disclosure"><summary>Remembered instructions</summary><ul>{profile.instructions.map((instruction, index) => <li key={index}><strong>{instruction.label}</strong><p>{instruction.description}</p></li>)}</ul></details>}
-          <p className="hint"><a href="#employment-heading">Review assessment inputs</a> before using these details for an assessment.</p>
+          <p className="hint"><ReviewEmploymentLink /> before running a requirement check. This opens your saved employment for review.</p>
         </> : <p className="memory-placeholder">Your remembered details are not available right now. Refresh to check again.</p>}
     </div>
     {earlier.length > 0 && <details className="memory-disclosure memory-history"><summary>Earlier updates ({earlier.length})</summary>
@@ -95,8 +96,10 @@ export function NativeMemoryPanel({ request, onChanged, onAssessmentHold = noAss
   }
   const unresolved = history.some(item => item.status === 'processing' || item.status === 'uncertain');
   const processing = busy && requestId !== null || history.some(item => item.status === 'processing');
+  const checkingUpdate = unresolved || requestId !== null || history[0]?.status === 'unverified';
+  const latestExplainsHold = !busy && !error && !requestId && ['processing', 'uncertain'].includes(history[0]?.status ?? '');
   return <section className="form-panel native-memory" aria-labelledby="native-memory-heading">
-    <div className="section-heading"><h2 id="native-memory-heading">Your remembered information</h2><button type="button" className="secondary" disabled={busy} onClick={refresh}>Refresh memory</button></div>
+    <div className="section-heading"><h2 id="native-memory-heading">Your remembered information</h2><button type="button" className="secondary" disabled={busy} onClick={refresh}>{checkingUpdate ? 'Check update status' : 'Refresh memory'}</button></div>
     <p className="memory-intro">See what is remembered, then share anything that has changed.</p>
     {!available && !busy && !error && <p className="memory-caution">Profile updates aren't available yet. You can still review the assessment inputs below.</p>}
     {error && <div className="notice error" role="alert"><strong>{notSent ? 'Message not sent' : requestId ? 'Update status unknown' : 'Your details could not be checked'}</strong>
@@ -104,21 +107,20 @@ export function NativeMemoryPanel({ request, onChanged, onAssessmentHold = noAss
         : <><p>Refresh to check the latest status.{requestId && ' Please do not send the message again yet.'}</p>
           <details><summary>More details</summary><p>{error}</p></details></>}
     </div>}
-    {(unresolved || requestId) && <p className="memory-caution" role="status">{processing
+    {(unresolved || requestId) && !error && !latestExplainsHold && <p className="memory-caution" role="status">{processing
       ? 'Your message is being processed. Please wait before sending anything else.'
       : "We couldn't confirm whether your earlier update finished. Refresh its status before sending anything else."}</p>}
     <div className="memory-layout">
     <NativeMemoryView profile={profile} history={history} loading={busy} />
     <form className="memory-composer" onSubmit={send}><h3>Share an update</h3>
-      <p className="hint">Correct a detail or tell us what has changed, in your own words.</p>
+      <p className="hint" id="native-message-purpose">Sending stores your message. Review and confirm your assessment inputs separately before running checks.</p>
       {syntheticOnly && <p className="memory-test-note">Test version: use fictional information only. Your messages may be stored.</p>}
       <fieldset disabled={!available || busy || unresolved || requestId !== null}>
       <legend className="visually-hidden">Update remembered information</legend>
-      <label>What has changed?<textarea rows={3} maxLength={NATIVE_MESSAGE_MAX_LENGTH} aria-describedby="native-message-size" value={message} onChange={event => setMessage(event.target.value)} /></label>
+      <label>What has changed?<textarea rows={3} maxLength={NATIVE_MESSAGE_MAX_LENGTH} aria-describedby="native-message-purpose native-message-size" value={message} onChange={event => setMessage(event.target.value)} /></label>
       <p className="hint" id="native-message-size">Up to 5,000 characters per update.</p>
       {syntheticOnly && <label className="checkbox"><input type="checkbox" checked={synthetic} onChange={event => setSynthetic(event.target.checked)} /><span>This message contains fictional test information.</span></label>}
       <button type="submit" disabled={(syntheticOnly && !synthetic) || !message.trim() || busy}>{busy && requestId ? 'Sending…' : 'Send'}</button>
-      <p className="hint">Sending stores your message. The assessment inputs below change only when you review and save them.</p>
     </fieldset><p className="hint memory-conversation-note">Conversational replies are not available yet.</p></form>
     </div>
   </section>;
