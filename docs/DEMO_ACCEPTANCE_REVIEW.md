@@ -1,206 +1,53 @@
-# Demo acceptance and boundary review — 2026-10-25
+# Demo acceptance review — October 25, 2026
 
-## What actually produces each result
+## Actual evidence by layer
 
-| Stage | Implementation | Evidence / limitation |
+| Layer | Verification | Limit |
 | --- | --- | --- |
-| Starting profile | Editable, explicitly fictional seed | A deterministic starting profile, not a generated finding. It uses a fictional employer; no Oracle reciprocity claim. |
-| Approved profile | Exact proposal and explicit confirmation; dedicated `demo_profile` entity in hosted AM | Actual SDK adapter and receipt checks are implemented. New demo hosted writes have not run. The operational store keeps a receipt pointer, not a canonical profile copy. |
-| Source retrieval | `GuideSources.retrieve` fetches two appropriate IRCC pages for C20/component requests, or five for a full CRS replay | Seven official public texts are retained in the reviewed bundle. Per-request retrieval is covered by test transport; the live discovery has not run. A changed hash or failed fetch holds the request. |
-| C20 condition checks | `discoverC20` computes a potential lead and missing evidence from the saved profile | It is a deterministic, reviewed criterion calculation. Employer name and wording do not trigger a positive result. This increment is explicitly C20-focused, not an autonomous search of every immigration pathway. |
-| Natural explanation | Installed native AM `/chat`, with separate unchanged question, saved fictional profile, computed conditions and official source bodies | No second model/interpreter or canned runtime answer. The reply must be received before the event is completed, and its actual text/session/trace are saved in the journey. **Hosted generation quality and persistence remain unverified.** |
-| Journey | Owner-bound event claim/result, including the actual reply and source/version evidence | The UI reloads saved records; profile/date changes move old results into a historical disclosure. Two hosted SurrealDB tests now pass, with AM explicitly substituted. Live generated explanation persistence remains untested. |
-| Express Entry replay | Developer action selects reviewed real source versions, retrieves current source text, calculates with the same saved profile/date | Independent of a trigger phrase. The legacy profile gets a Canadian-work component result. Explicit complete fictional evidence gets the supported full CRS estimate, actual offer/work maximum and breakdown; missing evidence holds a total. No guaranteed +40. November 3 remains future policy on October 25. |
+| Authentication | Existing Clerk server verification and one-owner bindings; negative tests | Current Codex IAB session is signed out; no live browser auth bypass |
+| Profile | Real dedicated AM triple write, exact receipt/digest readback, revision 1 | Explicit fictional profile; no documents adjudicated |
+| C20 sources | Two actual IRCC page fetches matched reviewed body hashes | Reviewed C20 coverage, not exhaustive pathway discovery |
+| C20 generation | One actual native AM `/chat` call using unchanged natural question, profile, conditions and source bodies | Generated explanation is not certified legal advice |
+| Reply validation | Complete JSON/code-fence wrapper, exact source/status checks and known-dangerous-claim checks | No claim that regex catches every semantic error |
+| Native retention | Exact returned session read shows user and assistant turns; no pagination | One bounded example, not retention or recall reliability certification |
+| Journey persistence | Two completed events reloaded through a fresh real Surreal connection | Derived output storage is distinct from canonical AM profile storage |
+| EE replay | Five real source fetches, complete fictional 528 → 568, same profile/date, November 3 projection, repeated request reused original event | Announced future policy; no invitation or legal-score guarantee |
+| Isolation | Dedicated Context/key verified; ordinary current attributes match before-state | Ordinary mixed Context still needs reviewed cleanup; multiuser production is deferred |
 
-The native explanation is not allowed to promote policy, approve profile facts, or
-replace the deterministic result. The UI distinguishes the condition checks from
-the generated explanation. A live mismatch between those surfaces needs review;
-offline test prose is never evidence of AM understanding.
+The live C20 response arrived inside a Markdown JSON fence. The first parser
+withheld it. A second check falsely flagged the disclaimer “cannot be guaranteed.”
+Regression fixes accept only one complete JSON fence and distinguish the limited
+negative guarantee wording, while still holding positive claims and mixed positive/
+negative cases. Existing raw evidence was revalidated and only its derived journey
+display was conditionally updated. The original record remains in the private audit;
+no new inference, profile mutation or deletion was used for recovery.
 
-## Offline browser evidence
+## Offline UI and negative coverage
 
-Codex IAB exercised the **actual component and DemoJourney coordinator** on the
-separate loopback fixture at `http://127.0.0.1:5196/`. A prominent permanent banner
-identifies its memory, store, generated reply and source transport as substitutes.
-No Clerk session, existing localhost data, AM service or hosted database was used.
+The separate fixture at `http://127.0.0.1:5196/` used the actual component and
+coordinator with prominently disclosed test adapters. Earlier Codex IAB checks
+covered exact profile review/save, C20 display, changed employer with no reciprocity,
+historical explanation inspection, policy replay, full-score evidence, fresh load
+and deduplication. Light/dark and mobile/desktop views were inspected. Those tests
+are distinct from the live backend acceptance above and cannot replace real sign-in.
 
-Observed through UI actions and fresh DOM/screenshot inspection:
+Regressions cover missing reciprocity, employer-name independence, date/arrival
+contradiction, impossible chronology, missing Canadian employer, conflicting offer,
+owner denial, missing Context binding, replay/idempotency, uncertain outcomes,
+source mismatch, excessive question length, malformed/contradictory native replies,
+code fences, disclaimers and dangerous positive claims. Current aggregate:
+**774 tests / 38 files**, typecheck and build passed.
 
-1. Review → exact confirmation → fixture save → C20 lead.
-2. Reload preserved the fixture profile and journey item.
-3. Changed the employer to another fictional name and set reciprocity to **No**.
-   Confirmed the variant; the new finding was `not_supported`. The previous positive
-   lead remained available only as a historical item after the revision changed.
-4. Policy replay produced the supported 46 → 86 **component** comparison, with the
-   future effective date and unknown total CRS visibly stated.
-5. Repeating replay did not add another card. A fresh load showed exactly three
-   cards: one current component result, one current no-reciprocity result and one
-   historical lead. The composer remained enabled after loading settled.
-6. Light and dark rendered views were inspected. Actual screenshot pixels were
-   available this time. The initial long editable fixture form remains a demo intake;
-   after save it collapses so the question and journey are the primary surface.
+## Remaining acceptance
 
-Private local request/response trace and final fixture state:
-`.local/demo-ui-fixture/ui-requests.jsonl` and `ui-state.json` in the active worktree.
-These are **offline artifacts**, not hosted persistence traces. They are ignored by
-Git and are not part of the PR. The fixture's in-process store surviving browser
-reload does not prove survival of a database/server restart.
+1. Complete real Clerk sign-in in Codex IAB, inspect both existing saved results,
+   then refresh/reload and repeat the already saved EE replay. No extra C20 model
+   call is needed for persistence verification.
+2. Confirm the actual localhost UI shows concise sources/reasons, the generated
+   explanation disclosure, full score breakdown and future-policy labels.
+3. Keep the current draft unmerged until user review. No live deployment is authorized.
 
-## Focused code review and corrections
-
-- Fixed an AM-readback error hiding pending proposal metadata: independent request
-  outcomes now keep the uncertain operation visible even when profile read fails.
-- Source failures before event claim/provider use release the local UI wait state;
-  network/uncertain outcomes retain the no-resubmit hold. No automatic retries.
-- Reused the business-day/resume watcher so dated journey results become historical
-  when the date changes without needing a profile edit.
-- Source capture now writes an **unreviewed candidate**. Retrieval does not set
-  `reviewedAt` or promote a source into the configured reviewed bundle.
-- Actual Clerk HTTP tests cover unmapped/foreign owners, client owner injection,
-  confirmation-only writes and production-style disablement. Fixture adapters are
-  explicit test dependencies; runtime composition uses the real SDK/store adapters.
-
-This was a focused implementation review, not a separate human security review.
-
-## Follow-up findings and fixes
-
-- Historical cards now retain the actual saved explanation under the dated-result
-  disclosure. It remains visibly historical after profile or business-date changes.
-- Questions are validated before setting the UI wait state, and the input exposes
-  its 2,000-character bound. Known pre-provider validation/source/profile failures
-  release the composer. A failed read-only identity check records `not_sent` and
-  permits a new explicit request; an uncertain `/chat` outcome remains blocked.
-  There is no automated reconciliation/retry for an unknown provider write. An
-  operator must inspect the recorded outcome; this remains a live acceptance gap.
-- A work interval preceding the recorded arrival produces no score. The result asks
-  about earlier Canadian stays or corrected dates rather than assuming a later
-  re-entry makes earlier qualifying work impossible.
-- Native explanation output now has a small JSON contract for condition status,
-  exact reviewed source URLs and prose. Missing/foreign sources, contradictory
-  status and detected consequential authorization/guarantee claims withhold the
-  explanation. Raw provider output stays in private evidence. No substitute answer
-  is presented as generated. These checks do not certify every sentence; visible
-  generated prose is explicitly unverified advice, and live quality is untested.
-- The unchanged ordinary question about continuing work can initiate the C20-focused
-  flow; users need not name C20. Coverage remains explicitly one pathway, not an
-  exhaustive discovery engine.
-
-Follow-up verification: 670 unit/contract/HTTP tests passed across 35 files. The
-first sandbox run could not open loopback HTTP connections; the permitted local
-loopback run passed. Codex IAB also verified an oversized input shows "Nothing was
-sent" without locking the composer, a corrected ordinary question proceeds, and a
-historical saved explanation remains visible after a fixture profile revision.
-These browser actions used only the prominently labelled offline fixture. The
-native date input did not accept the automation fill, so the arrival-conflict
-regression is unit-tested, not claimed as browser-tested.
-
-Fresh-load provenance is separate: AM receipt readback verifies the confirmed
-demo profile; Surreal journey records hold derived results and the generated reply.
-Reloading a journey item alone does not establish native conversational retention.
-Full CRS implementation, supported subset, independent vectors and unresolved
-future-cap edge are recorded in [CRS_COMPLETION_SCOPE.md](CRS_COMPLETION_SCOPE.md).
-
-The additional full-score IAB run explicitly added invented evidence to the
-unsaved form, reviewed and confirmed it, then executed replay through the actual
-coordinator. The UI showed 528 to 568, retained the breakdown after a fresh load,
-and reused the same journey item on repeat. This remains an **offline fixture**:
-it did not contact AM, retrieve sources over the network or prove hosted database
-persistence. Full-profile receipt serialization is separately tested through the
-real installed SDK with an explicit fake HTTP transport. Older profiles retain
-their original receipt hashes because the optional section adds no defaults.
-
-## Full-score consistency review follow-up
-
-Independent review identified three evidence-consistency gaps. Version v2 now
-withholds a total when a qualifying offer conflicts with the Canadian-offer
-answer, applicant work/test/ECA/arrival dates precede the applicant's birth, or
-Canadian-employer evidence is absent, unknown or no. No minimum adult age is
-invented. The new employer field is optional when parsing older receipts and has
-no default; missing evidence is unknown to the calculator. Older calculator
-versions are historical and cannot satisfy current replay deduplication.
-
-The reported offer and DOB cases reproduced before the fix. **754 tests in 37
-files**, typecheck and build pass afterward. Codex IAB verified a confirmed
-fictional profile with conflicting offer and unknown employer produces no total
-and displays both reasons. After explicit correction/review/confirmation, the
-fixture produced 528 to 582 (the offer alternative wins), retaining the older
-hold as historical. Date entry through browser automation did not change the
-native input, so chronology remains unit-tested, not claimed browser-tested.
-This entire run used offline adapters; no AM or hosted database writes occurred.
-
-## Shared AM context evidence for the pending decision
-
-Saved local test evidence identifies one shared authenticated principal for the
-named Rowan/Mira fixtures, current-time hours fixtures and later user-entered
-conversation. The native profile changed during those tests even while the older
-receipt-backed employment envelope remained unchanged. The later user-entered
-job-title message and ordinary employment edits are not certified fictional in the
-evidence. Therefore the Context cannot be represented as containing only disposable
-scripted data. An unverified fact readback also does not prove the source turn was
-never stored.
-
-Potentially affected memory includes native identity/name, job title, work schedule,
-hours and associated conversation/history. Direct demo triples target their own
-entity, but hosted `/chat` may extract or reconcile within the existing principal's
-Context. Labels, scope names and a prompt disclaimer are not a proven isolation
-boundary. No new provider request was used to produce this assessment. Exact IDs,
-artifact paths and timestamps remain in the ignored local boundary report, not
-this PR. Obtain a specific decision about affecting that shared memory, or an
-independent test Context, before live demo chat writes.
-
-## Exact approval and remaining setup
-
-The denied operation was the command to run `scripts/apply-demo-schema.ts test`
-against existing `maple/test`. The reviewer rejected it **before execution** because
-hosted migrations require separate explicit approval. The user's subsequent
-specific approval allowed one retry; it succeeded, then the real-engine workflow
-test passed, then the same schema was applied to development.
-
-The proposed transaction adds three new SCHEMAFULL tables (`maple_demo_heads`,
-`maple_demo_proposals`, `maple_demo_events`), their fields/unique indexes and the
-`maple_schema:demo_journey_v1` marker. New tables use `PERMISSIONS NONE`. It changes
-no existing table definition, user, key, principal or grant; no records are deleted.
-Existing database-scoped EDITOR credentials have database-system authority, so
-server owner checks remain required. This is a **schema expansion**, not an access
-grant expansion. Test fixture records would be retained.
-
-Completed on October 25 at 11:20-11:25 UTC: both schema applications and two
-real-engine tests. Ten synthetic rows remain in test (two heads/four proposals/four
-events); development demo tables remain empty. The full-score test used five live
-official-source fetches and verified a needs-information hold followed by 528 to
-568, reload, owner denial and deduplication. Its AM adapter was explicitly fake;
-no hosted memory or model result is claimed. Two additional C20 official-source
-fetches matched the reviewed hashes.
-
-Remaining setup is the separate demo AM Context and dedicated server binding,
-then coordinated local activation. See [ISOLATED_DEMO_SETUP.md](ISOLATED_DEMO_SETUP.md).
-Ordinary memory is never a fallback for missing demo configuration.
-
-Runtime isolation review: `loadDemoBindings` loads a separate operator-controlled
-file; requires the existing Clerk owner, a different Context and non-reused key;
-and verifies native identity/scope configuration. A real installed-SDK transport
-test observes only the new Context's `/me` and `/chat` requests with the dedicated
-test key while the original binding remains unchanged. Missing setup, reused
-Context/key, foreign owner and non-development modes fail closed. These are local
-contract tests, not live credentials or real two-Context verification. No reflection
-fallback remains in the selected adapter. Local aggregate: 763 tests/38 files,
-typecheck/build pass. No dependency changes.
-
-Separately, native `/chat` is documented to persist memory updates. Its installed
-options expose scopes and labels but no no-persistence switch. A fictional label
-and a separate `demo_profile` entity protect the direct form target, but do **not**
-prove that chat extraction/reconciliation cannot affect other memory in the same
-Context. No live guide call has been made. Before such a call, resolve whether the
-existing fictional Context may be affected, or use an independently provisioned
-test Context with the necessary explicit setup approval. This is not assumed solved
-by a scope name, prompt disclaimer, or the unchanged receipt-backed employment head.
-
-## Existing-schema assessment (no implementation or mutation)
-
-The existing employment head/operations are parsed as employment changes and use
-that record's revisions. The native-request tables are parsed as native-message
-results. Assessment tables refer to the ordinary profile revision and reviewed
-policy registry. Putting demo records into those schemas would require changing
-their invariants and reader filtering, and risks polluting the original scenario.
-They are not a safe drop-in migration-free adapter. No alternate-table workaround
-was attempted after the denial. The isolated offline fixture is verification only.
+The former hosted-schema permission block was resolved by the user's specific
+approval; test and development schemas are applied. Dedicated Context setup is
+also complete. The current browser sign-in prerequisite is not another database,
+subscription or credential setup request.
