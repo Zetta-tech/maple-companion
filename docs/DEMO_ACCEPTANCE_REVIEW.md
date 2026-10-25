@@ -109,6 +109,25 @@ persistence. Full-profile receipt serialization is separately tested through the
 real installed SDK with an explicit fake HTTP transport. Older profiles retain
 their original receipt hashes because the optional section adds no defaults.
 
+## Full-score consistency review follow-up
+
+Independent review identified three evidence-consistency gaps. Version v2 now
+withholds a total when a qualifying offer conflicts with the Canadian-offer
+answer, applicant work/test/ECA/arrival dates precede the applicant's birth, or
+Canadian-employer evidence is absent, unknown or no. No minimum adult age is
+invented. The new employer field is optional when parsing older receipts and has
+no default; missing evidence is unknown to the calculator. Older calculator
+versions are historical and cannot satisfy current replay deduplication.
+
+The reported offer and DOB cases reproduced before the fix. **754 tests in 37
+files**, typecheck and build pass afterward. Codex IAB verified a confirmed
+fictional profile with conflicting offer and unknown employer produces no total
+and displays both reasons. After explicit correction/review/confirmation, the
+fixture produced 528 to 582 (the offer alternative wins), retaining the older
+hold as historical. Date entry through browser automation did not change the
+native input, so chronology remains unit-tested, not claimed browser-tested.
+This entire run used offline adapters; no AM or hosted database writes occurred.
+
 ## Shared AM context evidence for the pending decision
 
 Saved local test evidence identifies one shared authenticated principal for the

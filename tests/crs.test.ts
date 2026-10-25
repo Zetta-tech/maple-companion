@@ -36,6 +36,39 @@ describe('full fictional CRS calculation from independently reviewed official ta
     const p=alex();p.qualifyingExpressEntryOffer='reviewed_offer';p.crsEvidence!.offer={status:'qualifying',noc:'20012',novemberRulesReviewed:'yes',genuineOfferEvidenceReviewed:'yes'};
     expect([completed(p).before,completed(p).after,completed(p).delta]).toEqual([521,575,54]);
   });
+  it.each(['no','unknown'] as const)('holds a reviewed qualifying offer when the Canadian offer answer is %s',canadianOffer=>{
+    const p=alex();p.canadianOffer=canadianOffer;p.qualifyingExpressEntryOffer='reviewed_offer';
+    p.crsEvidence!.offer={status:'qualifying',noc:'20012',novemberRulesReviewed:'yes',genuineOfferEvidenceReviewed:'yes'};
+    const r=calculateCrs(p,asOf);expect(r.status).toBe('needs_information');
+    if(r.status==='needs_information')expect(r.reasons.join(' ')).toContain('Canadian employment offer');
+  });
+  it('holds the reported newborn DOB against prior work, test and ECA evidence',()=>{
+    const p=alex();p.crsEvidence!.dateOfBirth='2026-10-24';const r=calculateCrs(p,asOf);
+    expect(r.status).toBe('needs_information');
+    if(r.status==='needs_information')for(const label of ['Canadian work start','Foreign work start','English test','Applicant ECA'])expect(r.reasons.join(' ')).toContain(label);
+  });
+  it.each(['arrival','canadian_start','canadian_end','foreign_start','foreign_end','english','french','eca'] as const)('holds an applicant %s date before birth',field=>{
+    const p=alex(),e=p.crsEvidence!,beforeBirth='1996-12-31';
+    if(field==='arrival')p.arrivedInCanada=beforeBirth;
+    if(field==='canadian_start')p.workStart=beforeBirth;
+    if(field==='canadian_end')e.canadianWorkEnd=beforeBirth;
+    if(field==='foreign_start')e.foreignWork.start=beforeBirth;
+    if(field==='foreign_end')e.foreignWork.end=beforeBirth;
+    if(field==='english')e.english.date=beforeBirth;
+    if(field==='french')e.french={...lang(9),test:'TEF-Canada',date:beforeBirth};
+    if(field==='eca')e.education.ecaDate=beforeBirth;
+    const r=calculateCrs(p,asOf);expect(r.status).toBe('needs_information');
+    if(r.status==='needs_information')expect(r.reasons.join(' ')).toContain('before the applicant’s date of birth');
+  });
+  it('does not invent an adult-age prerequisite beyond the CRS age table',()=>{
+    const p=alex();p.crsEvidence!.dateOfBirth='2009-01-01';
+    const r=completed(p);expect(r.core.find(x=>x.id==='age')?.points).toBe(0);
+  });
+  it.each(['no','unknown',undefined] as const)('withholds a total when Canadian-employer evidence is %s',answer=>{
+    const p=alex();if(answer===undefined)delete p.crsEvidence!.canadianEmployer;else p.crsEvidence!.canadianEmployer=answer;
+    const r=calculateCrs(p,asOf);expect(r.status).toBe('needs_information');
+    if(r.status==='needs_information')expect(r.reasons.join(' ')).toContain('Canadian employer throughout');
+  });
   it('uses without-spouse tables and no spouse points for an accompanying citizen/PR spouse',()=>{
     const p=single();p.spouseAccompanying='yes';p.crsEvidence!.spouseCitizenOrPermanentResident='yes';p.crsEvidence!.spouse.education.level='unknown';
     expect(completed(p).before).toBe(482);expect(completed(p).totals.spouse).toBe(0);

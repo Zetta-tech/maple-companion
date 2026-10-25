@@ -130,14 +130,21 @@ generated boundaries, source review guard and the additional shared-Context chat
 side-effect limitation. The fixture is at `http://127.0.0.1:5196/` and is visibly
 labelled offline. It does not establish live AM or hosted database acceptance.
 
-Final full-CRS checkpoint: **739 tests in 37 files**, TypeScript typecheck, server
-build and Vite build passed. The JavaScript bundle is 521.50 kB (149.92 kB gzip);
+Final full-CRS checkpoint: **754 tests in 37 files**, TypeScript typecheck, server
+build and Vite build passed. The JavaScript bundle is 521.70 kB (149.96 kB gzip);
 Vite reports a size warning. Codex IAB verified the complete fictional score,
 visible subtotals, repeat replay returning one card and a fresh-load result.
 The independently reviewed Alex fixture produces 521 to 561; offer-dominance
 fixtures produce deltas of 30 and 54, confirming the change is not hardcoded +40.
 No new AM request, hosted write or localhost:3000 restart was made for the CRS
 increment. The live guide remains disabled at the existing approval boundary.
+
+The v2 consistency follow-up holds conflicting offer answers, dates before the
+applicant's birth and missing Canadian-employer evidence. Old receipts are not
+rewritten; absent evidence remains unknown. The offline browser verified the
+hold, explicit correction and subsequent offer-dominant 528 to 582 result, with
+the older hold preserved as historical. Exact numeric baseline fixtures remain
+unchanged. See `DEMO_ACCEPTANCE_REVIEW.md` for reproduction and limitations.
 
 Next: obtain the exact schema approval, apply/test on `maple/test`, then apply to
 `maple/development`, load the configured source bundle, and verify one real fictional

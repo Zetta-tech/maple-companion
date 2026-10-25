@@ -15,6 +15,10 @@ describe('complete fictional score through existing approved-profile and private
     const raw=JSON.stringify(demoSeed),digest=demoDigest(demoSeed),parsed=demoProfileSchema.parse(JSON.parse(raw));
     expect(parsed.crsEvidence).toBeUndefined();expect(JSON.stringify(parsed)).toBe(raw);expect(demoDigest(parsed)).toBe(digest);
     expect(renderToStaticMarkup(<CrsEvidenceEditor value={undefined} onChange={()=>{}} asOf={asOf} spouseAccompanying="yes"/>)).toContain('Add fictional CRS details for review');
+    const olderEvidence=fictionalCrsEvidence(asOf);delete olderEvidence.canadianEmployer;
+    const olderProfile={...demoSeed,crsEvidence:olderEvidence};const olderParsed=demoProfileSchema.parse(olderProfile);
+    expect(olderParsed.crsEvidence?.canadianEmployer).toBeUndefined();expect(demoDigest(olderParsed)).toBe(demoDigest(olderProfile));
+    expect(renderToStaticMarkup(<CrsEvidenceEditor value={olderParsed.crsEvidence} onChange={()=>{}} asOf={asOf} spouseAccompanying="yes"/>)).toContain('Canadian work was for a Canadian employer throughout');
   });
   it('requires review and exact confirmation before full scoring, persists the actual breakdown, and deduplicates replay',async()=>{
     const store=new DemoFixtureStore(),memory=new DemoFixtureMemory(),service=new DemoJourney(store,memory,fixtureSources,()=>{},()=>new Date('2026-10-25T12:00:00Z'));
@@ -32,6 +36,9 @@ describe('complete fictional score through existing approved-profile and private
     expect(renderToStaticMarkup(<JourneyCard event={first} revision={2} date={asOf}/>)).toContain('historical item');
     if(first.discovery?.crs?.status==='complete')first.discovery.crs.policyVersion='superseded-fixture-version';
     expect(renderToStaticMarkup(<JourneyCard event={first} revision={1} date={asOf}/>)).toContain('historical item');
+    const stored=store.recorded.get(JSON.stringify(['user_fixture',first.id]))!;stored.event.calculatorVersion='2026-11-03.fictional-reviewed-evidence.v1';
+    const recalculated=await reloaded.replay('user_fixture',{requestId:randomUUID(),fictional:true});
+    expect(recalculated.id).not.toBe(first.id);expect(recalculated.calculatorVersion).not.toBe(stored.event.calculatorVersion);expect(memory.writes).toBe(1);
   });
   it('holds a full result if source versions are missing or do not match the reviewed calculator',async()=>{
     const e=fictionalCrsEvidence(asOf);e.completeEvidenceReviewed='yes';const profile={...demoSeed,crsEvidence:e};

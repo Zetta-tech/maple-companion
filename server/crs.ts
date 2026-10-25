@@ -63,6 +63,16 @@ export function calculateCrs(profile:DemoProfile,asOf:string):CrsCalculation {
   if(e.completeEvidenceReviewed!=='yes'||e.reviewedForDate!==asOf)issues.push('Review every scoring factor for this exact assessment date. The stored evidence is not a current complete review.');
   if(e.specialCases!=='no')issues.push('Special exceptions, complex work histories or unusual credential/test cases need separate source review before a total can be calculated.');
   if(!e.dateOfBirth||e.dateOfBirth>asOf)issues.push('Provide a valid date of birth before the assessment date.');
+  if(e.dateOfBirth){
+    // These dates describe the applicant. Spouse evidence belongs to a different
+    // person and must not be compared with the applicant's birth date.
+    const applicantDates:ReadonlyArray<readonly [string,string|null]>=[
+      ['Arrival in Canada',profile.arrivedInCanada],['Canadian work start',profile.workStart],['Canadian work end',e.canadianWorkEnd],
+      ['Foreign work start',e.foreignWork.start],['Foreign work end',e.foreignWork.end],
+      ['English test',e.english.date],['French test',e.french.date],['Applicant ECA',e.education.ecaDate],
+    ];
+    for(const [label,date] of applicantDates)if(date&&date<e.dateOfBirth)issues.push(`${label} is before the applicant’s date of birth. Reconcile these dates before calculating a total.`);
+  }
   if(profile.spouseAccompanying==='unknown')issues.push('Confirm whether a spouse accompanies the applicant.');
   if(profile.spouseAccompanying==='yes'&&e.spouseCitizenOrPermanentResident==='unknown')issues.push('Confirm whether the accompanying spouse is a Canadian citizen or permanent resident.');
   const withSpouse=profile.spouseAccompanying==='yes'&&e.spouseCitizenOrPermanentResident==='no';
@@ -73,6 +83,7 @@ export function calculateCrs(profile:DemoProfile,asOf:string):CrsCalculation {
   let workYears=0;
   if(!profile.nocReviewed||!/[0-3]/.test(profile.noc[1]!))issues.push('Review a valid skilled NOC and matching duties before counting Canadian work.');
   if(profile.physicallyCanada!=='yes'||profile.authorizedWork!=='yes'||profile.paidEmployee!=='yes'||profile.fullTimeStudy!=='no'||profile.selfEmployed!=='no')issues.push('Review the qualifying Canadian work conditions; unknown or excluded periods cannot be counted.');
+  if(e.canadianEmployer!=='yes')issues.push('Confirm the recorded Canadian work was for a Canadian employer throughout. Physical presence in Canada alone is not sufficient.');
   if(profile.workStart>asOf||profile.workStart<profile.arrivedInCanada||days(profile.workStart,asOf)>3653||profile.workStart.slice(5)==='02-29')issues.push('Review the Canadian work dates and any earlier stays. Only one consistent interval within ten years is supported.');
   else workYears=intervalYears({status:'recorded',start:profile.workStart,end:e.canadianWorkEnd,weeklyHours:profile.weeklyHours,noc:profile.noc,eligibilityReviewed:'yes'},'Applicant Canadian work',asOf,issues,5);
   const foreignYears=intervalYears(e.foreignWork,'Foreign work',asOf,issues,3);
@@ -86,6 +97,7 @@ export function calculateCrs(profile:DemoProfile,asOf:string):CrsCalculation {
   if(e.offer.status==='unknown'||e.offer.novemberRulesReviewed!=='yes')issues.push('Review the qualifying-offer alternative under the November 3 rules.');
   if(e.offer.status==='none'&&(e.offer.noc!==null||profile.qualifyingExpressEntryOffer!=='none_reviewed'))issues.push('The CRS no-offer answer conflicts with the demo offer assessment.');
   if(e.offer.status==='qualifying'&&(!e.offer.noc||e.offer.genuineOfferEvidenceReviewed!=='yes'||profile.qualifyingExpressEntryOffer!=='reviewed_offer'))issues.push('Confirm the genuine qualifying offer, its reviewed NOC and matching offer assessment.');
+  if(e.offer.status==='qualifying'&&profile.canadianOffer!=='yes')issues.push('The qualifying-offer claim conflicts with an absent or unconfirmed Canadian employment offer. Reconcile the offer answers before calculating a total.');
 
   const core=[line('age','Age',agePoints(e.dateOfBirth?years(e.dateOfBirth,asOf):0,withSpouse)),
     line('education','Education',(withSpouse?[0,28,84,91,112,119,126,140]:[0,30,90,98,120,128,135,150])[educationRank]!),

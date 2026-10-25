@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { policyDateSchema } from './policy.js';
-export const CRS_POLICY_VERSION='2026-11-03.fictional-reviewed-evidence.v1';
+export const CRS_POLICY_VERSION='2026-11-03.fictional-reviewed-evidence.v2';
 
 const answer = z.enum(['yes','no','unknown']);
 export const educationLevels = ['less_secondary','secondary','one_year','two_year','bachelors','two_or_more','masters_professional','doctoral'] as const;
@@ -24,6 +24,8 @@ export const crsEvidenceSchema = z.strictObject({
   education:educationEvidenceSchema, firstLanguage:z.enum(['english','french','unknown']),
   english:languageEvidenceSchema,french:languageEvidenceSchema,
   canadianWorkEnd:policyDateSchema.nullable(),
+  // Optional on read for old receipt compatibility; absence is unknown to scoring.
+  canadianEmployer:answer.optional(),
   spouseCitizenOrPermanentResident:answer,
   spouse:z.strictObject({education:educationEvidenceSchema,language:languageEvidenceSchema,languageName:z.enum(['english','french','unknown']),
     canadianWork:workIntervalSchema}),
@@ -54,7 +56,7 @@ const english=(level:number):LanguageEvidence=>({status:'tested',test:'CELPIP-Ge
 export function fictionalCrsEvidence(asOf:string):CrsEvidence {
   return {version:1,reviewedForDate:asOf,completeEvidenceReviewed:'unknown',specialCases:'no',dateOfBirth:'1995-04-15',
     education:{level:'masters_professional',basis:'canadian',ecaDate:null,qualificationReviewed:'yes'},
-    firstLanguage:'english',english:english(9),french:{...noLanguage},canadianWorkEnd:null,spouseCitizenOrPermanentResident:'no',
+    firstLanguage:'english',english:english(9),french:{...noLanguage},canadianWorkEnd:null,canadianEmployer:'yes',spouseCitizenOrPermanentResident:'no',
     spouse:{education:{level:'bachelors',basis:'foreign_eca',ecaDate:'2025-06-01',qualificationReviewed:'yes'},language:english(8),languageName:'english',canadianWork:{...noWork}},
     foreignWork:{status:'recorded',start:'2018-08-01',end:'2021-07-31',weeklyHours:30,noc:'21221',eligibilityReviewed:'yes'},tradeCertificate:'no',tradeCertificateEligibilityReviewed:'yes',
     canadianEducation:'three_year_or_eligible_graduate',canadianEducationEligibilityReviewed:'yes',eligibleSibling:'no',siblingEligibilityReviewed:'yes',
