@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs><pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="#344154" stroke-width="1"/></pattern><linearGradient id="fade"><stop stop-color="white"/><stop offset="1" stop-color="black"/></linearGradient><mask id="grid-fade"><rect width="510" height="630" fill="url(#fade)"/></mask></defs>
+  <rect width="1200" height="630" fill="#080f1d"/>
+  <rect width="510" height="630" fill="url(#grid)" opacity=".4" mask="url(#grid-fade)"/>
+  <image x="72" y="155" width="320" height="320" xlink:href="../web/public/maple-icon-512.png"/>
+  <g font-family="Arial, sans-serif">
+    <text x="470" y="145" fill="#ef4444" font-size="22" font-weight="700" letter-spacing="3">MAPLE COMPANION</text>
+    <text x="470" y="252" fill="#f8fafc" font-size="56" font-weight="700" letter-spacing="-1.5">Your next step,</text>
+    <text x="470" y="320" fill="#f8fafc" font-size="56" font-weight="700" letter-spacing="-1.5">with the evidence.</text>
+    <text x="470" y="382" fill="#b8c3d1" font-size="24">Explore your work options in Canada.</text>
+    <path d="M470 470H1128" stroke="#dc2626" stroke-width="2"/>
+    <text x="470" y="518" fill="#f8fafc" font-size="22">app.maplenewsletter.com</text>
+  </g>
+</svg>
