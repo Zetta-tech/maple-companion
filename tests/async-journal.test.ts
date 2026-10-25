@@ -37,6 +37,55 @@ function deferred() {
 afterEach(() => { vi.restoreAllMocks(); journals.splice(0).forEach(j => j.close()); });
 
 describe('asynchronous journal caller safety', () => {
+  it('fences a confirmation committed during the delayed assessment save response', async () => {
+    const { port, workflow, source } = setup();
+    const policy = makeTestPolicy();
+    const assessments = new Assessments(port, workflow, registryFor(policy));
+    const started = deferred(), release = deferred(), save = port.saveAssessment.bind(port);
+    port.saveAssessment = async (...args) => { const record = await save(...args); started.resolve(); await release.promise; return record; };
+    const running = assessments.run(owner, { policyId: policy.id });
+    await started.promise;
+    const proposal = await workflow.propose(owner, { baseRevision: 0, employment });
+    await workflow.confirm(owner, proposal.id, { proposalRevision: 1 });
+    release.resolve();
+    expect(await running).toMatchObject({ profileRevision: 0, freshness: 'stale', results: [] });
+    expect(source.head(owner).revision).toBe(1);
+  });
+
+  it.each(['run', 'list', 'get'] as const)('fences %s after a final evidence callback overlaps a confirmation', async method => {
+    const { port, workflow } = setup();
+    const policy = makeTestPolicy();
+    let callbackCount = 0, pauseAt = 0;
+    const started = deferred(), release = deferred();
+    const assessments = new Assessments(port, workflow, registryFor(policy), () => new Date(), async () => {
+      if (++callbackCount === pauseAt) { started.resolve(); await release.promise; }
+      return true;
+    });
+    const prior = await assessments.run(owner, { policyId: policy.id });
+    callbackCount = 0; pauseAt = method === 'run' ? 3 : 2;
+    const reading = method === 'run' ? assessments.run(owner, { policyId: policy.id })
+      : method === 'list' ? assessments.list(owner) : assessments.get(owner, prior.id);
+    await started.promise;
+    const proposal = await workflow.propose(owner, { baseRevision: 0, employment });
+    await workflow.confirm(owner, proposal.id, { proposalRevision: 1 });
+    release.resolve();
+    const value = await reading;
+    for (const result of Array.isArray(value) ? value : [value]) expect(result).toMatchObject({ freshness: 'stale', results: [] });
+  });
+
+  it('fences an in-flight confirmation even before its new revision is committed', async () => {
+    const { port, source, workflow } = setup();
+    const policy = makeTestPolicy();
+    const assessments = new Assessments(port, workflow, registryFor(policy));
+    const started = deferred(), release = deferred(), save = port.saveAssessment.bind(port);
+    port.saveAssessment = async (...args) => { const record = await save(...args); started.resolve(); await release.promise; return record; };
+    const running = assessments.run(owner, { policyId: policy.id });
+    await started.promise;
+    const proposal = source.propose(owner, 0, null, employment, new Date().toISOString());
+    source.claim(owner, proposal.id, new Date().toISOString());
+    release.resolve();
+    expect(await running).toMatchObject({ freshness: 'stale', results: [] });
+  });
   it('does not send AM writes before the durable claim resolves', async () => {
     const { port, memory, workflow } = setup();
     const proposal = await workflow.propose(owner, { baseRevision: 0, employment });

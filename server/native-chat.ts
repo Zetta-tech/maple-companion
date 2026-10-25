@@ -63,8 +63,7 @@ export class NativeChat {
     }
     try { await this.diagnostic(owner, request.requestId, evidence); }
     catch { result = { ...result, status: 'uncertain', message: 'Diagnostic evidence could not be retained. The processing outcome needs review; do not resend this message.' }; }
-    await this.store.finish(owner, result);
-    return result;
+    return await this.store.finish(owner, result);
   }
 }
 

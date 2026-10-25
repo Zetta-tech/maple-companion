@@ -1,3 +1,4 @@
+import { nativeInputsReviewed } from './native-review.js';
 import { createApp } from './app.js';
 import { loadAuthConfig, loadConfig, bindingFor, type AuthConfig, type Config } from './config.js';
 import { AppError } from './errors.js';
@@ -62,16 +63,8 @@ try {
             new GuideSources(process.env.MAPLE_GUIDE_SOURCES_FILE), privateGuideEvidence('.local/guide-diagnostics'));
         } catch { console.error('DEMO_JOURNEY_SETUP_REQUIRED'); }
       }
-      const currentWorkflow = workflow;
-      assessments = new Assessments(workflow.journal, workflow, policies, () => new Date(), async owner => {
-        const messages = await store.list(owner);
-        if (!messages.length) return true;
-        if (messages.some(message => ['processing', 'uncertain'].includes(message.status))) return false;
-        const latest = messages.reduce((a, b) => a.createdAt > b.createdAt ? a : b);
-        const head = await currentWorkflow.journal.head(owner);
-        const approved = (await currentWorkflow.journal.list(owner)).find(op => op.status === 'committed' && op.baseRevision + 1 === head.revision);
-        return !!approved?.confirmedAt && approved.confirmedAt > latest.createdAt;
-      });
+      const currentJournal = workflow.journal;
+      assessments = new Assessments(currentJournal, workflow, policies, () => new Date(), owner => nativeInputsReviewed(owner, store, currentJournal));
     } catch { console.error('NATIVE_CHAT_SETUP_REQUIRED'); }
   }
 } catch (error) {

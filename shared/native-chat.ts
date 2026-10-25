@@ -12,6 +12,9 @@ export type NativeMessageResult = {
   status: 'processing' | 'verified' | 'unverified' | 'uncertain';
   message: string;
   createdAt: string;
+  /** Durable ordering barrier, absent on processing/legacy receipts. A later
+   * employment revision must be confirmed before assessments can use its inputs. */
+  completion?: { version: 1; employmentRevision: number };
   warnings: string[];
 };
 export type NativeProfile = {

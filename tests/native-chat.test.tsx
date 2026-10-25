@@ -29,7 +29,10 @@ function setup(found = true) {
       if (row) { if (row.digest !== digest) throw new AppError(409, 'NATIVE_REQUEST_CONFLICT', 'Conflict'); return row.result!; }
       records.set(key(owner, id), { digest, result: null }); return null;
     },
-    finish: async (owner, result) => { records.get(key(owner, result.requestId))!.result = result; },
+    finish: async (owner, result) => {
+      const completed = { ...result, completion: { version: 1 as const, employmentRevision: 0 } };
+      records.get(key(owner, result.requestId))!.result = completed; return completed;
+    },
     list: async owner => [...records.entries()].filter(([k]) => JSON.parse(k)[0] === owner).flatMap(([, v]) => v.result ? [v.result] : []),
   };
   const profile = { selfFacts: found ? [{ entity: 'Mira', key: 'work_hours', value: '28 hours per week' }] : [], static: [], dynamic: [], preferences: [], instructions: [] };

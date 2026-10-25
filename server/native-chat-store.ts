@@ -3,11 +3,12 @@ import { RecordId, type Surreal } from 'surrealdb';
 import { AppError } from './errors.js';
 import type { NativeSession, NativeSessions } from './native-memory.js';
 import type { NativeMessageResult } from '../shared/native-chat.js';
+import { journalRecordId } from './surreal-journal.js';
 
 export interface NativeChatStore extends NativeSessions {
   current(owner: string): Promise<NativeSession | null>;
   claim(owner: string, requestId: string, digest: string, at: string): Promise<NativeMessageResult | null>;
-  finish(owner: string, result: NativeMessageResult): Promise<void>;
+  finish(owner: string, result: NativeMessageResult): Promise<NativeMessageResult>;
   list(owner: string): Promise<NativeMessageResult[]>;
 }
 const record = (table: string, owner: string, key = owner) => new RecordId(table,
@@ -62,10 +63,33 @@ export class SurrealNativeChatStore implements NativeChatStore {
     }
   }
   async finish(owner: string, result: NativeMessageResult) {
-    const [rows] = await this.db.query<unknown[][]>(
-      "UPDATE $record SET status = $status, result_json = $json WHERE owner = $owner AND status = 'processing' RETURN AFTER;",
-      { record: record('maple_native_requests', owner, result.requestId), owner, status: result.status, json: JSON.stringify(result) }).retry(false);
-    if (rows?.length !== 1) throw unavailable();
+    const tx = await this.db.beginTransaction();
+    try {
+      if (!['verified', 'unverified', 'uncertain'].includes(result.status)) throw unavailable();
+      // The SAME owner head/epoch used by SurrealJournal.atomic serializes this
+      // completion with employment claim/complete. Wall-clock ordering is unsafe.
+      await tx.query('UPSERT $record SET owner = $owner, key = $owner, revision = revision ?? 0, receipt_json = receipt_json ?? NULL, epoch = (epoch ?? 0) + 1;',
+        { record: journalRecordId('heads', owner), owner }).retry(false);
+      const [heads] = await tx.query<[{ revision: number }[]]>(
+        'SELECT revision FROM maple_heads WHERE owner = $owner AND key = $owner;', { owner }).retry(false);
+      const [active] = await tx.query<[{ base_revision: number }[]]>(
+        "SELECT base_revision FROM maple_operations WHERE owner = $owner AND status IN ['applying', 'uncertain'];", { owner }).retry(false);
+      if (heads.length !== 1 || !Array.isArray(active)) throw unavailable();
+      const revisions = [heads[0]!.revision, ...active.map(op => op.base_revision + 1)];
+      if (revisions.some(value => !Number.isSafeInteger(value) || value < 0)) throw unavailable();
+      // Include an employment confirmation already in flight: finishing its AM
+      // write later must not count as a new review of this conversation update.
+      const completed: NativeMessageResult = { ...result, completion: { version: 1, employmentRevision: Math.max(...revisions) } };
+      const [rows] = await tx.query<unknown[][]>(
+        "UPDATE $record SET status = $status, result_json = $json WHERE owner = $owner AND status = 'processing' RETURN AFTER;",
+        { record: record('maple_native_requests', owner, result.requestId), owner, status: result.status, json: JSON.stringify(completed) }).retry(false);
+      if (rows?.length !== 1) throw unavailable();
+      await tx.commit();
+      return completed;
+    } catch {
+      try { await tx.cancel(); } catch { /* Commit acknowledgement may be lost. No retry or fabricated completion. */ }
+      throw unavailable();
+    }
   }
   async list(owner: string) {
     const [rows] = await this.db.query<[{ key: string; status: NativeMessageResult['status']; created_at: string; result_json: string | null }[]]>(

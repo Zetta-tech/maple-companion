@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { NATIVE_MESSAGE_MAX_LENGTH, nativeMessageTextSchema, nativeStatusText, type NativeMessageResult, type NativeProfile } from '../shared/native-chat.js';
 import { nativePendingAfterFailure } from './request.js';
+import { NativeAssessmentGate, sendWithAssessmentHold } from './native-assessment-gate.js';
 import './NativeMemoryPanel.css';
 
 const statusHeading = {
@@ -43,9 +44,11 @@ export function NativeMemoryView({ profile, history, loading = false }: {
   </div>;
 }
 
-export function NativeMemoryPanel({ request, onChanged }: {
-  request: <T>(path: string, body?: unknown) => Promise<T>; onChanged: () => void;
+const noAssessmentHold = (_held: boolean) => {};
+export function NativeMemoryPanel({ request, onChanged, onAssessmentHold = noAssessmentHold }: {
+  request: <T>(path: string, body?: unknown) => Promise<T>; onChanged: () => void; onAssessmentHold?: (held: boolean) => void;
 }) {
+  const assessmentGate = useMemo(() => new NativeAssessmentGate(onAssessmentHold), [onAssessmentHold]);
   const [available, setAvailable] = useState(false);
   const [profile, setProfile] = useState<NativeProfile | null>(null);
   const [history, setHistory] = useState<NativeMessageResult[]>([]);
@@ -56,16 +59,18 @@ export function NativeMemoryPanel({ request, onChanged }: {
   const [notSent, setNotSent] = useState(false);
   const [requestId, setRequestId] = useState<string | null>(null);
   async function refresh() {
+    assessmentGate.checking();
     setBusy(true); setError(''); setNotSent(false); setProfile(null);
     try {
       const status = await request<{ available: boolean; history: NativeMessageResult[] }>('/api/native/status');
       setAvailable(status.available); setHistory(status.history);
+      assessmentGate.refresh(status.history);
       if (requestId && status.history.some(item => item.requestId === requestId && item.status !== 'processing')) { setRequestId(null); setMessage(''); }
       if (status.available) setProfile(await request<NativeProfile>('/api/native/profile'));
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Current memory could not be verified.'); }
     finally { setBusy(false); }
   }
-  useEffect(() => { void refresh(); }, [request]);
+  useEffect(() => { void refresh(); }, [request, assessmentGate]);
   async function send(event: FormEvent) {
     event.preventDefault();
     if (!synthetic || !message.trim() || busy || !available || requestId) return;
@@ -75,7 +80,8 @@ export function NativeMemoryPanel({ request, onChanged }: {
     const id = crypto.randomUUID();
     setRequestId(id); setBusy(true); setError(''); setNotSent(false); setProfile(null);
     try {
-      const result = await request<NativeMessageResult>('/api/native/messages', { requestId: id, message, syntheticTest: true });
+      const result = await sendWithAssessmentHold(assessmentGate, id,
+        () => request<NativeMessageResult>('/api/native/messages', { requestId: id, message, syntheticTest: true }));
       setHistory(current => [result, ...current.filter(item => item.requestId !== id)]);
       setRequestId(null); setMessage(''); onChanged();
       setProfile(await request<NativeProfile>('/api/native/profile'));
