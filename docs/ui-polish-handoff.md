@@ -1,59 +1,100 @@
-# Maple UI handoff — 2026-10-25
+# Maple UI review handoff — 2026-10-25
 
-Reviewable implementation on `feat/ui-polish`, rebased onto backend recovery commit `f52dae8c42d2ef0c3184a2b0278209d4d09e4fb3`. No merge or deployment. The original signed-in localhost:3000 recording process and its data were left unchanged.
+This revision replaces the visually rejected `fb324924afbd4a85092f55483c18ceb003f28def` presentation. It is reviewable, not claimed visual acceptance or proof of 5–10 second comprehension. Branch `feat/ui-polish` includes backend recovery base `f52dae8c42d2ef0c3184a2b0278209d4d09e4fb3`. No merge or deployment. Original signed-in localhost:3000 and its saved data were left unchanged.
 
 ## Preview
 
-**http://127.0.0.1:5175/** uses the actual app components with a conspicuous offline-fixture banner. It has synthetic data, the existing offline calculator, no API proxy, no provider calls, and no database writes. Its state survives browser reload, but resets on process restart or Reset fixture. This is a UI review preview, not a live personal-account result.
+**http://127.0.0.1:5175/** uses the actual app components with an explicit offline preview banner, synthetic data and the existing calculator. No API proxy, provider calls or database writes. It is not a live personal-account result. State survives browser reload and resets on process restart or Reset fixture.
 
-Local-only preview helpers are `.local/ui-preview.config.ts` and `.local/clerk-preview.tsx` in the isolated UI worktree. Start with `node node_modules/vite/bin/vite.js --config .local/ui-preview.config.ts --port 5175`. These ignored helpers are excluded from production and must not be used as production authentication.
+QA session: **http://127.0.0.1:5175/?preview=qa-navigation**. Synthetic state is isolated by query parameter, avoiding interference with the root review session. Both policy-first and C20-first fixtures are available. Production event ordering remains unchanged.
 
-## Changes since screenshot 31
+Ignored local helpers: `.local/ui-preview.config.ts`, `.local/clerk-preview.tsx`. Start with `node node_modules/vite/bin/vite.js --config .local/ui-preview.config.ts --port 5175`. These are excluded from production and must never serve as production authentication.
 
-- Removed the visible “Your next steps” and “Your discoveries” heading layers while retaining accessible headings. Category and discovery status share one quiet line.
-- Replaced the competing side-by-side result blocks with one primary discovery and a compact secondary policy comparison. The C20 reason and next action have distinct positions; action emphasis comes from typography and an accent rule.
-- Moved employment refresh to the employment section; the results have one quiet refresh control. History and research controls remain below outcomes.
-- Shortened evidence disclosure labels and placed them together. Qualification, missing evidence, demo status, effective date and policy uncertainty remain visible beside their claims.
-- Retained the green/serif identity and designed light/dark surfaces, including expanded sources and notifications. No new design library, avatar, branding exploration or decorative animation.
+## Requirement versus current screen
 
-## Research acceptance comparison
-
-| Recovered requirement | Current implementation and evidence |
+| Requirement | Current implementation |
 | --- | --- |
-| Purposeful grouping without a nested-card dashboard | Main results use whitespace and dividers; the next action has a subtle accent rule. Input/review and notification boundaries remain clear. Desktop screenshots 40–41. |
-| One dominant discovery, reason, next action | C20 leads with its employer-specific reason and action. EE leads with actual calculated 528 → 568 / +40 in the fixture, not a hardcoded finding. Screenshots 38–41. |
-| Both themes, including expanded states | Same populated state checked in light/dark. Sources, version metadata and notification surfaces remain legible. Screenshots 42–43. Draft values survived theme switching. |
-| Human outcome-led copy | Removed repeated headings and receipt jargon from primary views. Exact profile data, hashes and calculation internals remain inspectable. |
-| Material qualifications and sources | Potential eligibility, demo, projected/effective date, outstanding evidence and unresolved cap remain adjacent. Historical/uncertain results do not appear as current conclusions. |
-| Desktop/mobile interaction evidence | IAB checks at desktop and 416/316 CSS-pixel widths; no horizontal overflow. Keyboard disclosure activation and notification Escape/focus restoration verified. |
+| Cohesive score story | A single softly contrasted surface contains actual delta, previous score and projected score. Desktop +40 is 72px beside 528 → 568 at 48px; mobile keeps both numeric rows together. No gauges, number cards or count animation. |
+| Breathing room with structure | Space separates result, qualification and action. Desktop explanation has a bounded adjacent column; numbers stay close. C20 retains distinct reason, qualification and next step. |
+| Visible, concise qualifications | Projected, effective date, demo status, eligibility not established and unresolved-cap qualification stay below the score and above its action. Full exact conditions are retained in details. |
+| Fewer collapsible controls | EE's Review score breakdown opens calculation, evidence and official records together. C20 has one Review evidence and official sources control. Per-source version toggles are removed; all hashes/dates remain readable inside the unified evidence surface. Existing history, generated explanation and meaningful profile review controls remain available. |
+| Both discoveries | Both event orderings inspected. C20's reason, outstanding evidence and one next step precede its detail control. No permanent EE-first sorting was introduced. |
+| Newsletter theme and backdrop | Inter/Space Grotesk, neutral light/charcoal surfaces and restrained Maple red replace arbitrary green/serif styling. Static 84px grid is masked out of the entire reading column, restricted to outer margins and removed on mobile; solid result surfaces preserve readability. No decorative motion. |
+| Both themes and access | Same populated data, expanded sources, notifications and review controls checked in both themes. Current 320 CSS-pixel captures have no horizontal overflow. Keyboard breakdown activation/focus return and C20 detail activation verified. Workspace anchors use aria-current and an underline. Desktop sticky navigation is visually verified; mobile scrolled capture remains uncertain as described below. |
 
-Sources applied: the three May 10 files in `C:/Users/aakas/Downloads/Codex/Maple Landing Page/` (`yc-design-review-feedback.md`, `yc-framer-conversion-review-feedback.md`, `maple-landing-page-design-plan.md`), their relevant screenshot evidence, the supplied Library brief and parent-recovered chat decisions. Landing-page positioning was not transplanted into this immigration product. The canceled Oct 20 prototype was not treated as an approved destination. Its protected sign-in was not retried.
+## Source-backed decisions
 
-## Personal Guide integration
+Read-only inspection of **Zetta-tech/maple-newsletter**:
 
-Uses the committed `/api/guide/*` contract and existing confirmed employment. Supplemental intake starts unknown; personal CRS evidence does not use fictional defaults. Employment dates remain canonical. Exact assembled information is shown before confirmation, and stale inputs withhold current conclusions.
+- [web/src/app/globals.css](https://github.com/Zetta-tech/maple-newsletter/blob/main/web/src/app/globals.css), blob `bafebddf565b6c7639af99e1e84f7b6932569f90`: brand #dc2626, #fafafa/#ffffff, #0f0f0f/#161616, #111827; type families.
+- [web/src/app/layout.tsx](https://github.com/Zetta-tech/maple-newsletter/blob/main/web/src/app/layout.tsx), blob `e64189c78255a2e61c617066116ee70aebc3b5c7`: actual font configuration.
+- [web/src/components/landing/CinematicStory.tsx](https://github.com/Zetta-tech/maple-newsletter/blob/main/web/src/components/landing/CinematicStory.tsx), blob `5db39450184c4118839bf3b6fe132b0aa067920a`: typography and red emphasis; cinematic motion not imported.
+- [web/src/components/draws-client.tsx](https://github.com/Zetta-tech/maple-newsletter/blob/main/web/src/components/draws-client.tsx), blob `7f5d3ad249bbc425f4d765477f0200a3a46b10ab`: dark surface roles, subtle grid/dividers and CRS emphasis.
+- [web/src/app/post-ita-guidance/page.tsx](https://github.com/Zetta-tech/maple-newsletter/blob/main/web/src/app/post-ita-guidance/page.tsx), blob `72429b7cf0eb217bc9ce869d271b71e9806fa220`, and [post-ita-guidance.module.css](https://github.com/Zetta-tech/maple-newsletter/blob/main/web/src/app/post-ita-guidance/post-ita-guidance.module.css), blob `325173873fb73c97ca63b6cb4393afea1ff31f99`: task grouping, readable takeaways, line lengths, section space, source strip and 84px hero grid.
 
-Personal and demo save controls now share a check-only recovery state. An uncertain save exposes `POST /proposals/:id/reconcile` with `{}`; it does not resend facts. Only a refreshed backend proposal restored to pending enables confirmation again. Browser fixtures verified both uncertain-save readback across reload and the proved-unsent retry of the same proposal. Personal source failures release the request hold only with explicit `guideRequestState: not_started`.
+The public [post-ITA page](https://www.maplenewsletter.com/post-ita-guidance) was accessible and inspected in IAB; screenshots 12/13 are saved locally. Newsletter code and Neon configuration were not changed.
 
-NativeMemoryPanel honors backend `syntheticOnly`; missing status remains fail-closed. Its assessment-hold coordination and AssessmentPanel behavior are preserved. No server or shared contract was edited in the UI commits.
+Companion adaptations use #c82323 light text accent, #ff777b dark text accent and #dc2626 action fill to pass actual role-based contrast checks. Inter and Space Grotesk are self-hosted with SIL licenses, avoiding runtime font network calls.
 
-## Verification
+Research: [NN/g visual hierarchy](https://www.nngroup.com/articles/visual-hierarchy-ux-definition/), [layer-cake scanning](https://www.nngroup.com/articles/layer-cake-pattern-scanning/), [minimalist design](https://www.nngroup.com/articles/aesthetic-minimalist-design/), [GOV.UK details](https://design-system.service.gov.uk/components/details/), [buttons](https://design-system.service.gov.uk/components/button/), [WCAG use of color](https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html). These support grouping/emphasis/disclosure decisions; no universal psychological effect or comprehension time is claimed.
 
-Final `npm run check`: TypeScript, **643 tests in 38 files**, production build passed. `git diff --check` passed. Existing bundle-size warning remains: about 550 kB minified / 157 kB gzip. No dependency change.
+The May 10 files in `C:/Users/aakas/Downloads/Codex/Maple Landing Page/` and parent-recovered chat decisions remain constraints. The canceled Oct 20 prototype was not treated as an approved destination, and its denied protected sign-in was not retried.
 
-IAB verification used only isolated fixtures: personal unknown intake; confirmation/save/reload; retained drafts across themes; explicit safe retry; uncertain save held across reload and recovered by readback; uncertain research held; stale personal results withheld; demo confirmation/reload invalidating prior results; source links/version details; full score calculation; mobile layout; keyboard disclosures; notifications and focus restoration. Earlier checks covered empty, missing-information, unsupported C20, processing, source failure and native-memory holds. No live provider requests were made.
+## Navigation and login follow-up
 
-Live authenticated personal save/readback and provider execution remain an integration check for the parent's configured combined application. Production policy seeding/configuration remains backend-owned. This handoff does not claim production deployment or live end-to-end verification.
+Navigation research reread: `yc-design-review-feedback.md:96` (predictable navigation), `:147` (one clear sticky state), and `maple-landing-page-design-plan.md:55` (one sticky state, additive hover, stable mobile targets) and `:381` (sticky QA). The app uses one section bar, native anchors with 80px offsets, active-section tracking on scroll and focus transfer to the chosen heading. Mobile visible labels shorten to Discoveries / Your info / Checks while accessible names remain complete. Desktop bar is about 61px; mobile is about 57px. No duplicated header or scroll animation.
 
-## Screenshots
+The user-requested separate login agent completed `LoginExperience.tsx/.css`. Production wiring is **<LoginExperience><SignIn routing="hash" /></LoginExperience>**, retaining the real Clerk component and authentication flow. The app-owned page uses a large subtle bottom-left leaf, short occasional motion in a 16-second cycle, pause/resume, pause during form focus, and a static reduced-motion CSS alternative. The original decorative leaf is not represented as the newsletter logo. Clerk primary-button styling uses the accessible action fill; no hosted account settings changed.
 
-Saved locally, inspected, uploaded successfully to Library; version metadata was written back to each local file. Local folder: `C:/Users/aakas/AppData/Local/Temp/maple-ui-audit-20261025`.
+**http://127.0.0.1:5175/?login-preview=1** is an explicit offline visual preview. Its form is a non-submitting placeholder, not real authentication. Desktop/320px light/dark screenshots and pause behavior were verified; no credentials were entered. Actual hosted Clerk form rendering, email-code flow and first account binding remain for the parent's live integration check. Reduced-motion CSS was inspected; an OS preference toggle was not exercised.
 
-- [Desktop dark](https://chatgpt.com/api/library/files/libfile_5ccfc172d4588191a163f789c9160467/download)
-- [Desktop light](https://chatgpt.com/api/library/files/libfile_e926f938fc0881918b140a31ca993276/download)
-- [Mobile C20](https://chatgpt.com/api/library/files/libfile_eac8730997bc8191a4a284c1f02f0744/download)
-- [Mobile Express Entry](https://chatgpt.com/api/library/files/libfile_c01e8fa9c1708191b10286b1ce2affe4/download)
-- [Expanded light](https://chatgpt.com/api/library/files/libfile_d2538853ee988191a264f48cac0ac934/download)
-- [Expanded dark](https://chatgpt.com/api/library/files/libfile_aeb9e70fb74c8191bbbc2412ee056db4/download)
+## Data behavior preserved
 
-Owned frontend files: `main.tsx`, `styles.css`, `DemoJourneyPanel.tsx/.css`, `CrsBreakdown.tsx`, `CrsEvidenceEditor.tsx`, `journey-presentation.ts`, `NotificationCenter.tsx`, `PersonalGuidePanel.tsx`, `GuideSaveActions.tsx`, `NativeMemoryPanel.tsx`, `request.ts`. Regression coverage: `tests/ui-presentation.test.tsx`, `tests/personal-guide-ui.test.tsx`.
+Personal Guide uses committed `/api/guide/*`, confirmed employment, unknown initial supplemental answers, exact review before confirmation and stale-input protection. It never uses fictional defaults for personal CRS.
+
+Uncertain saves use `POST /proposals/:id/reconcile` with `{}` for readback, without resending facts. Only a backend proposal restored to pending allows confirmation again. Personal source failures release the request hold only for explicit `guideRequestState: not_started`. NativeMemoryPanel synthetic-only handling and AssessmentPanel pending-state coordination remain intact. No server/shared contract changed.
+
+## Verification and limits
+
+- Final `npm run check`: TypeScript, **643 tests in 38 files**, production build passed after disclosure/backdrop changes.
+- `git diff --check` passed. Build contains local font binaries/licenses. Existing size warning: 554.76 kB minified / 158.49 kB gzip.
+- Current IAB: both themes, desktop/320px, both story orderings, real breakdown action, exact official links/hashes/dates, C20 unified disclosure, keyboard focus, expanded-state reflow and clean reload with no captured warnings/errors. Five EE sources and two C20 sources remain accessible without nested disclosures.
+- This revision also checked review forms, draft retention across themes and confirmed personal synthetic save/reload. Earlier combined checks cover unknown intake, proved-unsent safe retry, uncertain save held across reload and reconciled without resend, stale results withheld, demo review invalidation, source failures, processing/missing/unsupported/empty states and native-memory holds.
+
+**Open mobile navigation visual QA:** at 320px and 416px, IAB layout/hit testing reports the section bar at y=0, correct active link and focused destination below the bar, with no horizontal overflow. However, captured scrolled-information pixels omit the bar and crop the heading. This persisted in a fresh IAB tab; desktop pixels are correct. Whether this is capture-specific or an actual mobile paint issue remains **uncertain**. Do not mark mobile sticky navigation visually accepted without an independent check. The source retains standard CSS sticky positioning; an experimental fixed equivalent did not resolve the capture discrepancy and was not retained.
+
+Live authenticated personal save/readback and provider execution remain a combined-environment integration check. Policy seeding/configuration remains backend-owned. No provider request was made for visual QA.
+
+Provided rejection attachment `libfile_f896204047d481918e7014da128dc2b2` was not materialized: the supported Library helper required an unavailable Python runtime. This is a tooling block, not a denied audit. Fresh actual IAB pixels were saved and inspected instead (01-before.png). Native host Library uploads succeeded for all final screenshots below.
+
+## Final screenshots
+
+Saved, inspected and uploaded successfully; returned Library version metadata written to local files. Local directory: `C:/Users/aakas/AppData/Local/Temp/maple-ui-audit-20261025/revision-2`.
+
+- [30-final-desktop-dark.png](https://chatgpt.com/api/library/files/libfile_ae69e1e0d6a88191b7e9909903a97ebe/download)
+- [31-final-desktop-light.png](https://chatgpt.com/api/library/files/libfile_4d73a7cd9dd48191b1787b3f4bfa4d18/download)
+- [32-consolidated-details-light.png](https://chatgpt.com/api/library/files/libfile_5ca155f767608191a2dd3297bea16479/download)
+- [33-consolidated-details-dark.png](https://chatgpt.com/api/library/files/libfile_4fe34a8b880c8191bd0a4b8bdded9744/download)
+- [34-final-mobile-dark.png](https://chatgpt.com/api/library/files/libfile_9df8c919be908191b5355e0168066efd/download)
+- [35-final-mobile-light.png](https://chatgpt.com/api/library/files/libfile_eb70fa0e1ba48191ab3fdac0070b87c1/download)
+- [36-final-c20-light.png](https://chatgpt.com/api/library/files/libfile_9ba0cff1b9c881919eb3960048b85569/download)
+- [37-final-c20-dark.png](https://chatgpt.com/api/library/files/libfile_9c5f4253ac50819186124e02e16fb332/download)
+
+
+
+Latest masked-backdrop and navigation evidence (supersedes the initial grid in screenshots 30/31):
+- [70-review-desktop-dark.jpg](https://chatgpt.com/api/library/files/libfile_cc5e924f166c81919b02a5d2f76d9156/download)
+- [71-review-navigation-dark.jpg](https://chatgpt.com/api/library/files/libfile_c99bb9f7ffcc8191838b264037bcd9f6/download)
+- [42-muted-grid-desktop-light.png](https://chatgpt.com/api/library/files/libfile_383ce54329d481918c8d78815c908571/download)
+- [43-sticky-information-light.png](https://chatgpt.com/api/library/files/libfile_588f534004708191a2963fb161a4d8a7/download)
+- [45-sticky-mobile-result-light.png](https://chatgpt.com/api/library/files/libfile_1f7a27e7b9388191b118db0601ea1006/download)
+
+Login visual preview (explicit offline form placeholder):
+- [60-login-desktop-light.jpg](https://chatgpt.com/api/library/files/libfile_361986ae38f48191806b0c12faeaf33c/download)
+- [61-login-desktop-dark.jpg](https://chatgpt.com/api/library/files/libfile_b573f8bea4b08191b2038c20e9de1220/download)
+- [62-login-mobile-dark.jpg](https://chatgpt.com/api/library/files/libfile_1ec76c87734081918e65c35437eee071/download)
+- [63-login-mobile-light.jpg](https://chatgpt.com/api/library/files/libfile_1932336f8fcc8191bf902fe447f5b84f/download)
+
+## Owned files
+
+Current revision: `web/LoginExperience.tsx/.css`, `web/Theme.tsx` presentation, `web/ScoreImpact.tsx`, `DiscoveryEvidence.tsx`, `WorkspaceNavigation.tsx`, `CrsBreakdown.tsx`, `DemoJourneyPanel.tsx/.css`, `main.tsx`, `styles.css`, `web/public/fonts/*`, presentation/theme tests and this handoff. Earlier UI commits include PersonalGuidePanel, GuideSaveActions, NativeMemoryPanel presentation, CrsEvidenceEditor, journey-presentation, NotificationCenter and request handling. Backend-owner worktree was not edited.

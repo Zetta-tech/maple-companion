@@ -49,7 +49,7 @@ for (const mode of ['light', 'dark']) {
     for (const status of ['error', 'success', 'warning']) {
       it(`${status} is readable`, () => expect(contrast(palette[`${status}-ink`]!, palette[`${status}-wash`]!)).toBeGreaterThanOrEqual(4.5));
     }
-    for (const background of ['accent', 'accent-hover']) {
+    for (const background of ['action', 'action-hover']) {
       it(`button label on ${background} is readable`, () => expect(contrast(palette['on-accent']!, palette[background]!)).toBeGreaterThanOrEqual(4.5));
     }
     for (const surface of surfaces) {

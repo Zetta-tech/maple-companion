@@ -13,6 +13,8 @@ import { HoursReviewNote } from './HoursReviewNote.js';
 import { NativeMemoryPanel } from './NativeMemoryPanel.js';
 import { NotificationCenter, type WorkspaceNotification } from './NotificationCenter.js';
 import { useFlowNavigation } from './useFlowNavigation.js';
+import { WorkspaceNavigation } from './WorkspaceNavigation.js';
+import { LoginExperience } from './LoginExperience.js';
 
 type Snapshot = { revision: number; employment: Employment | null };
 type Proposal = {
@@ -87,7 +89,7 @@ function Bootstrap() {
 function AuthenticatedApp() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   if (!isLoaded) return <Shell><p className="loading" role="status">Loading secure sign-in…</p></Shell>;
-  if (!isSignedIn) return <Shell><div className="sign-in-layout"><section className="intro"><p className="eyebrow">A little clarity for your next step</p><h1>Your story.<br />Your say.</h1><p>Review what Maple remembers and keep your employment information up to date.</p><p className="muted">Sign in to continue to your private workspace.</p></section><section className="sign-in" aria-label="Sign in"><SignIn routing="hash" /></section></div></Shell>;
+  if (!isSignedIn) return <Shell><LoginExperience><SignIn routing="hash" /></LoginExperience></Shell>;
   return <SessionGate key={userId} />;
 }
 
@@ -288,7 +290,7 @@ function Workspace() {
   }, [request]);
 
   return <Shell account={<div className="account"><UserButton /></div>} updates={<NotificationCenter notifications={notifications} status={notificationStatus} />}>
-    <div className="page-heading workspace-heading"><h1 className="visually-hidden">Your next steps.</h1><nav className="workspace-nav" aria-label="Workspace sections">{journeyAvailable && <a href="#journey">Discoveries</a>}<a href="#profile-workspace">Your information</a><a href="#assessment-heading">Requirement checks</a></nav></div>
+    <div className="page-heading workspace-heading"><h1 className="visually-hidden">Your next steps.</h1><WorkspaceNavigation discoveries={journeyAvailable} /></div>
     {error && <div id="workspace-error" tabIndex={-1} className="notice error" role="alert">{error}</div>}
     {message && <div id="workspace-feedback" tabIndex={-1} className="notice" role="status">{message}</div>}
 

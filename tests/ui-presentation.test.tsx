@@ -29,12 +29,14 @@ describe('results-first presentation preserves the meaning of backend outcomes',
     for(const delta of [40,0,-15]){
       const changed={...discovery,crs:{...discovery.crs,delta,after:discovery.crs.before+delta}};
       const html=renderToStaticMarkup(<JourneyCard event={{...base,kind:'policy_update',discovery:changed}} revision={2} date={date}/>);
-      const primary=html.slice(0,html.indexOf('<details>'));
+      const primary=html.slice(0,html.search(/<details(?:\s|>)/));
       expect(primary).toContain(String(changed.crs.after));
       expect(primary).toContain(delta>0?'could add 40':delta<0?'could reduce your CRS by 15':'unchanged');
       expect(primary).toContain('Projected');
       expect(primary).toContain(changed.crs.effectiveFrom);
-      expect(primary).toContain('overall policy cap remains unresolved');
+      expect(primary).toContain('Eligibility not established');
+      expect(primary).toContain('Policy cap unresolved; this estimate is below the disputed limit');
+      expect(html).toContain(discovery.outstanding[0]!);
     }
   });
   it('does not label missing information or unsupported C20 as a discovered possibility',()=>{

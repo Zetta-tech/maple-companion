@@ -75,5 +75,5 @@ export const clerkAppearance: ComponentProps<typeof ClerkProvider>['appearance']
     colorWarning: 'var(--warning-ink)', colorNeutral: 'var(--ink)',
     colorModalBackdrop: 'var(--backdrop)', fontFamily: 'var(--font)', borderRadius: '0.5rem',
   },
-  elements: { rootBox: { maxWidth: '100%', width: '100%' }, cardBox: { maxWidth: '100%', width: '100%' } },
+  elements: { rootBox: { maxWidth: '100%', width: '100%' }, cardBox: { maxWidth: '100%', width: '100%' }, formButtonPrimary: { backgroundColor: 'var(--action)', color: 'var(--on-accent)' } },
 };

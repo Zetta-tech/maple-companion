@@ -8,26 +8,30 @@ import {CrsBreakdown} from './CrsBreakdown.js';
 import { findingHeading, findingLabel, findingReason, isJourneyStale, splitJourney } from './journey-presentation.js';
 import { useFlowNavigation } from './useFlowNavigation.js';
 import { GuideSaveActions } from './GuideSaveActions.js';
+import { ScoreImpact } from './ScoreImpact.js';
+import { DiscoveryEvidence } from './DiscoveryEvidence.js';
 import './DemoJourneyPanel.css';
 type Request=<T>(path:string,body?:unknown)=>Promise<T>;
 type Proposal={id:string;status:string;profile:DemoProfile|null;baseRevision:number};
 function Finding({ discovery: d, fictional = true }: { discovery: Discovery; fictional?: boolean }) {
   const crs = d.crs?.status === 'complete' ? d.crs : null;
   const why = findingReason(d);
+  const qualification = d.status === 'potential_pathway' && d.outstanding[0]?.startsWith('Obtain the employer')
+    ? 'Employer exchange evidence still needs review.'
+    : d.outstanding[0];
   return <>
+    {crs ? <ScoreImpact discovery={d} fictional={fictional} /> : <>
     <div className={`finding-overview finding-overview--${d.kind}`}><div className="finding-outcome">
     <h3>{findingHeading(d)}</h3>
     {d.crs && <CrsBreakdown result={d.crs} view="summary" fictional={fictional} />}
     {d.kind === 'c20' && <p className="finding-relevance">{why}</p>}
+    {d.kind === 'c20' && <p className="result-qualification"><strong>{d.status === 'potential_pathway' ? 'Potential pathway · Eligibility not established' : 'Employer evidence still needs review'}</strong><span>{qualification ?? 'Review the official requirements before relying on this result.'}</span></p>}
     {d.score && <><div className="journey-score" aria-label="Canadian work component comparison"><span><small>Previous component</small>{d.score.before}</span><span className="score-arrow" aria-hidden="true">→</span><span><small>Projected component</small>{d.score.after}</span><strong>{d.score.delta > 0 ? '+' : ''}{d.score.delta}<small>points</small></strong></div><p className="result-qualification"><strong>Component only · Effective {d.score.effectiveFrom}</strong><span>Total CRS not calculated.{d.score.conditional && ' Qualifying-offer comparison is unresolved; the final difference may differ.'}</span></p></>}
     </div><div className="finding-action">{d.kind !== 'c20' && <p className="finding-relevance">{why}</p>}
     {d.nextSteps[0] && <div className="finding-next"><h4>Your next step</h4><p>{d.nextSteps[0]}</p></div>}</div></div>
-    {d.kind === 'c20' && <p className="result-qualification"><strong>{d.status === 'potential_pathway' ? 'Potential pathway · Eligibility not established' : 'Employer evidence still needs review'}</strong><span>{d.outstanding[0] ?? 'Review the official requirements before relying on this result.'}</span></p>}
     {d.kind === 'express_entry' && d.outstanding[0] && <p className="result-qualification"><strong>Still to verify</strong><span>{crs && d.outstanding[0].startsWith('The overall maximum under the announced allocation remains unresolved') ? 'The overall policy cap remains unresolved. This projection stays below the disputed boundary; higher-score cases are withheld.' : d.outstanding[0]}</span></p>}
-    <div className="finding-details">{d.crs && <CrsBreakdown result={d.crs} view="details" fictional={fictional} />}
-    <details><summary>Evidence &amp; conditions ({d.outstanding.length})</summary><p>{d.summary}</p><h4>Why Maple surfaced this</h4><ul>{d.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul><h4>Outstanding evidence</h4><ul>{d.outstanding.map(item => <li key={item}>{item}</li>)}</ul><h4>Suggested actions</h4><ol>{d.nextSteps.map(item => <li key={item}>{item}</li>)}</ol></details>
-    <details><summary>Official sources ({d.sources.length})</summary><ul className="source-list">{d.sources.map(source => <li key={source.id}><a href={source.url} target="_blank" rel="noreferrer">{source.title}<span className="visually-hidden"> (opens in a new tab)</span></a><small>Checked {new Date(source.retrievedAt).toLocaleString()}{source.effectiveFrom && ` · Effective ${source.effectiveFrom}`}</small><details><summary>Source version</summary><small>Reviewed {new Date(source.reviewedAt).toLocaleString()}{source.publishedAt && ` · Published ${source.publishedAt}`}</small><small>SHA-256 <code>{source.bodySha256}</code></small></details></li>)}</ul></details>
-    </div>
+    </>}
+    {!crs && <div className="finding-details"><details><summary>Review evidence and official sources</summary><DiscoveryEvidence discovery={d} /></details></div>}
   </>;
 }
 function Explanation({ event }: { event: JourneyEvent }) {
