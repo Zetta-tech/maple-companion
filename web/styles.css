@@ -259,3 +259,66 @@ code { overflow-wrap: anywhere; }
 @media (max-width: 520px) {
   .review .actions > button { width: 100%; white-space: normal; }
 }
+
+/* The workspace leads with saved outcomes; editing stays close at hand. */
+.workspace-heading { margin-bottom:1rem; align-items:center; }
+.workspace-heading h1 { font-size:clamp(2rem,4vw,3rem); margin-bottom:.7rem; }
+.workspace-heading > button { margin-top:0; }
+.workspace-heading .eyebrow { margin-bottom:.6rem; }
+.workspace-nav { display:flex; flex-wrap:wrap; gap:.4rem 1.6rem; margin:0 0 1.5rem; padding-bottom:.5rem; border-bottom:1px solid var(--line); font-size:.88rem; }
+.workspace-nav a { display:inline-flex; align-items:center; min-height:44px; color:var(--muted); text-decoration:none; border-bottom:2px solid transparent; }
+.workspace-nav a:hover,.workspace-nav a:focus-visible { color:var(--accent); border-bottom-color:var(--accent); }
+#journey,#profile-workspace,#assessment-heading { scroll-margin-top:2rem; }
+.profile-workspace { border-top:1px solid var(--line); padding-top:1rem; }
+.profile-workspace .native-memory { margin-bottom:2rem; }
+.profile-workspace .section-heading { border-top:0; }
+.assessment-inputs { margin-bottom:2.5rem; }
+.saved-input-summary { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; margin:1.5rem 0 .5rem; font-size:.9rem; }
+.saved-input-summary span { color:var(--muted); }
+.profile-editor { border-bottom:1px solid var(--line); }
+.profile-editor>summary { padding:1rem 0; cursor:pointer; font-size:.9rem; font-weight:600; color:var(--accent); min-height:44px; }
+.profile-editor form { max-width:48rem; padding:1rem 0 2rem; }
+.profile-workspace .memory-composer { box-shadow:none; border-radius:0; background:transparent; }
+.profile-workspace .changes { border:0; border-top:1px solid var(--line); border-radius:0; padding:1.5rem 0; background:transparent; }
+.notification-center { position:relative; }
+.notification-center>summary { display:flex; align-items:center; gap:.45rem; min-height:44px; padding:.5rem .65rem; border:1px solid transparent; border-radius:8px; cursor:pointer; list-style:none; font-size:.8rem; color:var(--ink); }
+.notification-center>summary::-webkit-details-marker { display:none; }
+.notification-center>summary:hover,.notification-center[open]>summary { background:var(--surface-subtle); border-color:var(--line); }
+.notification-count { font-size:.7rem; color:var(--accent); font-variant-numeric:tabular-nums; }
+.notification-popover { position:absolute; z-index:50; top:calc(100% + .65rem); right:0; width:22rem; max-width:calc(100vw - 2rem); max-height:min(75vh,36rem); overflow:auto; background:var(--surface-elevated); box-shadow:var(--shadow); border:1px solid var(--control-border); border-radius:10px; padding:1.25rem; }
+.notification-heading { display:flex; gap:1rem; justify-content:space-between; align-items:center; margin-bottom:.5rem; }
+.notification-heading h2 { font-size:1.15rem; margin:0; }
+.notification-popover ul { list-style:none; padding:0; margin:0 0 1rem; }
+.notification-popover li { border-bottom:1px solid var(--line); padding:1rem 0; font-size:.85rem; }
+.notification-popover li p { margin:.25rem 0; color:var(--muted); }
+.notification-popover time { font-size:.75rem; color:var(--muted); }
+button.text-button { background:transparent; border-color:transparent; color:var(--ink); font-size:.8rem; padding:.4rem .5rem; }
+button.text-button:hover:not(:disabled) { background:var(--surface-subtle); }
+@media(max-width:800px) {
+  .workspace-heading { align-items:flex-start; }
+  .workspace-heading>button { margin-top:0; }
+  .workspace-nav { margin-bottom:1.5rem; }
+}
+@media(max-width:520px) {
+  .workspace-heading { flex-wrap:wrap; gap:1rem; }
+  .workspace-heading>button { font-size:.8rem; min-height:44px; padding:.5rem .75rem; }
+  .header-actions { gap:.25rem; }
+  .notification-label { display:none; }
+  .notification-popover { position:fixed; top:76px; right:1rem; }
+  button.theme-toggle { width:44px; padding-inline:0; }
+  .theme-toggle span { display:none; }
+  .workspace-nav { gap:.25rem 1rem; font-size:.78rem; }
+  .saved-input-summary { flex-direction:column; gap:.3rem; }
+  .section-heading { flex-wrap:wrap; }
+}
+
+main:has(.workspace-heading) { padding-top:1.5rem; }
+@media(max-width:520px) {
+  .workspace-heading { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; }
+  .workspace-heading .eyebrow { font-size:.65rem; letter-spacing:.08em; }
+  .workspace-heading h1 { font-size:1.9rem; margin-bottom:0; }
+  .workspace-heading p:not(.eyebrow) { display:none; }
+  .workspace-heading>button { align-self:end; padding:.4rem .6rem; font-size:.73rem; }
+  .journey-intro { display:grid; grid-template-columns:minmax(0,1fr) auto; }
+  .journey-profile-label { font-size:.75rem; gap:.25rem .5rem; }
+}

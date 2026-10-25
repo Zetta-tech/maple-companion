@@ -11,6 +11,7 @@ import { DemoJourneyPanel } from './DemoJourneyPanel.js';
 import { CecWorkFields, CecWorkReview } from './CecWorkFields.js';
 import { HoursReviewNote } from './HoursReviewNote.js';
 import { NativeMemoryPanel } from './NativeMemoryPanel.js';
+import { NotificationCenter, type WorkspaceNotification } from './NotificationCenter.js';
 import { useFlowNavigation } from './useFlowNavigation.js';
 
 type Snapshot = { revision: number; employment: Employment | null };
@@ -23,7 +24,7 @@ type Proposal = {
   newValue: Employment;
   chat?: { utterance: string; expiresAt: string; periodSource: 'message' | 'interpretation'; clarificationAnswer?: 'actual_weekly_work'; clarificationSource?: 'user_entered' };
 };
-type Notification = { id: string; operationId: string | null; assessmentId: string | null; kind: 'saved' | 'assessed'; createdAt: string; revision: number };
+type Notification = WorkspaceNotification;
 const blankEmployment: Employment = {
   employer: '', title: '', duties: '', startDate: '', currentJob: true, endDate: null,
   hoursPerWeek: null, countryCode: '', paid: 'unknown', authorizedToWork: 'unknown',
@@ -50,10 +51,10 @@ function displayValue(employment: Employment | null, field: keyof Employment): s
   return String(value);
 }
 
-function Shell({ children, account }: { children: ReactNode; account?: ReactNode }) {
+function Shell({ children, account, updates }: { children: ReactNode; account?: ReactNode; updates?: ReactNode }) {
   return <>
     <a className="skip-link" href="#main">Skip to content</a>
-    <header className="site-header"><a className="brand" href="/" aria-label="Maple home">maple<span aria-hidden="true">.</span></a><span className="header-note">Your immigration companion</span><div className="header-actions"><ThemeToggle />{account}</div></header>
+    <header className="site-header"><a className="brand" href="/" aria-label="Maple home">maple<span aria-hidden="true">.</span></a><span className="header-note">Your immigration companion</span><div className="header-actions">{updates}<ThemeToggle />{account}</div></header>
     <main id="main">{children}</main>
     <footer>Your information stays yours to review. Employment details alone do not determine immigration eligibility.</footer>
   </>;
@@ -126,6 +127,8 @@ function Workspace() {
   const [form, setForm] = useState<Employment>({ ...blankEmployment });
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [journeyAvailable, setJourneyAvailable] = useState(false);
+  const [notificationStatus, setNotificationStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [loading, setLoading] = useState(true);
   const [activity, setActivity] = useState<'refresh' | 'propose' | 'confirm' | 'reject' | 'reconcile' | null>(null);
   const busy = activity !== null;
@@ -159,6 +162,7 @@ function Workspace() {
     // An uncertain write deliberately blocks the authoritative snapshot. Operational
     // statuses must still load so a restarted client can reach reconciliation.
     setSnapshot(null);
+    setNotificationStatus('loading');
     const [nextSnapshot, changes, inbox] = await Promise.allSettled([
       request<Snapshot>('/api/employment'),
       request<{ proposals: Proposal[] }>('/api/proposals'),
@@ -166,6 +170,7 @@ function Workspace() {
     ]);
     if (changes.status === 'fulfilled') setProposals(changes.value.proposals);
     if (inbox.status === 'fulfilled') setNotifications(inbox.value.notifications);
+    setNotificationStatus(inbox.status === 'fulfilled' ? 'ready' : 'error');
 
     const hasUncertainSave = changes.status === 'fulfilled'
       && changes.value.proposals.some((proposal) => ['applying', 'uncertain'].includes(proposal.status));
@@ -276,15 +281,19 @@ function Workspace() {
   const unresolved = proposals.filter((proposal) => !['committed', 'rejected', 'stale'].includes(proposal.status));
   const canEdit = snapshot !== null && !loading && !busy && unresolved.length === 0;
   const refreshNotifications = useCallback(async () => {
-    const inbox = await request<{ notifications: Notification[] }>('/api/notifications');
-    setNotifications(inbox.notifications);
+    try {
+      const inbox = await request<{ notifications: Notification[] }>('/api/notifications');
+      setNotifications(inbox.notifications); setNotificationStatus('ready');
+    } catch (error) { setNotificationStatus('error'); throw error; }
   }, [request]);
 
-  return <Shell account={<div className="account"><UserButton /></div>}>
-    <div className="page-heading"><div><p className="eyebrow">Your information</p><h1>Your memory and next steps.</h1><p>Review remembered information and the evidence used for your private requirement checks.</p></div><button type="button" className="secondary" disabled={busy || loading} onClick={refresh}>{activity === 'refresh' ? 'Refreshing…' : 'Refresh status'}</button></div>
+  return <Shell account={<div className="account"><UserButton /></div>} updates={<NotificationCenter notifications={notifications} status={notificationStatus} />}>
+    <div className="page-heading workspace-heading"><div><p className="eyebrow">Your private workspace</p><h1>Your next steps.</h1><p>Discoveries, changes and the information behind them.</p></div><button type="button" className="secondary" disabled={busy || loading} onClick={refresh}>{activity === 'refresh' ? 'Refreshing…' : 'Refresh status'}</button></div>
     {error && <div id="workspace-error" tabIndex={-1} className="notice error" role="alert">{error}</div>}
     {message && <div id="workspace-feedback" tabIndex={-1} className="notice" role="status">{message}</div>}
-    <DemoJourneyPanel request={request} />
+    <nav className="workspace-nav" aria-label="Workspace sections">{journeyAvailable && <a href="#journey">Discoveries</a>}<a href="#profile-workspace">Your information</a><a href="#assessment-heading">Requirement checks</a></nav>
+    <DemoJourneyPanel request={request} onAvailabilityChange={setJourneyAvailable} />
+    <div id="profile-workspace" className="profile-workspace">
     <NativeMemoryPanel request={request} onChanged={() => setMemoryEpoch(value => value + 1)} onAssessmentHold={updateAssessmentHold} />
     {review?.chat && review.newValue?.hoursPerWeek !== null && <HoursReviewNote {...review.chat} oldHours={review.oldValue?.hoursPerWeek ?? null} newHours={review.newValue.hoursPerWeek} />}
     {loading && <p role="status">Loading your saved information…</p>}
@@ -294,10 +303,11 @@ function Workspace() {
 
     {review && <section className="review" aria-labelledby="review-heading"><p className="eyebrow">Nothing changes until you confirm</p><h2 id="review-heading" tabIndex={-1}>Review this exact change</h2><p>Confirmation applies only to the values below. If your saved information has changed since this proposal was made, Maple will ask you to review again.</p><div className="comparison"><div className="comparison-head" aria-hidden="true"><span>Detail</span><span>Currently saved</span><span>Proposed</span></div>{fields.map(([key, label]) => <div className={`comparison-row${displayValue(review.oldValue, key) !== displayValue(review.newValue, key) ? ' changed' : ''}`} key={key}><strong>{label}</strong><div><span className="mobile-label">Currently saved</span>{displayValue(review.oldValue, key)}</div><div><span className="mobile-label">Proposed</span>{displayValue(review.newValue, key)}</div></div>)}</div><CecWorkReview oldValue={review.oldValue?.cecWork} newValue={review.newValue.cecWork} /><div className="actions"><button type="button" disabled={busy} onClick={() => decide(review, 'confirm')}>{activity === 'confirm' ? 'Saving confirmed change…' : 'Confirm and save'}</button><button type="button" className="secondary" disabled={busy} onClick={() => decide(review, 'reject')}>{activity === 'reject' ? 'Discarding…' : 'Discard change'}</button></div></section>}
 
-    <div className="workspace-grid"><section className="form-panel" aria-labelledby="employment-heading"><div className="section-heading"><h2 id="employment-heading">Reviewed assessment inputs</h2><span className="muted">{snapshot ? (snapshot.employment ? `Saved revision ${snapshot.revision}` : 'No saved record') : 'Saved record unavailable'}</span></div><p className="muted">These are the explicitly reviewed inputs for requirement checks, not a second live profile. Review them after conversation changes. Leave unknown details unknown.</p><form onSubmit={propose}><fieldset disabled={!canEdit}><legend className="visually-hidden">Your employment record</legend><div className="field-grid"><label>Employer<input name="employer" autoComplete="organization" value={form.employer} maxLength={200} required onChange={(event) => update('employer', event.target.value)} /></label><label>Job title<input name="title" autoComplete="organization-title" value={form.title} maxLength={200} required onChange={(event) => update('title', event.target.value)} /></label></div><div className="field-grid"><label>Start date<input type="date" name="startDate" value={form.startDate} required onChange={(event) => update('startDate', event.target.value)} /></label><label>Country code<input name="countryCode" value={form.countryCode} placeholder="For example, CA" minLength={2} maxLength={2} pattern="[A-Z]{2}" required onChange={(event) => update('countryCode', event.target.value.toUpperCase())} /><span className="hint">Two-letter country code for where you worked.</span></label></div><label className="checkbox"><input type="checkbox" checked={form.currentJob} onChange={(event) => setForm((current) => ({ ...current, currentJob: event.target.checked, endDate: null }))} /><span>I currently work in this job</span></label>{!form.currentJob && <label>Actual end date<input type="date" name="endDate" value={form.endDate ?? ''} required onChange={(event) => update('endDate', event.target.value || null)} /></label>}<label>Hours per week <span className="optional">(optional)</span><input name="hoursPerWeek" type="number" min="0.01" max="168" step="any" value={form.hoursPerWeek ?? ''} onChange={(event) => update('hoursPerWeek', event.target.value === '' ? null : Number(event.target.value))} /><span className="hint">Leave blank if unknown.</span></label><div className="field-grid"><AnswerField label="Was this paid work?" value={form.paid} onChange={(value) => update('paid', value)} /><AnswerField label="Were you authorized to work?" value={form.authorizedToWork} onChange={(value) => update('authorizedToWork', value)} /></div><label>What were your main duties? <span className="optional">(optional)</span><textarea name="duties" rows={4} value={form.duties} maxLength={10_000} onChange={(event) => update('duties', event.target.value)} /><span className="hint">Describe your actual work. Duties are needed before recording a NOC code.</span></label><details className="noc-details"><summary>Add a NOC code you have reviewed</summary><p className="hint">A job title alone is not enough to choose a NOC code. Review its description against your duties before adding it.</p><label>NOC code<input name="nocCode" inputMode="numeric" pattern="[0-9]{5}" maxLength={5} value={form.nocCode ?? ''} onChange={(event) => setForm((current) => ({ ...current, nocCode: event.target.value || null, nocReviewed: false }))} /></label><label className="checkbox"><input type="checkbox" disabled={!form.nocCode || !canEdit} checked={form.nocReviewed} onChange={(event) => update('nocReviewed', event.target.checked)} /><span>I reviewed this NOC code against my job duties.</span></label></details><CecWorkFields value={form.cecWork} jobStartDate={form.startDate} onChange={value => update('cecWork', value)} /><div className="form-actions"><button type="submit">{activity === 'propose' ? 'Preparing review…' : 'Review change'}</button><p className="hint">You will see the exact change before confirming.</p></div></fieldset></form></section>
-      <aside className="inbox" aria-labelledby="notifications-heading"><p className="eyebrow">Notification centre</p><h2 id="notifications-heading">Your updates</h2>{notifications.length === 0 ? <p className="muted">No updates yet.</p> : <ul>{notifications.map((notification) => <li key={notification.id}><strong>{notification.kind === 'assessed' ? 'Private requirement check completed' : 'Employment information saved'}</strong><p>Revision {notification.revision}</p><time dateTime={notification.createdAt}>{new Date(notification.createdAt).toLocaleString()}</time></li>)}</ul>}<p className="inbox-note">Confirmed saves and completed private checks appear here. Pending changes remain in your review list.</p></aside>
+    <div className="assessment-inputs"><section className="form-panel" aria-labelledby="employment-heading"><div className="section-heading"><h2 id="employment-heading">Reviewed assessment inputs</h2><span className="muted">{snapshot ? (snapshot.employment ? `Saved revision ${snapshot.revision}` : 'No saved record') : 'Saved record unavailable'}</span></div><p className="muted">These are the explicitly reviewed inputs for requirement checks, not a second live profile. Review them after conversation changes. Leave unknown details unknown.</p>{snapshot?.employment && <div className="saved-input-summary"><strong>{snapshot.employment.title || 'Job title not recorded'}</strong><span>{snapshot.employment.employer || 'Employer not recorded'}</span><span>{snapshot.employment.startDate}{snapshot.employment.currentJob ? ' – Present' : ' – ' + (snapshot.employment.endDate ?? 'End date unknown')} · {snapshot.employment.hoursPerWeek === null ? 'Hours unknown' : `${snapshot.employment.hoursPerWeek} hours/week`}</span></div>}<details className="profile-editor" open={!snapshot?.employment}><summary>Review or edit assessment inputs</summary><form onSubmit={propose}><fieldset disabled={!canEdit}><legend className="visually-hidden">Your employment record</legend><div className="field-grid"><label>Employer<input name="employer" autoComplete="organization" value={form.employer} maxLength={200} required onChange={(event) => update('employer', event.target.value)} /></label><label>Job title<input name="title" autoComplete="organization-title" value={form.title} maxLength={200} required onChange={(event) => update('title', event.target.value)} /></label></div><div className="field-grid"><label>Start date<input type="date" name="startDate" value={form.startDate} required onChange={(event) => update('startDate', event.target.value)} /></label><label>Country code<input name="countryCode" value={form.countryCode} placeholder="For example, CA" minLength={2} maxLength={2} pattern="[A-Z]{2}" required onChange={(event) => update('countryCode', event.target.value.toUpperCase())} /><span className="hint">Two-letter country code for where you worked.</span></label></div><label className="checkbox"><input type="checkbox" checked={form.currentJob} onChange={(event) => setForm((current) => ({ ...current, currentJob: event.target.checked, endDate: null }))} /><span>I currently work in this job</span></label>{!form.currentJob && <label>Actual end date<input type="date" name="endDate" value={form.endDate ?? ''} required onChange={(event) => update('endDate', event.target.value || null)} /></label>}<label>Hours per week <span className="optional">(optional)</span><input name="hoursPerWeek" type="number" min="0.01" max="168" step="any" value={form.hoursPerWeek ?? ''} onChange={(event) => update('hoursPerWeek', event.target.value === '' ? null : Number(event.target.value))} /><span className="hint">Leave blank if unknown.</span></label><div className="field-grid"><AnswerField label="Was this paid work?" value={form.paid} onChange={(value) => update('paid', value)} /><AnswerField label="Were you authorized to work?" value={form.authorizedToWork} onChange={(value) => update('authorizedToWork', value)} /></div><label>What were your main duties? <span className="optional">(optional)</span><textarea name="duties" rows={4} value={form.duties} maxLength={10_000} onChange={(event) => update('duties', event.target.value)} /><span className="hint">Describe your actual work. Duties are needed before recording a NOC code.</span></label><details className="noc-details"><summary>Add a NOC code you have reviewed</summary><p className="hint">A job title alone is not enough to choose a NOC code. Review its description against your duties before adding it.</p><label>NOC code<input name="nocCode" inputMode="numeric" pattern="[0-9]{5}" maxLength={5} value={form.nocCode ?? ''} onChange={(event) => setForm((current) => ({ ...current, nocCode: event.target.value || null, nocReviewed: false }))} /></label><label className="checkbox"><input type="checkbox" disabled={!form.nocCode || !canEdit} checked={form.nocReviewed} onChange={(event) => update('nocReviewed', event.target.checked)} /><span>I reviewed this NOC code against my job duties.</span></label></details><CecWorkFields value={form.cecWork} jobStartDate={form.startDate} onChange={value => update('cecWork', value)} /><div className="form-actions"><button type="submit">{activity === 'propose' ? 'Preparing review…' : 'Review change'}</button><p className="hint">You will see the exact change before confirming.</p></div></fieldset></form></details></section>
+
     </div>
     <AssessmentPanel key={memoryEpoch} request={request} revision={snapshot?.revision ?? null} onAssessed={refreshNotifications} blocked={assessmentHold} />
+    </div>
   </Shell>;
 }
 
