@@ -13,27 +13,48 @@ Library text was available and read, so implementation was not blocked on its co
 ## Current experience status
 
 - Existing local application: `http://localhost:3000`, single authorized Clerk account.
-- C20: **Blocked on hosted schema approval and live end-to-end validation**. Local
+- C20: **Ready for isolated AM setup and live end-to-end validation**. Local
   profile/review, AM adapter, source retrieval, condition checks, native hosted-chat
   request, journey persistence adapter and UI are implemented, not yet live-validated.
 - Express Entry: **Working offline within the supported fictional subset; live
   validation blocked**. Source ingestion, component fallback and complete fictional
   CRS before/after calculation are implemented. All full-score inputs are explicitly
   reviewed; no real-user baseline is invented. Live persistence/replay depends on
-  the same schema and AM-context approval.
+  the separate AM-context setup. Hosted operational schema is now applied.
 - Existing ordinary employment revision 7 remains separate from the fictional demo
   entity. No overnight demo profile or model request has been sent yet.
 
-## Exact blocked action
+The isolated Guide binding is now enforced in runtime composition: its Context
+and key cannot match ordinary memory, and the Clerk owner must match the existing
+authorized account. Missing demo configuration leaves Guide disabled. The native
+`/chat` design is retained; the unactivated reflection experiment was removed.
+The original UI's unused preview callbacks/status polling and never-assigned
+server interpreter hook were removed. Historical proposal/receipt parsing and
+its regression coverage remain because existing records still depend on them.
+
+Current local verification: **763 tests across 38 files**, typecheck and build
+pass. The two hosted database tests are separate from that fixture suite. No
+dependency was added for the separate Context. The live guide is not activated.
+
+## Hosted schema stage completed after specific approval
 
 Automatic approval review denied execution of `scripts/apply-demo-schema.ts test`
 before execution. It would add `maple_demo_heads`, `maple_demo_proposals`,
 `maple_demo_events` and `maple_schema:demo_journey_v1` to existing `maple/test`.
 The stated reason was that hosted migrations require separate explicit approval.
-No schema operation ran. Do not retry or redirect through another tool without
-materially new authorization. The same additive schema in `maple/development`
-also needs approval before local feature activation. No existing record deletion,
-user/grant changes or credentials are involved.
+That first attempt did not execute. The user's later specific approval resolved
+the blocker. On October 25, the exact additive operation succeeded on `maple/test`
+at 11:20:56 UTC, followed by the existing real-engine workflow test. The same
+schema then succeeded on `maple/development` at 11:21:49 UTC. No existing records,
+users, grants or credentials changed; no deletion occurred.
+
+Two live Surreal integration tests now pass. The second retrieves five real
+official CRS sources, holds unknown Canadian-employer evidence, then persists
+the fully reviewed fictional 528-to-568 projection and verifies reload and
+deduplication. AM remains explicitly substituted in these two tests. A separate
+read-only retrieval verified both C20 source hashes. At 11:25 UTC, test retained
+two heads, four proposals and four journey events; development's three demo
+tables were empty. Schema marker version is 1 in both databases.
 
 ## Implemented workflow
 
@@ -122,7 +143,7 @@ receipt integrity, wrong owner, native `/chat` routing, employer-name independen
 missing reciprocity, future policy dates, NOC/condition holds and hours caps.
 The real-engine test in `integration/demo-journey.test.ts` covers exact approval,
 foreign-owner denial, replay, concurrent proposals and history after reconstruction;
-it has **not run** because its hosted schema setup was denied. Its AM transport is
+it **passed against hosted maple/test** after specific approval. Its AM transport is
 explicitly synthetic and does not validate model quality or hosted AM persistence.
 
 See `DEMO_ACCEPTANCE_REVIEW.md` for the actual offline IAB trace, deterministic versus
@@ -146,8 +167,8 @@ hold, explicit correction and subsequent offer-dominant 528 to 582 result, with
 the older hold preserved as historical. Exact numeric baseline fixtures remain
 unchanged. See `DEMO_ACCEPTANCE_REVIEW.md` for reproduction and limitations.
 
-Next: obtain the exact schema approval, apply/test on `maple/test`, then apply to
-`maple/development`, load the configured source bundle, and verify one real fictional
+Next: finish the dedicated AM Context setup in [ISOLATED_DEMO_SETUP.md](ISOLATED_DEMO_SETUP.md),
+load the configured source bundle, and verify one real fictional
 profile + guide request + replay through the actual UI. Preserve raw native JSON
 only in ignored `.local/guide-diagnostics`. Never create an artificial live Clerk
 session or call a mock result a completed demo.

@@ -10,20 +10,19 @@ import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { PolicyRegistry } from './policies.js';
 import { Assessments } from './assessments.js';
-import type { ChatProposals } from './chat-proposals.js';
 import { createNativeChat, privateNativeDiagnostics, type NativeChat } from './native-chat.js';
 import { SurrealNativeChatStore } from './native-chat-store.js';
 import { SurrealDemoStore } from './demo-store.js';
 import { createDemoMemory } from './demo-memory.js';
 import { DemoJourney, privateGuideEvidence } from './demo-journey.js';
 import { GuideSources } from './guide-sources.js';
+import { loadDemoBindings } from './demo-config.js';
 
 let config: Config | undefined;
 let authConfig: AuthConfig | undefined;
 let configurationError: AppError | undefined;
 let workflow: Workflow | undefined;
 let assessments: Assessments | undefined;
-let chatProposals: ChatProposals | undefined;
 let nativeChat: NativeChat | undefined;
 let demoJourney: DemoJourney | undefined;
 let database: Surreal | undefined;
@@ -58,7 +57,8 @@ try {
         try {
           const demoStore = new SurrealDemoStore(database);
           await demoStore.ready();
-          demoJourney = new DemoJourney(demoStore, createDemoMemory(owner => bindingFor(config!,owner)),
+          const demoBindings = loadDemoBindings(config);
+          demoJourney = new DemoJourney(demoStore, createDemoMemory(owner => bindingFor({bindings:demoBindings},owner)),
             new GuideSources(process.env.MAPLE_GUIDE_SOURCES_FILE), privateGuideEvidence('.local/guide-diagnostics'));
         } catch { console.error('DEMO_JOURNEY_SETUP_REQUIRED'); }
       }
@@ -74,7 +74,6 @@ try {
       });
     } catch { console.error('NATIVE_CHAT_SETUP_REQUIRED'); }
   }
-  if (chatProposals) for (const owner of config.bindings.keys()) await workflow.journal.recoverChat(owner);
 } catch (error) {
   configurationError = error instanceof AppError ? error : new AppError(503, 'JOURNAL_UNAVAILABLE', 'The operation journal is unavailable. No data was saved.');
   config = undefined;
@@ -94,7 +93,7 @@ const sweepChat = async () => {
 };
 sweepChat();
 const sweep = setInterval(sweepChat, 60_000).unref();
-const server = createApp({ config, authConfig, configurationError, workflow, assessments, chatProposals, nativeChat, demoJourney,
+const server = createApp({ config, authConfig, configurationError, workflow, assessments, nativeChat, demoJourney,
   webRoot: process.env.MAPLE_WEB_ROOT,
   operationalStore: 'surrealdb', operationalReady: () => database?.status === 'connected',
 }).listen(port, '127.0.0.1', () => console.log(`Maple listening on loopback port ${port}`));

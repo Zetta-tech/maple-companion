@@ -9,7 +9,7 @@
 | Source retrieval | `GuideSources.retrieve` fetches two appropriate IRCC pages for C20/component requests, or five for a full CRS replay | Seven official public texts are retained in the reviewed bundle. Per-request retrieval is covered by test transport; the live discovery has not run. A changed hash or failed fetch holds the request. |
 | C20 condition checks | `discoverC20` computes a potential lead and missing evidence from the saved profile | It is a deterministic, reviewed criterion calculation. Employer name and wording do not trigger a positive result. This increment is explicitly C20-focused, not an autonomous search of every immigration pathway. |
 | Natural explanation | Installed native AM `/chat`, with separate unchanged question, saved fictional profile, computed conditions and official source bodies | No second model/interpreter or canned runtime answer. The reply must be received before the event is completed, and its actual text/session/trace are saved in the journey. **Hosted generation quality and persistence remain unverified.** |
-| Journey | Owner-bound event claim/result, including the actual reply and source/version evidence | The UI reloads saved records; profile/date changes move old results into a historical disclosure. Offline tests prove the coordinator/UI contract only; hosted SurrealDB tests await schema approval. |
+| Journey | Owner-bound event claim/result, including the actual reply and source/version evidence | The UI reloads saved records; profile/date changes move old results into a historical disclosure. Two hosted SurrealDB tests now pass, with AM explicitly substituted. Live generated explanation persistence remains untested. |
 | Express Entry replay | Developer action selects reviewed real source versions, retrieves current source text, calculates with the same saved profile/date | Independent of a trigger phrase. The legacy profile gets a Canadian-work component result. Explicit complete fictional evidence gets the supported full CRS estimate, actual offer/work maximum and breakdown; missing evidence holds a total. No guaranteed +40. November 3 remains future policy on October 25. |
 
 The native explanation is not allowed to promote policy, approve profile facts, or
@@ -152,7 +152,9 @@ independent test Context, before live demo chat writes.
 
 The denied operation was the command to run `scripts/apply-demo-schema.ts test`
 against existing `maple/test`. The reviewer rejected it **before execution** because
-hosted migrations require separate explicit approval. It was not retried.
+hosted migrations require separate explicit approval. The user's subsequent
+specific approval allowed one retry; it succeeded, then the real-engine workflow
+test passed, then the same schema was applied to development.
 
 The proposed transaction adds three new SCHEMAFULL tables (`maple_demo_heads`,
 `maple_demo_proposals`, `maple_demo_events`), their fields/unique indexes and the
@@ -162,10 +164,27 @@ Existing database-scoped EDITOR credentials have database-system authority, so
 server owner checks remain required. This is a **schema expansion**, not an access
 grant expansion. Test fixture records would be retained.
 
-Required approval bundle: apply that exact additive schema to `maple/test`, run the
-isolated real-engine tests, then apply the same schema to `maple/development` after
-they pass, configure the already-reviewed guide-source path for the local process
-and restart the owned local preview. No new credentials or services are proposed.
+Completed on October 25 at 11:20-11:25 UTC: both schema applications and two
+real-engine tests. Ten synthetic rows remain in test (two heads/four proposals/four
+events); development demo tables remain empty. The full-score test used five live
+official-source fetches and verified a needs-information hold followed by 528 to
+568, reload, owner denial and deduplication. Its AM adapter was explicitly fake;
+no hosted memory or model result is claimed. Two additional C20 official-source
+fetches matched the reviewed hashes.
+
+Remaining setup is the separate demo AM Context and dedicated server binding,
+then coordinated local activation. See [ISOLATED_DEMO_SETUP.md](ISOLATED_DEMO_SETUP.md).
+Ordinary memory is never a fallback for missing demo configuration.
+
+Runtime isolation review: `loadDemoBindings` loads a separate operator-controlled
+file; requires the existing Clerk owner, a different Context and non-reused key;
+and verifies native identity/scope configuration. A real installed-SDK transport
+test observes only the new Context's `/me` and `/chat` requests with the dedicated
+test key while the original binding remains unchanged. Missing setup, reused
+Context/key, foreign owner and non-development modes fail closed. These are local
+contract tests, not live credentials or real two-Context verification. No reflection
+fallback remains in the selected adapter. Local aggregate: 763 tests/38 files,
+typecheck/build pass. No dependency changes.
 
 Separately, native `/chat` is documented to persist memory updates. Its installed
 options expose scopes and labels but no no-persistence switch. A fictional label

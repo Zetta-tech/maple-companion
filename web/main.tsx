@@ -8,11 +8,9 @@ import './styles.css';
 import { AssessmentPanel } from './AssessmentPanel.js';
 import { DemoJourneyPanel } from './DemoJourneyPanel.js';
 import { CecWorkFields, CecWorkReview } from './CecWorkFields.js';
-import { HoursChat } from './HoursChat.js';
 import { HoursReviewNote } from './HoursReviewNote.js';
 import { NativeMemoryPanel } from './NativeMemoryPanel.js';
 import { useFlowNavigation } from './useFlowNavigation.js';
-import type { HoursAnswer, HoursClarification } from '../shared/chat.js';
 
 type Snapshot = { revision: number; employment: Employment | null };
 type Proposal = {
@@ -145,15 +143,12 @@ function Workspace() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activity, setActivity] = useState<'refresh' | 'propose' | 'chat' | 'clarify' | 'confirm' | 'reject' | 'reconcile' | null>(null);
+  const [activity, setActivity] = useState<'refresh' | 'propose' | 'confirm' | 'reject' | 'reconcile' | null>(null);
   const busy = activity !== null;
   const beginNavigation = useFlowNavigation();
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [reviewId, setReviewId] = useState<string | null>(null);
-  const [chatAvailable, setChatAvailable] = useState(false);
-  const [chatFallback, setChatFallback] = useState(false);
-  const [chatClarification, setChatClarification] = useState<HoursClarification | null>(null);
   const [memoryEpoch, setMemoryEpoch] = useState(0);
 
   const request = useCallback(async <T,>(path: string, body?: unknown): Promise<T> => {
@@ -165,7 +160,7 @@ function Workspace() {
         method: body === undefined ? 'GET' : 'POST',
         headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(path === '/api/demo/discover' ? 90_000 : path === '/api/chat/proposals' || path === '/api/native/messages' ? 60_000 : 25_000),
+        cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(path === '/api/demo/discover' ? 90_000 : path === '/api/native/messages' ? 60_000 : 25_000),
       });
     } catch { throw new RequestError('The connection was interrupted. Refresh the change status before trying again.', 'CONNECTION_INTERRUPTED'); }
     return readResponse<T>(response);
@@ -175,14 +170,11 @@ function Workspace() {
     // An uncertain write deliberately blocks the authoritative snapshot. Operational
     // statuses must still load so a restarted client can reach reconciliation.
     setSnapshot(null);
-    const [nextSnapshot, changes, inbox, chat] = await Promise.allSettled([
+    const [nextSnapshot, changes, inbox] = await Promise.allSettled([
       request<Snapshot>('/api/employment'),
       request<{ proposals: Proposal[] }>('/api/proposals'),
       request<{ notifications: Notification[] }>('/api/notifications'),
-      request<{ available: boolean; clarification: HoursClarification | null }>('/api/chat/status'),
     ]);
-    setChatAvailable(chat.status === 'fulfilled' && chat.value.available);
-    setChatClarification(chat.status === 'fulfilled' ? chat.value.clarification : null);
     if (changes.status === 'fulfilled') setProposals(changes.value.proposals);
     if (inbox.status === 'fulfilled') setNotifications(inbox.value.notifications);
 
@@ -248,60 +240,6 @@ function Workspace() {
     } finally { setActivity(null); navigation.complete(destination); }
   }
 
-  async function proposeChat(text: string): Promise<boolean> {
-    if (!snapshot || !canEdit) return false;
-    const navigation = beginNavigation();
-    let destination = 'workspace-error';
-    setActivity('chat'); setError(''); setMessage(''); setChatFallback(false);
-    try {
-      const result = await request<{ kind: string; proposal?: Proposal; message?: string; formHref?: string; clarification?: HoursClarification }>('/api/chat/proposals', {
-        baseRevision: snapshot.revision, message: text, syntheticTest: true,
-      });
-      setChatClarification(result.clarification ?? null);
-      if (result.kind === 'proposal' && result.proposal) {
-        const proposal = result.proposal;
-        setProposals(current => [proposal, ...current.filter(item => item.id !== proposal.id)]);
-        setReviewId(proposal.id);
-        setMessage('Your chat correction is ready for review. Your employment record has not changed.');
-        destination = 'review-heading';
-        return true;
-      }
-      setMessage(result.message ?? 'No change was proposed. Please use the employment form.');
-      setChatFallback(result.kind === 'unavailable' && result.formHref === '#employment-heading');
-      destination = result.clarification ? 'hours-clarification-heading' : 'workspace-feedback';
-      return false;
-    } catch (reason) {
-      setError(`Your employment record was not changed by this chat request. ${reason instanceof Error ? reason.message : 'The preview could not be completed.'}`);
-      // Refresh possible pending state after a lost response; never replay.
-      try { await load(); } catch { /* Existing load applies successful status reads. */ }
-      return false;
-    } finally { setActivity(null); navigation.complete(destination); }
-  }
-
-  async function answerChat(answer: HoursAnswer, hours?: number) {
-    if (!chatClarification || !canEdit) return;
-    const navigation = beginNavigation();
-    let destination = 'workspace-error';
-    setActivity('clarify'); setError(''); setMessage('');
-    try {
-      const result = await request<{ kind: string; proposal?: Proposal; message?: string }>(`/api/chat/clarifications/${encodeURIComponent(chatClarification.id)}`, { answer, ...(hours !== undefined ? { hours } : {}) });
-      setChatClarification(null);
-      if (result.kind === 'proposal' && result.proposal) {
-        const proposal = result.proposal;
-        setProposals(current => [proposal, ...current.filter(item => item.id !== proposal.id)]);
-        setReviewId(proposal.id);
-        setMessage('Your clarification prepared a change for review. Your employment record has not changed.');
-        destination = 'review-heading';
-      } else {
-        setMessage(result.message ?? 'Your employment record is unchanged.');
-        destination = 'workspace-feedback';
-      }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Your answer could not be processed. Refresh status before trying again.');
-      try { await load(); } catch { /* Recover pending state without replaying. */ }
-    } finally { setActivity(null); navigation.complete(destination); }
-  }
-
   async function decide(proposal: Proposal, decision: 'confirm' | 'reject') {
     const navigation = beginNavigation();
     let destination = 'workspace-error';
@@ -356,7 +294,7 @@ function Workspace() {
   return <Shell account={<div className="account"><UserButton /></div>}>
     <div className="page-heading"><div><p className="eyebrow">Your information</p><h1>Your memory and next steps.</h1><p>Review remembered information and the evidence used for your private requirement checks.</p></div><button type="button" className="secondary" disabled={busy || loading} onClick={refresh}>{activity === 'refresh' ? 'Refreshing…' : 'Refresh status'}</button></div>
     {error && <div id="workspace-error" tabIndex={-1} className="notice error" role="alert">{error}</div>}
-    {message && <div id="workspace-feedback" tabIndex={-1} className="notice" role="status">{message}{chatFallback && <> <a href="#employment-heading">Employment form</a></>}</div>}
+    {message && <div id="workspace-feedback" tabIndex={-1} className="notice" role="status">{message}</div>}
     <DemoJourneyPanel request={request} />
     <NativeMemoryPanel request={request} onChanged={() => setMemoryEpoch(value => value + 1)} />
     {review?.chat && review.newValue?.hoursPerWeek !== null && <HoursReviewNote {...review.chat} oldHours={review.oldValue?.hoursPerWeek ?? null} newHours={review.newValue.hoursPerWeek} />}
