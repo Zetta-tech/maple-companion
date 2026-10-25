@@ -1,0 +1,48 @@
+.login-experience {
+  position:relative;
+  isolation:isolate;
+  display:grid;
+  grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+  align-items:start;
+  gap:clamp(2rem,6vw,5rem);
+  min-height:clamp(38rem,calc(100svh - 13rem),48rem);
+  padding:clamp(2rem,5vw,4rem) 0 5rem;
+}
+.login-intro { max-width:34rem; padding-top:1.5rem; }
+.login-kicker { font-size:.875rem; font-weight:600; color:var(--accent); margin:0 0 1.25rem; }
+.login-intro h1 { font-size:clamp(2.25rem,3.7vw,3.4rem); font-weight:600; letter-spacing:-.045em; line-height:1.08; margin:0 0 1.5rem; max-width:15ch; }
+.login-description { max-width:35ch; color:var(--ink); font-size:1rem; line-height:1.6; margin-bottom:1rem; }
+.login-continuation { color:var(--muted); font-size:.875rem; line-height:1.5; margin:0; }
+.login-form-region { width:100%; max-width:27rem; min-width:0; justify-self:end; align-self:start; }
+.login-form-region>* { max-width:100%; }
+.login-leaf-window { position:absolute; left:0; bottom:0; width:48%; height:50%; overflow:hidden; z-index:-1; pointer-events:none; }
+.login-leaf { position:absolute; left:-3%; bottom:-12%; width:95%; height:110%; color:var(--accent); transform-origin:50% 88%; animation:maple-login-breeze 16s ease-in-out infinite; }
+.login-leaf path { fill:currentColor; fill-opacity:.065; stroke:currentColor; stroke-width:1.2; stroke-opacity:.17; stroke-linejoin:round; }
+.login-leaf .login-leaf-veins { fill:none; stroke-width:1; stroke-opacity:.12; }
+:root[data-theme="dark"] .login-leaf path { fill-opacity:.055; stroke-opacity:.14; }
+:root[data-theme="dark"] .login-leaf .login-leaf-veins { stroke-opacity:.1; }
+.login-motion-toggle { position:absolute; left:0; bottom:.5rem; background:transparent; border:0; color:var(--muted); padding:.4rem 0; font-size:.75rem; font-weight:400; min-height:44px; text-decoration:underline; text-underline-offset:.2em; }
+.login-motion-toggle:hover:not(:disabled) { background:transparent; color:var(--ink); border-color:transparent; }
+.login-motion-toggle:active:not(:disabled) { transform:none; }
+.login-experience[data-motion="paused"] .login-leaf,
+.login-experience:has(.login-form-region :focus) .login-leaf { animation-play-state:paused; }
+@keyframes maple-login-breeze {
+  0%,60%,100% { transform:translate3d(0,0,0) rotate(-8deg); }
+  71% { transform:translate3d(3px,-5px,0) rotate(-6deg); }
+  84% { transform:translate3d(-2px,-2px,0) rotate(-9deg); }
+}
+@media(max-width:800px) {
+  .login-experience { grid-template-columns:minmax(0,1fr); min-height:auto; gap:2rem; padding:1.25rem 0 7rem; }
+  .login-intro { padding-top:0; max-width:33rem; }
+  .login-intro h1 { font-size:clamp(2rem,6vw,2.75rem); max-width:20ch; margin-bottom:1rem; }
+  .login-title-break { display:none; }
+  .login-description { max-width:42ch; }
+  .login-form-region { justify-self:start; max-width:28rem; }
+  .login-leaf-window { width:48%; height:40%; max-height:20rem; }
+  .login-leaf path { fill-opacity:.035; stroke-opacity:.12; }
+  .login-leaf .login-leaf-veins { stroke-opacity:.08; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .login-leaf { animation:none; transform:rotate(-8deg); }
+  .login-motion-toggle { display:none; }
+}
