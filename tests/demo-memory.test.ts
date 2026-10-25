@@ -2,12 +2,14 @@ import {createHash,randomUUID} from 'node:crypto';
 import {describe,it,expect} from 'vitest';
 import {createDemoMemory,demoDigest,type DemoEnvelope} from '../server/demo-memory.js';
 import {demoSeed} from '../shared/demo.js';
+import {fictionalCrsEvidence} from '../shared/crs.js';
 const owner='user_TestDemo';const entity='maple-demo-'+createHash('sha256').update(owner).digest('hex');
 const binding={ownerId:owner,endpoint:'https://fictional.example.test',context:'test',nativePrincipalId:'principalTest',readKey:'fixture-read',writeKey:'fixture-write'};
 describe('real SDK demo boundary with explicit test transport',()=>{
-  it('writes only the confirmed dedicated entity and verifies receipt, without touching employment_record',async()=>{
+  it.each(['legacy','complete CRS'] as const)('writes the confirmed %s profile and verifies the SDK receipt without touching employment_record',async variant=>{
     let row:Record<string,unknown>|null=null;const requests:{method:string;path:string;body:unknown}[]=[];
-    const envelope:DemoEnvelope={schema:1,purpose:'maple-fictional-demo',ownerId:owner,revision:1,operationId:randomUUID(),previousFactId:null,confirmedAt:'2026-10-25T12:00:00Z',profile:demoSeed};
+    const crsEvidence=fictionalCrsEvidence('2026-10-25');crsEvidence.completeEvidenceReviewed='yes';
+    const envelope:DemoEnvelope={schema:1,purpose:'maple-fictional-demo',ownerId:owner,revision:1,operationId:randomUUID(),previousFactId:null,confirmedAt:'2026-10-25T12:00:00Z',profile:variant==='legacy'?demoSeed:{...demoSeed,crsEvidence}};
     const transport:typeof fetch=async(input,init)=>{
       const url=new URL(String(input));const body=init?.body?JSON.parse(String(init.body)):null;requests.push({method:init?.method??'GET',path:url.pathname,body});
       if(url.pathname.endsWith('/attributes'))return Response.json({attributes:row?[row]:[],page:{hasMore:false,nextCursor:null}});

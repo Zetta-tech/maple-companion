@@ -6,11 +6,11 @@
 | --- | --- | --- |
 | Starting profile | Editable, explicitly fictional seed | A deterministic starting profile, not a generated finding. It uses a fictional employer; no Oracle reciprocity claim. |
 | Approved profile | Exact proposal and explicit confirmation; dedicated `demo_profile` entity in hosted AM | Actual SDK adapter and receipt checks are implemented. New demo hosted writes have not run. The operational store keeps a receipt pointer, not a canonical profile copy. |
-| Source retrieval | `GuideSources.retrieve` fetches the two appropriate official IRCC pages for each request | Four official public texts were fetched and reviewed for the initial bundle. Per-request retrieval is covered by test transport; the live discovery has not run. A changed hash or failed fetch holds the request. |
+| Source retrieval | `GuideSources.retrieve` fetches two appropriate IRCC pages for C20/component requests, or five for a full CRS replay | Seven official public texts are retained in the reviewed bundle. Per-request retrieval is covered by test transport; the live discovery has not run. A changed hash or failed fetch holds the request. |
 | C20 condition checks | `discoverC20` computes a potential lead and missing evidence from the saved profile | It is a deterministic, reviewed criterion calculation. Employer name and wording do not trigger a positive result. This increment is explicitly C20-focused, not an autonomous search of every immigration pathway. |
 | Natural explanation | Installed native AM `/chat`, with separate unchanged question, saved fictional profile, computed conditions and official source bodies | No second model/interpreter or canned runtime answer. The reply must be received before the event is completed, and its actual text/session/trace are saved in the journey. **Hosted generation quality and persistence remain unverified.** |
 | Journey | Owner-bound event claim/result, including the actual reply and source/version evidence | The UI reloads saved records; profile/date changes move old results into a historical disclosure. Offline tests prove the coordinator/UI contract only; hosted SurrealDB tests await schema approval. |
-| Express Entry replay | Developer action selects reviewed real source versions, retrieves current source text, calculates with the same saved profile/date | Independent of a trigger phrase. It computes the supported Canadian-work component only. No full CRS baseline, full Labour Market Integration offer comparison, or guaranteed total +40. The November 3 change remains future policy on October 25. |
+| Express Entry replay | Developer action selects reviewed real source versions, retrieves current source text, calculates with the same saved profile/date | Independent of a trigger phrase. The legacy profile gets a Canadian-work component result. Explicit complete fictional evidence gets the supported full CRS estimate, actual offer/work maximum and breakdown; missing evidence holds a total. No guaranteed +40. November 3 remains future policy on October 25. |
 
 The native explanation is not allowed to promote policy, approve profile facts, or
 replace the deterministic result. The UI distinguishes the condition checks from
@@ -97,7 +97,17 @@ regression is unit-tested, not claimed as browser-tested.
 Fresh-load provenance is separate: AM receipt readback verifies the confirmed
 demo profile; Surreal journey records hold derived results and the generated reply.
 Reloading a journey item alone does not establish native conversational retention.
-Full CRS completion is scoped in [CRS_COMPLETION_SCOPE.md](CRS_COMPLETION_SCOPE.md).
+Full CRS implementation, supported subset, independent vectors and unresolved
+future-cap edge are recorded in [CRS_COMPLETION_SCOPE.md](CRS_COMPLETION_SCOPE.md).
+
+The additional full-score IAB run explicitly added invented evidence to the
+unsaved form, reviewed and confirmed it, then executed replay through the actual
+coordinator. The UI showed 528 to 568, retained the breakdown after a fresh load,
+and reused the same journey item on repeat. This remains an **offline fixture**:
+it did not contact AM, retrieve sources over the network or prove hosted database
+persistence. Full-profile receipt serialization is separately tested through the
+real installed SDK with an explicit fake HTTP transport. Older profiles retain
+their original receipt hashes because the optional section adds no defaults.
 
 ## Shared AM context evidence for the pending decision
 

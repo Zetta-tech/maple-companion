@@ -1,4 +1,6 @@
 import type { DemoProfile, Discovery, SourceEvidence } from '../shared/demo.js';
+import {calculateCrs} from './crs.js';
+import {crsRuleSourceHashes} from './crs-sources.js';
 const days = (from: string, to: string) => Math.floor((Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / 86_400_000);
 
 /** Reviewed conditions, not a language parser, brand lookup or eligibility decision. */
@@ -30,6 +32,16 @@ export function projectExpressEntry(profile: DemoProfile, date: string, revision
   const effectiveFrom = '2026-11-03';
   const base: Discovery = { kind:'express_entry',title:'An official Express Entry change may affect your work points',status:'needs_information',
     summary:'A total CRS score cannot be calculated from this demo profile.',reasons:[],outstanding:[],nextSteps:['Review all CRS inputs and any qualifying offer separately before relying on a total score.'],sources,assessmentDate:date,profileRevision:revision };
+  if(profile.crsEvidence){
+    if(!Object.entries(crsRuleSourceHashes).every(([id,hash])=>sources.some(s=>s.id===id&&s.bodySha256===hash)))return {...base,outstanding:['The full-score calculation needs the complete reviewed source set matching this calculator version.']};
+    const crs=calculateCrs(profile,date);
+    if(crs.status==='needs_information')return {...base,crs,outstanding:crs.reasons};
+    return {...base,crs,status:'projected_total',title:crs.projected?'An announced-policy projection of your fictional CRS':'A same-profile CRS policy comparison',
+      summary:`Using the identical reviewed fictional profile and ${date} assessment date, the total is ${crs.before} under the pre-November rules and ${crs.after} under the announced November 3 rules. This is not a certified future score or an eligibility decision.`,
+      reasons:[...crs.assumptions,`Labour Market Integration selects ${crs.labourMarket.selected} points: the higher of work ${crs.labourMarket.workAlternative} and offer ${crs.labourMarket.offerAlternative}.`,`Transferability continues to use actual Canadian work duration, including when the offer alternative wins.`],
+      outstanding:['The overall maximum under the announced allocation remains unresolved in available governing material. This projection stays below that disputed boundary; higher-score cases are withheld.','Retest against the governing rules and official calculator when the November policy is live.'],
+      nextSteps:['Inspect each subtotal and the approved fictional evidence.','Update and confirm any missing or changed evidence before re-running; no real account or application is modified.']};
+  }
   const knownConditions = profile.nocReviewed && ['21221','21223'].includes(profile.noc)
     && profile.physicallyCanada === 'yes' && profile.authorizedWork === 'yes' && profile.paidEmployee === 'yes'
     && profile.fullTimeStudy === 'no' && profile.selfEmployed === 'no' && profile.spouseAccompanying !== 'unknown';

@@ -10,6 +10,7 @@ import type { GuideSources } from './guide-sources.js';
 import { discoverC20,projectExpressEntry } from './discovery.js';
 import { guideQuestionSchema } from '../shared/guide-request.js';
 import { guideReplyContract,reviewGuideExplanation } from './guide-explanation.js';
+import {CRS_POLICY_VERSION} from '../shared/crs.js';
 
 const proposalBody=z.strictObject({baseRevision:z.number().int().nonnegative(),profile:demoProfileSchema});
 const guideBody=z.strictObject({requestId:z.uuid(),question:guideQuestionSchema,fictional:z.literal(true)});
@@ -45,15 +46,16 @@ export class DemoJourney {
   private async process(owner:string,id:string,kind:JourneyEvent['kind'],question?:string):Promise<JourneyEvent>{
     const snapshot=await this.profile(owner);if(!snapshot.profile)throw new AppError(409,'DEMO_PROFILE_REQUIRED','Review and save a fictional demonstration profile first.');
     const currentDate=businessDate(this.now());
-    const official=await this.sources.retrieve(kind==='discovery'?'c20':'express_entry');
+    const official=await this.sources.retrieve(kind==='discovery'?'c20':snapshot.profile.crsEvidence?'express_entry_full':'express_entry');
     if(kind==='policy_update') {
       const existing=(await this.store.events(owner)).find(event=>event.kind==='policy_update'&&event.status==='completed'&&event.profileRevision===snapshot.revision
+        &&(!snapshot.profile?.crsEvidence||event.calculatorVersion===CRS_POLICY_VERSION)
         &&event.discovery?.assessmentDate===currentDate&&JSON.stringify(event.discovery.sources.map(s=>s.bodySha256))===JSON.stringify(official.evidence.map(s=>s.bodySha256)));
       if(existing)return existing;
     }
-    const digest=demoDigest({kind,question:question??null,profileRevision:snapshot.revision,date:currentDate,sources:official.evidence.map(s=>s.bodySha256)});
+    const digest=demoDigest({kind,question:question??null,profileRevision:snapshot.revision,date:currentDate,sources:official.evidence.map(s=>s.bodySha256),...(kind==='policy_update'&&snapshot.profile.crsEvidence?{calculatorVersion:CRS_POLICY_VERSION}:{})});
     const replayed=await this.store.claimEvent(owner,id,digest,snapshot.revision);if(replayed)return replayed;
-    const base:JourneyEvent={id,kind,status:'processing',createdAt:this.now().toISOString(),profileRevision:snapshot.revision,...(kind==='policy_update'?{replay:true}:{})};
+    const base:JourneyEvent={id,kind,status:'processing',createdAt:this.now().toISOString(),profileRevision:snapshot.revision,...(kind==='policy_update'?{replay:true,...(snapshot.profile.crsEvidence?{calculatorVersion:CRS_POLICY_VERSION}:{})}:{})};
     try {
       const discovery=kind==='discovery'?discoverC20(snapshot.profile,currentDate,snapshot.revision,official.evidence):projectExpressEntry(snapshot.profile,currentDate,snapshot.revision,official.evidence);
       let explanation:Awaited<ReturnType<DemoMemory['explain']>>|undefined;

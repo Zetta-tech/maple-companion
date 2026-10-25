@@ -16,9 +16,11 @@ Library text was available and read, so implementation was not blocked on its co
 - C20: **Blocked on hosted schema approval and live end-to-end validation**. Local
   profile/review, AM adapter, source retrieval, condition checks, native hosted-chat
   request, journey persistence adapter and UI are implemented, not yet live-validated.
-- Express Entry: **Partial**. Source ingestion and the Canadian-work component
-  projection are implemented; no complete CRS calculator or invented baseline.
-  Live persistence/replay depends on the same schema approval.
+- Express Entry: **Working offline within the supported fictional subset; live
+  validation blocked**. Source ingestion, component fallback and complete fictional
+  CRS before/after calculation are implemented. All full-score inputs are explicitly
+  reviewed; no real-user baseline is invented. Live persistence/replay depends on
+  the same schema and AM-context approval.
 - Existing ordinary employment revision 7 remains separate from the fictional demo
   entity. No overnight demo profile or model request has been sent yet.
 
@@ -66,13 +68,16 @@ brand and expiry do not establish this. A reported program is a lead, not approv
 Spouse eligibility, status, employer submission, admissibility and other conditions
 remain separate checks. No fixed reciprocity percentage is invented.
 
-The October 16 Express Entry change takes effect November 3, 2026. The current
-projection only supports reviewed NOCs 21221/21223 and one consistent work interval.
-It caps weekly hours at 30, does not accelerate years with overtime, and distinguishes
-occupation median wage from personal salary. A +40 Canadian-work component is not
-a +40 verified total CRS. A qualifying-offer alternative is not added to work points.
-Full CRS inputs, complex work history and additional occupations remain outside this
-increment. The interface labels the projection and replay explicitly.
+The October 16 Express Entry change takes effect November 3, 2026. The legacy
+component view supports reviewed NOCs 21221/21223. The optional full-score path
+uses all 186 reviewed high-wage occupation codes and explicit fictional evidence
+for every claimed factor. It caps weekly hours at 30, does not accelerate years
+with overtime, and distinguishes occupation median wage from personal salary.
+Work-duration plus bonus competes with the qualifying-offer alternative; it is
+not added to it. Both totals use the same facts/date. Complex histories and
+special exceptions hold for review. The unresolved future overall-cap boundary
+also holds a projection above 1,200. See `CRS_COMPLETION_SCOPE.md` for exact scope,
+sources and independently supplied numeric fixtures. No invitation is predicted.
 
 ## Intended reproduction after approval and verification
 
@@ -82,20 +87,27 @@ increment. The interface labels the projection and replay explicitly.
 3. Enter a natural question about work options and select **Explore work options**.
    Inspect the profile-specific C20 reasons, unresolved evidence, next steps and
    official sources. Reload and confirm the saved journey item is retained.
-4. Under **Demo controls: official policy replay**, select **Process official
-   Express Entry update**. Inspect future effective date, component-only comparison
-   and unknown total CRS. Repeat to verify notification/result deduplication.
+4. For a full fictional score, open **Optional: complete fictional CRS evidence**,
+   add the invented example values, review every factor and the dated review box,
+   then inspect and confirm the exact revised profile. This is optional; otherwise
+   the replay remains component-only. No facts are silently attached.
+5. Under **Demo controls: official policy replay**, select **Process official
+   Express Entry update**. The complete default fictional profile yields 528 to
+   568, with source versions, subtotals and future effective date. Repeat and reload
+   to verify the same saved result. Do not treat this intended live reproduction
+   as evidence it has passed against the hosted services.
 
 These are intended reproduction steps, not a claim that the live workflow passed.
 
 ## Validation and next step
 
-Completed locally: **656 tests in 34 files**, TypeScript typecheck, server build and
-Vite build passed. The initial restricted-shell run could not open loopback test
-sockets; the authorized loopback rerun passed. Tracked-file hygiene passed; this
-does not replace secret review. The complete staged set of 143 files subsequently
-passed hygiene checks, and the production dependency audit reported no known
-vulnerabilities. Vite reports a 500.87 kB JavaScript chunk warning, not a build failure.
+Earlier checkpoint: 656 tests in 34 files passed; the follow-up review reached
+670 tests, and the full CRS increment adds numeric and workflow coverage. The final
+verification count is recorded below. Restricted-shell loopback tests needed the
+authorized local-socket runner; no hosted database or AM call is part of that
+suite. Hygiene checks do not replace secret review. The dependency audit at the
+preceding checkpoint reported no known production vulnerabilities. Vite's large
+chunk warning is recorded as a remaining performance limitation.
 
 The combined build is in `.local/overnight-guide-build/` within the active worktree.
 At 05:14:57 UTC, the owned localhost process was restarted to serve the approved
@@ -117,6 +129,15 @@ See `DEMO_ACCEPTANCE_REVIEW.md` for the actual offline IAB trace, deterministic 
 generated boundaries, source review guard and the additional shared-Context chat
 side-effect limitation. The fixture is at `http://127.0.0.1:5196/` and is visibly
 labelled offline. It does not establish live AM or hosted database acceptance.
+
+Final full-CRS checkpoint: **739 tests in 37 files**, TypeScript typecheck, server
+build and Vite build passed. The JavaScript bundle is 521.50 kB (149.92 kB gzip);
+Vite reports a size warning. Codex IAB verified the complete fictional score,
+visible subtotals, repeat replay returning one card and a fresh-load result.
+The independently reviewed Alex fixture produces 521 to 561; offer-dominance
+fixtures produce deltas of 30 and 54, confirming the change is not hardcoded +40.
+No new AM request, hosted write or localhost:3000 restart was made for the CRS
+increment. The live guide remains disabled at the existing approval boundary.
 
 Next: obtain the exact schema approval, apply/test on `maple/test`, then apply to
 `maple/development`, load the configured source bundle, and verify one real fictional

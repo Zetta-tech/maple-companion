@@ -3,6 +3,8 @@ import type { DemoStore, DemoHead, DemoProposal } from '../../server/demo-store.
 import { demoDigest, type DemoEnvelope, type DemoMemory } from '../../server/demo-memory.js';
 import { AppError } from '../../server/errors.js';
 import type { DemoProfile, DemoReceipt, JourneyEvent } from '../../shared/demo.js';
+import {crsRuleSourceHashes} from '../../server/crs-sources.js';
+import {guideUrls} from '../../server/guide-sources.js';
 
 /** Offline test adapter only. No SDK, credentials, network or database connection. */
 export class DemoFixtureStore implements DemoStore {
@@ -37,4 +39,4 @@ export class DemoFixtureMemory implements DemoMemory {
   async write(owner:string,envelope:DemoEnvelope) {if(envelope.ownerId!==owner)throw Error('fixture owner mismatch');this.writes++;this.envelopes.set(owner,structuredClone(envelope));return {factId:'offline-fixture-'+envelope.operationId,digest:demoDigest(envelope)};}
   async explain(_owner:string,_requestId:string,message:string):ReturnType<DemoMemory['explain']> {this.explanations++;if(this.failExplanation)throw new AppError(503,'GUIDE_RESPONSE_UNCERTAIN','Offline fixture simulates an unverified response.');const status=JSON.parse(message.split('CONDITION CHECKS (not an eligibility decision):\n')[1]!.split('\n\nOFFICIAL SOURCE MATERIAL:')[0]!).status;return {reply:JSON.stringify({assessmentStatus:status,sourceUrls:['https://www.canada.ca/'],explanation:'OFFLINE UI FIXTURE: this text verifies presentation only. It is not an AM-generated finding.'}),sessionId:'offline-fixture',traceId:'offline-fixture',raw:{offlineFixture:true}};}
 }
-export const fixtureSources={async retrieve(){return {evidence:[{id:'offline',title:'Offline source fixture — not live retrieval',url:'https://www.canada.ca/',bodySha256:'a'.repeat(64),retrievedAt:new Date().toISOString(),reviewedAt:new Date().toISOString()}],context:'OFFLINE TEST DATA: no official source fetch occurs.'};}};
+export const fixtureSources={async retrieve(kind?:string){return {evidence:kind==='express_entry_full'?Object.entries(crsRuleSourceHashes).map(([id,bodySha256])=>({id,title:`Offline copy of reviewed ${id} metadata`,url:guideUrls[id as keyof typeof guideUrls],bodySha256,retrievedAt:'2026-10-25T05:00:00Z',reviewedAt:'2026-10-25T05:00:00Z'})):[{id:'offline',title:'Offline source fixture - not live retrieval',url:'https://www.canada.ca/',bodySha256:'a'.repeat(64),retrievedAt:new Date().toISOString(),reviewedAt:new Date().toISOString()}],context:'OFFLINE TEST DATA: no official source fetch occurs.'};}};

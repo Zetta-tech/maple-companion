@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { policyDateSchema } from './policy.js';
+import {crsEvidenceSchema,type CrsCalculation} from './crs.js';
 
 const answer = z.enum(['yes', 'no', 'unknown']);
 export const demoProfileSchema = z.strictObject({
@@ -14,19 +15,21 @@ export const demoProfileSchema = z.strictObject({
   noc: z.string().regex(/^\d{5}$/), duties: z.string().trim().min(20).max(3000), nocReviewed: z.boolean(),
   physicallyCanada: answer, authorizedWork: answer, paidEmployee: answer,
   fullTimeStudy: answer, selfEmployed: answer,
-  qualifyingExpressEntryOffer: z.enum(['none_reviewed', 'not_reviewed']),
+  qualifyingExpressEntryOffer: z.enum(['none_reviewed', 'not_reviewed','reviewed_offer']),
+  crsEvidence:crsEvidenceSchema.optional(),
 });
 export type DemoProfile = z.infer<typeof demoProfileSchema>;
 export type DemoReceipt = { factId: string; digest: string };
 export type DemoSnapshot = { revision: number; profile: DemoProfile | null; verified: boolean };
 export type SourceEvidence = { id: string; title: string; url: string; bodySha256: string; retrievedAt: string; reviewedAt: string; publishedAt?: string; effectiveFrom?: string };
 export type Discovery = {
-  kind: 'c20' | 'express_entry'; title: string; status: 'potential_pathway' | 'needs_information' | 'not_supported' | 'projected_component';
+  kind: 'c20' | 'express_entry'; title: string; status: 'potential_pathway' | 'needs_information' | 'not_supported' | 'projected_component' | 'projected_total';
   summary: string; reasons: string[]; outstanding: string[]; nextSteps: string[];
   sources: SourceEvidence[]; assessmentDate: string; profileRevision: number;
   score?: { scope: 'canadian_work_component'; before: number; after: number; delta: number; effectiveFrom: string; totalCrs: null; conditional: boolean };
+  crs?:CrsCalculation;
 };
-export type JourneyEvent = { id: string; kind: 'discovery' | 'policy_update'; createdAt: string; status: 'completed' | 'processing' | 'uncertain' | 'not_sent'; profileRevision: number; discovery?: Discovery; reply?: string; explanationStatus?: 'available' | 'withheld'; explanationReason?: string; sessionId?: string; traceId?: string; replay?: boolean };
+export type JourneyEvent = { id: string; kind: 'discovery' | 'policy_update'; createdAt: string; status: 'completed' | 'processing' | 'uncertain' | 'not_sent'; profileRevision: number; discovery?: Discovery; reply?: string; explanationStatus?: 'available' | 'withheld'; explanationReason?: string; sessionId?: string; traceId?: string; replay?: boolean; calculatorVersion?: string };
 
 /** Deliberate, editable fictional seed; findings are calculated separately. */
 export const demoSeed: DemoProfile = {

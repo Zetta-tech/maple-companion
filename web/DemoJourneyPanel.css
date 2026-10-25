@@ -23,3 +23,11 @@
 .demo-review div { display:grid; grid-template-columns:minmax(8rem,1fr) 2fr; gap:1rem; padding:.5rem 0; border-bottom:1px solid var(--line); }
 .demo-review dd { margin:0; overflow-wrap:anywhere; }
 @media(max-width:540px) { .demo-review div { grid-template-columns:1fr; gap:.3rem; } .journey-score { gap:.8rem; } }
+.crs-evidence fieldset { margin-block: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: .75rem; }
+.crs-evidence legend { font-weight: 650; padding-inline: .35rem; }
+.crs-evidence details { margin-block: .75rem; }
+.crs-evidence label { margin-block: .6rem; }
+.crs-breakdown dl > div { display: flex; justify-content: space-between; gap: 1rem; padding-block: .35rem; border-bottom: 1px solid var(--border); }
+.crs-breakdown dd { margin: 0; font-variant-numeric: tabular-nums; }
+.crs-breakdown h4 { margin-block: 1rem .35rem; }
+.demo-review pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-width: 100%; }

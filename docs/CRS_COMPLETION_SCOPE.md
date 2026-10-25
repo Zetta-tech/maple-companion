@@ -1,49 +1,46 @@
-# Full CRS completion scope - 2026-10-25
+# Full fictional CRS comparison — 2026-10-25
 
-The current result remains a **Canadian-work component projection**, not a total
-CRS score. November 3, 2026 is the policy's effective date; an October 25 comparison
-is a future projection using one fixed profile and assessment date.
+Implemented locally and tested offline. A profile without the optional complete CRS evidence retains the earlier Canadian-work component view. A complete, explicitly confirmed fictional profile gets age, education, four-ability language, spouse, work, transferability and additional-point calculations with visible subtotals. This is a points estimate within the supported subset, not program eligibility, document authentication or an officer-certified score.
 
 ## Reviewed primary references
 
 - [IRCC CRS criteria](https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/check-score/crs-criteria.html)
-- [IRCC changes](https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/changes.html)
-- [IRCC high-wage occupations](https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/check-score/high-wage.html)
+- [IRCC announced changes](https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/changes.html)
+- [IRCC high-wage occupation lists](https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/check-score/high-wage.html)
+- [IRCC language evidence](https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/documents/language-test.html)
+- [IRCC educational credential assessment](https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/documents/education-assessment.html)
 
-The criteria reference supplies age, education, language, spouse, transferability
-and additional-point tables. It also defines caps and when accompanying-spouse
-scoring applies. These inputs are absent from the current demo profile. Missing
-inputs must not be silently assigned zero or populated from the operator's life.
+The source bundle retains full public text, retrieval time and content hashes. `server/crs-sources.ts` binds the calculator to those five reviewed versions; missing, changed or unavailable sources hold a total. The capture script creates unreviewed candidates, never automatic rule promotions.
 
-## Smallest credible complete fictional-profile increment
+## Calculation and supported evidence
 
-1. Add an optional, explicitly confirmed CRS evidence section to the AM demo
-   envelope, with backward-compatible receipt validation. Record age as of the
-   assessment date, reviewed education/equivalency, each language ability and test
-   validity, spouse applicability and factors, eligible foreign work, Canadian
-   education, sibling, nomination and trade-certificate facts. Explicit negative
-   answers differ from unknown. A fully specified fictional fixture can be offered
-   for review, but must not be silently attached to an existing profile.
-2. Implement the published tables and caps as a pure calculator with a visible
-   breakdown. Keep qualifying experience/evidence validation separate from points.
-   Establish the qualifying-offer alternative independently; compare it with
-   work-duration plus the occupation bonus rather than adding both alternatives.
-3. Add the reviewed CRS source to retrieval/version validation. Save the exact
-   evidence revision, source hashes, as-of date and before/after breakdown in the
-   private journey. Withhold a total when any required evidence is unresolved.
-4. Test boundary tables/caps, spouse applicability, incomplete/expired evidence,
-   alternative offer dominance, identical before/after dates, old receipt
-   compatibility, exact confirmation and fresh-load persistence.
+Version: `2026-11-03.fictional-reviewed-evidence.v1`.
 
-Estimated implementation scope: roughly 6–9 code/test files, 250–400 lines of
-scoring/evidence logic plus intake and regression tests; two focused implementation
-and review passes (approximately 3–5 hours, not a delivery guarantee). It is larger
-than a safe overnight patch to the existing component calculator. No new service
-or AI interpreter is required, and no full-score implementation is claimed here.
+- Accompanying noncitizen/non-PR spouse uses the with-spouse tables. A single, nonaccompanying or Canadian citizen/PR spouse case uses without-spouse tables and no spouse-factor points.
+- Language uses reviewed CLB/NCLC for each ability, accepted tests less than two years old, and the minimum ability for transferability. Foreign credentials require a reviewed immigration ECA less than five years old.
+- One consistent Canadian interval, one foreign interval/NOC and one spouse Canadian interval are supported. Hours are capped at 30 per week; completed calendar years and sufficient hours are both required. The Canadian end date is optional for ongoing work. Gaps, overlaps, disputed arrival history, boundary/complex histories and special exceptions hold a total for review.
+- Eligibility attestations are explicit, dated, manually reviewed fictional evidence. They do not automatically validate documents, a NOC from a title, qualifying study, a trade certificate, nomination, sibling or an offer.
+- Missing factors are not zero. Optional bonuses require an explicit no/none answer when absent. The complete-evidence section is added only by a user action and saved only through the exact-profile confirmation path.
+- Education/foreign-work transferability pairs cap at 50 each; all transferability caps at 100. Additional points cap at 600. French minimum NCLC 7 gives 25 extra points, or 50 when every English ability is CLB 5 or better.
+- Current offer points are zero. The announced replacement is `current total - Canadian duration + max(duration + high-wage bonus, offer)`. Transferability continues to use actual qualifying experience. The tiers are occupation-median tiers, not the applicant's personal salary; alternatives do not stack. All 186 listed occupation codes are pinned to the reviewed source.
 
-The higher-value immediate fixes are complete: contradictory arrival/work history
-now holds scoring, dated results retain their explanation, known-unsent requests
-do not lock the composer, and ungrounded generated explanations are withheld.
-The priority remains verifying the C20 workflow through real persistence after the
-explicit migration and shared-AM-context decisions, rather than manufacturing a
-total score from incomplete inputs.
+Both sides use identical profile facts and the same assessment date. On October 25, November 3 remains a future effective date. The public criteria retain the old overall maximum while the announcement changes allocation; the governing instrument was not available to settle the new upper-cap edge. A projection above 1,200 is withheld, not silently clamped or treated as an authorized 1,270 maximum. Sub-1,200 results remain **announced-policy projections**.
+
+## Independent numeric fixtures and actual offline flow
+
+| Explicit fictional fixture | Current | Announced | Delta |
+| --- | ---: | ---: | ---: |
+| Married Alex, master's, CLB9, two Canadian years, three foreign years, reviewed spouse factors | 521 | 561 | 40 |
+| Single bachelor, CLB9, one Canadian year, three foreign years | 482 | 522 | 40 |
+| Same single profile, two Canadian years | 507 | 547 | 40 |
+| Single one-year profile, unlisted skilled Canadian occupation, qualifying tier-1.5 offer | 482 | 512 | 30 |
+| Married Alex with a qualifying 100-point offer alternative | 521 | 575 | 54 |
+| Explicitly offered Avery UI fixture | 528 | 568 | 40 |
+
+The Alex and single vectors were supplied by a separate official-table review; their components are asserted independently in `tests/crs.test.ts`. No fixture is the real operator's biography. Tests also cover unknown/expired evidence, contradictions, caps, minimum-language thresholds, source versions, old receipt hashes, actual SDK serialization with test transport, owner denial, exact confirmation, saved breakdown, date/version staleness and replay deduplication.
+
+Codex IAB exercised the real component/coordinator at `http://127.0.0.1:5196/`: add optional invented evidence, review every factor, inspect the exact proposal, confirm, replay, see 528 → 568, repeat and reload. The fixture visibly substitutes AM, source transport and operational storage. Its trace is private and ignored; this proves UI/coordinator behavior, not hosted service persistence or inference.
+
+## Live boundary and remaining work
+
+No new service, credential, principal, grant or hosted schema is required beyond the already pending three-table demo migration. The original localhost app and ordinary employment record were not changed by this increment. Demo activation, real database tests and actual AM profile/readback/chat remain blocked on the previously documented migration and shared-context decisions. No provider calls or hosted writes were made for this increment. See `DEMO_ACCEPTANCE_REVIEW.md`.
