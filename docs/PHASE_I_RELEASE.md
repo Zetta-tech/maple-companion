@@ -41,6 +41,11 @@ merged at `277688c`; subsequent correctness changes are on `feat/pilot-readiness
 
 - Exact Vercel project/team/environment and fixed HTTPS domain, followed by explicit
   deployment/promotion approval. Signing into Vercel is not deployment authorization.
+  Parent verified the existing `zetta-techs-projects` team and `maplenewsletter.com`.
+  `app.maplenewsletter.com` is a candidate separate subdomain with no returned
+  assignment/conflict; it is not reserved or configured. External DNS control and
+  the exact DNS/Clerk changes still require confirmation. Preserve the newsletter
+  apex/www and its existing project.
 - Clean AM target and preservation choice; any required new credential or destructive
   action must be approved separately and never supplied through chat.
 - Production database/schema and scoped credential setup. No production DB was
@@ -62,3 +67,46 @@ completion ordering, persisted/reloaded receipts, later same-timestamp review,
 active confirmation reservation and owner-private atomic assessment snapshots.
 No AM calls, schema changes, deletions or localhost restart were performed. These
 tests prove database ordering, not native-model reliability or hosted readiness.
+
+## Hosting preparation (not activated)
+
+The new root `app.ts` is a recognized Vercel Express entrypoint. `server/runtime.ts`
+constructs the same backend without a listener or background timer. Local
+`server/index.ts` still owns its loopback listener and retention sweep. Hosted
+requests retain the existing request-time expiry check. `build:vercel` copies only
+compiled frontend assets into generated `public/`; `.local`, environment files and
+runtime evidence are excluded from deployment input. Automatic Git deployments
+are disabled in `vercel.json` pending a specific release approval.
+
+`single-owner-production` is prepared but not enabled: HTTPS, NODE_ENV=production,
+Clerk live keys, exactly one bound owner/principal and separate key references are
+required. Distinct keys are not proof of restricted grants; live permissions still
+need verification. A nonsecret `MAPLE_AM_BINDINGS_JSON` can replace the local binding
+file, never coexist with it. Native status reports `syntheticOnly: false` in that
+mode and accepts only an explicit `syntheticTest: false` input contract. The UI must
+follow that capability; the existing localhost mode and test contract are unchanged.
+
+Hosted native processing requires the prepared additive
+`database/provider-evidence-v1.surql` table/marker. It stores only owner, operation,
+purpose, response digest and timestamp, not raw personal messages or provider
+payloads. There is no filesystem fallback or automatic schema application. The
+schema is **not applied**. This metadata supports processing integrity but cannot
+recover a missing provider response or prove that a fact is visible in AM.
+
+The real-profile Guide transition is still outstanding and the hosted runtime
+deliberately does not expose the fictional Guide as a personal product. Do not
+deploy this intermediate adapter as if the full release were finished.
+
+Official setup references: [Vercel Express entrypoint and static assets](https://vercel.com/docs/frameworks/backend/express),
+[disable automatic Git deployments](https://vercel.com/docs/project-configuration/git-configuration),
+and [Clerk production deployment on Vercel](https://clerk.com/docs/guides/development/deployment/vercel).
+Clerk production requires an owned domain; an ordinary `*.vercel.app` address with
+development keys is not production authentication setup.
+
+Hosting-preparation validation: 611 offline tests across 34 files, typecheck, build
+and local CDN asset packaging pass. Importing the hosted entrypoint makes no
+provider request and starts no listener/timer; missing configuration returns 503.
+The production mode rejects test keys, loopback origins, multiple owners, missing
+principal bindings and the reused full-key development exception. No hosted test of
+this new mode or evidence schema has run. The 523 kB frontend bundle still emits a
+size warning; cosmetic/bundle optimization is not part of this correctness change.

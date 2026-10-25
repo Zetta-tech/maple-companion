@@ -8,6 +8,7 @@ import type { NativeChatStore } from './native-chat-store.js';
 import { nativeMessageTextSchema, nativeStatusText, type NativeMessageResult, type NativeProfile } from '../shared/native-chat.js';
 
 export const nativeMessageSchema = z.strictObject({ requestId: z.uuid(), message: nativeMessageTextSchema, syntheticTest: z.literal(true) });
+const personalMessageSchema = nativeMessageSchema.extend({ syntheticTest: z.literal(false) });
 type NativePort = ReturnType<typeof createNativeMemory>;
 export type NativeDiagnostic = (owner: string, requestId: string, evidence: unknown) => Promise<void>;
 
@@ -23,7 +24,8 @@ export function privateNativeDiagnostics(directory: string): NativeDiagnostic {
 
 export class NativeChat {
   constructor(private store: NativeChatStore, private memory: NativePort,
-    private diagnostic: NativeDiagnostic, private clock = () => new Date()) {}
+    private diagnostic: NativeDiagnostic, private clock = () => new Date(), readonly syntheticOnly = true) {}
+  validateInput(input: unknown) { return (this.syntheticOnly ? nativeMessageSchema : personalMessageSchema).parse(input); }
   async history(owner: string) { return this.store.list(owner); }
   async profile(owner: string): Promise<NativeProfile> {
     const snapshot = await this.memory.read(owner);
@@ -35,7 +37,7 @@ export class NativeChat {
       unresolved: snapshot.state.unknowns.length };
   }
   async send(owner: string, input: unknown): Promise<NativeMessageResult> {
-    const request = nativeMessageSchema.parse(input);
+    const request = this.validateInput(input);
     if (!request.message.trim()) throw new AppError(400, 'MESSAGE_REQUIRED', 'Enter a message.');
     const createdAt = this.clock().toISOString();
     const digest = createHash('sha256').update(request.message).digest('hex');
@@ -68,6 +70,6 @@ export class NativeChat {
 }
 
 /** Constructed only after explicit development configuration/identity setup. */
-export function createNativeChat(resolveBinding: (owner: string) => NativeBinding, store: NativeChatStore, diagnostic: NativeDiagnostic) {
-  return new NativeChat(store, createNativeMemory(resolveBinding, store), diagnostic);
+export function createNativeChat(resolveBinding: (owner: string) => NativeBinding, store: NativeChatStore, diagnostic: NativeDiagnostic, syntheticOnly = true) {
+  return new NativeChat(store, createNativeMemory(resolveBinding, store), diagnostic, () => new Date(), syntheticOnly);
 }

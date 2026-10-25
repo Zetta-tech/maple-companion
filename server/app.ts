@@ -8,7 +8,7 @@ import { AppError } from './errors.js';
 import { bindingFor, type AuthConfig, type Config } from './config.js';
 import { Workflow, confirmationSchema } from './workflow.js';
 import { Assessments } from './assessments.js';
-import { nativeMessageSchema, type NativeChat } from './native-chat.js';
+import type { NativeChat } from './native-chat.js';
 import type { DemoJourney } from './demo-journey.js';
 import { demoSeed } from '../shared/demo.js';
 
@@ -27,6 +27,7 @@ export function clerkAuthentication(config: AuthConfig): Authentication {
 export function createApp(options: { config?: Config; authConfig?: AuthConfig; configurationError?: AppError; workflow?: Workflow; assessments?: Assessments; nativeChat?: NativeChat; demoJourney?: DemoJourney; authentication?: Authentication; webRoot?: string; operationalStore?: 'surrealdb'; operationalReady?: () => boolean }) {
   const app = express();
   const authConfig = options.authConfig ?? options.config;
+  const nativeAllowed = ['single-user-development', 'single-owner-production'].includes(options.config?.amAccessMode ?? '');
   app.disable('x-powered-by');
   // Clerk components need their own JS/connect hosts; tighten to actual instance hosts before deployment.
   app.use(helmet({ contentSecurityPolicy: false }));
@@ -35,7 +36,7 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
     const configured = !!options.config && !!options.workflow && (options.operationalReady?.() ?? true);
     res.status(configured ? 200 : 503).json({ configured, authConfigured: !!authConfig,
       memoryAccessMode: options.config?.amAccessMode ?? null, operationalStore: options.operationalStore ?? null,
-      nativeMemoryAvailable: !!options.nativeChat && options.config?.amAccessMode === 'single-user-development',
+      nativeMemoryAvailable: !!options.nativeChat && nativeAllowed,
       nativeMemoryMode: 'remember-profile', liveIntegrationsVerified: false });
   });
   app.get('/api/config', (_req, res, next) => {
@@ -74,7 +75,7 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   });
   app.use('/api', express.json({ limit: '32kb', strict: true }));
   const workflow = () => options.workflow!;
-  const nativeChat = options.config?.amAccessMode === 'single-user-development' ? options.nativeChat : undefined;
+  const nativeChat = nativeAllowed ? options.nativeChat : undefined;
   const native = () => {
     if (!nativeChat) throw new AppError(503, 'NATIVE_CHAT_NOT_READY', 'Native memory setup is pending. Reviewed assessment inputs remain available.');
     return nativeChat;
@@ -96,12 +97,12 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   app.post('/api/demo/discover', async(req,res)=>res.json(await demo().discover(res.locals.owner,req.body)));
   app.post('/api/demo/policy-replay', async(req,res)=>res.json(await demo().replay(res.locals.owner,req.body)));
   app.get('/api/employment', async (_req, res) => res.json(await workflow().read(res.locals.owner)));
-  app.get('/api/native/status', async (_req, res) => res.json({ available: !!nativeChat, syntheticOnly: true,
+  app.get('/api/native/status', async (_req, res) => res.json({ available: !!nativeChat, syntheticOnly: nativeChat?.syntheticOnly ?? true,
     history: nativeChat ? await nativeChat.history(res.locals.owner) : [] }));
   app.get('/api/native/profile', async (_req, res) => res.json(await native().profile(res.locals.owner)));
   app.post('/api/native/messages', async (req, res) => {
     const channel = native();
-    const message = nativeMessageSchema.parse(req.body);
+    const message = channel.validateInput(req.body);
     // Claim failures may be ambiguous too. From this point onward, no error may
     // assert that the native request was never started, regardless of status/code.
     res.locals.nativeRequestStarted = true;

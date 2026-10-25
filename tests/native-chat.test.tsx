@@ -16,7 +16,7 @@ import { AppError } from '../server/errors.js';
 
 const owner = 'user_alice';
 const binding = { ownerId: owner, context: 'ctx', endpoint: 'https://memory.example.test', readKey: 'fixture-read', writeKey: 'fixture-write' };
-function setup(found = true) {
+function setup(found = true, syntheticOnly = true) {
   const records = new Map<string, { digest: string; result: NativeMessageResult | null }>();
   const sessions = new Map<string, NativeSession>();
   const key = (owner: string, id: string) => JSON.stringify([owner, id]);
@@ -48,11 +48,21 @@ function setup(found = true) {
       attributeVisibility: [{ id: 'attr', foundInState: found }] })),
   };
   const diagnostics = vi.fn(async (_owner: string, _requestId: string, _evidence: unknown) => {});
-  const chat = new NativeChat(store, memory as unknown as ReturnType<typeof createNativeMemory>, diagnostics);
+  const chat = new NativeChat(store, memory as unknown as ReturnType<typeof createNativeMemory>, diagnostics, () => new Date(), syntheticOnly);
   return { chat, memory, store, diagnostics };
 }
 
 describe('native memory workflow (test transport only)', () => {
+  it('separates explicitly configured personal input from fictional trial input before a claim', async () => {
+    const real = setup(true, false), trial = setup();
+    const body = { requestId: randomUUID(), message: 'Synthetic transport test of the real-input contract.', syntheticTest: false };
+    await expect(trial.chat.send(owner, body)).rejects.toThrow();
+    expect(trial.memory.remember).not.toHaveBeenCalled();
+    await expect(real.chat.send(owner, { ...body, syntheticTest: true })).rejects.toThrow();
+    expect(real.memory.remember).not.toHaveBeenCalled();
+    expect((await real.chat.send(owner, body)).status).toBe('verified');
+    expect(real.memory.remember).toHaveBeenCalledOnce();
+  });
   it('passes unchanged natural text, retains native evidence and deduplicates the same request', async () => {
     const { chat, memory, diagnostics } = setup();
     const body = { requestId: randomUUID(), message: 'Correction: I currently work 28 hours per week, not 29.', syntheticTest: true };
