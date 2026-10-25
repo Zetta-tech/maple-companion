@@ -80,6 +80,13 @@ export const clerkAppearance: ComponentProps<typeof ClerkProvider>['appearance']
 
 // Keep authentication content and states intact; only the app-owned sign-in
 // uses the open composition. Account popovers retain their normal surfaces.
+// Clerk's card clips outside focus shadows. Keep one high-contrast ring inside
+// each input instead of stacking Clerk's shadow and the app's global outline.
+const signInInputFocus = {
+  '&&:focus, &&:focus-visible': {
+    boxShadow: 'none', outline: '2px solid var(--focus)', outlineOffset: '-2px',
+  },
+};
 export const clerkSignInAppearance: ComponentProps<typeof SignIn>['appearance'] = {
   elements: {
     rootBox: { width: '100%', maxWidth: '100%' },
@@ -88,7 +95,8 @@ export const clerkSignInAppearance: ComponentProps<typeof SignIn>['appearance'] 
     header: { textAlign: 'left' },
     headerTitle: { fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: '600', letterSpacing: '-0.035em', lineHeight: '1.15', color: 'var(--ink)' },
     headerSubtitle: { fontSize: '0.9375rem', lineHeight: '1.5', color: 'var(--muted)' },
-    formFieldInput: { minHeight: '3rem', borderRadius: '0.5rem', boxShadow: 'none' },
+    formFieldInput: { minHeight: '3rem', borderRadius: '0.5rem', boxShadow: 'none', ...signInInputFocus },
+    otpCodeFieldInput: { ...signInInputFocus },
     formButtonPrimary: { minHeight: '3rem', borderRadius: '0.5rem', backgroundColor: 'var(--action)', color: 'var(--on-accent)', boxShadow: 'none', '&:hover': { backgroundColor: 'var(--action-hover)' } },
     footer: { padding: '1.5rem 0 0', background: 'transparent', backgroundImage: 'none', border: '0' },
     footerAction: { padding: '0' },
