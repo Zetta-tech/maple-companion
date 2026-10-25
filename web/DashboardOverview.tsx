@@ -1,4 +1,5 @@
 import type { Employment } from '../shared/employment.js';
+import { MapleCompanion } from './MapleCompanion.js';
 import './DashboardOverview.css';
 
 export type GuideOverviewState = 'checking' | 'review' | 'saved' | 'empty' | 'unavailable' | 'pending';
@@ -56,7 +57,7 @@ export function DashboardOverview({ employment, available, loading, held, pendin
       <div className="dashboard-welcome-copy"><p className="dashboard-kicker">Your Maple workspace</p><h1 id="overview-title" tabIndex={-1}>What would you like<br className="dashboard-heading-break" /> to understand?</h1><p>Explore your work options, keep your information current, and see what to prepare next.</p>
         <div className="dashboard-welcome-actions"><a className="dashboard-primary-action" href={askIsPrimary ? '#journey' : next.href} onClick={event => { event.preventDefault(); askIsPrimary ? ask() : openWorkspaceSection(next.href); }}>{primaryAction}<span aria-hidden="true">→</span></a>{!askIsPrimary && discoveries ? <button className="dashboard-secondary-action" type="button" onClick={ask}>Ask Maple Guide <span aria-hidden="true">↗</span></button> : <a href="#profile-workspace" onClick={event => { event.preventDefault(); openWorkspaceSection('#profile-workspace'); }}>Review my information <span aria-hidden="true">→</span></a>}</div>
       </div>
-      <div className="dashboard-companion" aria-label="Placeholder for the Maple companion character"><span className="dashboard-companion-mark" aria-hidden="true">m<span>.</span></span><span>Your companion</span><small>Character placeholder</small></div>
+      <div className="dashboard-companion"><MapleCompanion compact state={loading || guideState === 'checking' ? 'reviewing' : 'idle'} /></div>
     </div>
     <div className="dashboard-overview-grid">
       <section className="dashboard-next" aria-labelledby="dashboard-next-title"><p className="dashboard-kicker">{next.label}</p><h2 id="dashboard-next-title">{next.title}</h2><p>{next.body}</p></section>
