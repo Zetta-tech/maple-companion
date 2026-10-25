@@ -3,7 +3,7 @@ import { RequestError, readResponse } from './request.js';
 import { ClerkProvider, SignIn, UserButton, useAuth } from '@clerk/react';
 import { StrictMode, useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ThemeProvider, ThemeToggle, clerkAppearance } from './Theme.js';
+import { ThemeProvider, ThemeToggle, clerkAppearance, clerkSignInAppearance } from './Theme.js';
 import { employmentSchema, type Employment } from '../shared/employment.js';
 import './styles.css';
 import { AssessmentPanel } from './AssessmentPanel.js';
@@ -89,7 +89,7 @@ function Bootstrap() {
 function AuthenticatedApp() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   if (!isLoaded) return <Shell><p className="loading" role="status">Loading secure sign-in…</p></Shell>;
-  if (!isSignedIn) return <Shell><LoginExperience><SignIn routing="hash" /></LoginExperience></Shell>;
+  if (!isSignedIn) return <Shell><LoginExperience><SignIn routing="hash" appearance={clerkSignInAppearance} /></LoginExperience></Shell>;
   return <SessionGate key={userId} />;
 }
 

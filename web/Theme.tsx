@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
-import type { ClerkProvider } from '@clerk/react';
+import type { ClerkProvider, SignIn } from '@clerk/react';
 
 type Theme = 'light' | 'dark';
 const storageKey = 'maple-theme';
@@ -76,4 +76,21 @@ export const clerkAppearance: ComponentProps<typeof ClerkProvider>['appearance']
     colorModalBackdrop: 'var(--backdrop)', fontFamily: 'var(--font)', borderRadius: '0.5rem',
   },
   elements: { rootBox: { maxWidth: '100%', width: '100%' }, cardBox: { maxWidth: '100%', width: '100%' }, formButtonPrimary: { backgroundColor: 'var(--action)', color: 'var(--on-accent)' } },
+};
+
+// Keep authentication content and states intact; only the app-owned sign-in
+// uses the open composition. Account popovers retain their normal surfaces.
+export const clerkSignInAppearance: ComponentProps<typeof SignIn>['appearance'] = {
+  elements: {
+    rootBox: { width: '100%', maxWidth: '100%' },
+    cardBox: { width: '100%', maxWidth: '100%', background: 'transparent', boxShadow: 'none', border: '0', borderRadius: '0' },
+    card: { padding: '0', gap: '1.5rem', background: 'transparent', boxShadow: 'none', border: '0' },
+    header: { textAlign: 'left' },
+    headerTitle: { fontFamily: 'var(--display)', fontSize: '2rem', fontWeight: '600', letterSpacing: '-0.035em', lineHeight: '1.15', color: 'var(--ink)' },
+    headerSubtitle: { fontSize: '0.9375rem', lineHeight: '1.5', color: 'var(--muted)' },
+    formFieldInput: { minHeight: '3rem', borderRadius: '0.5rem', boxShadow: 'none' },
+    formButtonPrimary: { minHeight: '3rem', borderRadius: '0.5rem', backgroundColor: 'var(--action)', color: 'var(--on-accent)', boxShadow: 'none', '&:hover': { backgroundColor: 'var(--action-hover)' } },
+    footer: { padding: '1.5rem 0 0', background: 'transparent', backgroundImage: 'none', border: '0' },
+    footerAction: { padding: '0' },
+  },
 };

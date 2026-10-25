@@ -1,48 +1,48 @@
+/* The user's reference informs composition, while Maple supplies the palette. */
+main:has(.login-experience) { max-width:none; padding:0; min-height:0; }
+body:has(.login-experience)::before { display:none; }
 .login-experience {
   position:relative;
   isolation:isolate;
-  display:grid;
-  grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
-  align-items:start;
-  gap:clamp(2rem,6vw,5rem);
-  min-height:clamp(38rem,calc(100svh - 13rem),48rem);
-  padding:clamp(2rem,5vw,4rem) 0 5rem;
+  overflow:clip;
+  min-height:max(40rem,calc(100svh - 10.25rem));
+  padding:clamp(4rem,13svh,9rem) max(1.5rem,calc((100vw - 1440px)/2)) 6rem;
 }
-.login-intro { max-width:34rem; padding-top:1.5rem; }
-.login-kicker { font-size:.875rem; font-weight:600; color:var(--accent); margin:0 0 1.25rem; }
-.login-intro h1 { font-size:clamp(2.25rem,3.7vw,3.4rem); font-weight:600; letter-spacing:-.045em; line-height:1.08; margin:0 0 1.5rem; max-width:15ch; }
-.login-description { max-width:35ch; color:var(--ink); font-size:1rem; line-height:1.6; margin-bottom:1rem; }
-.login-continuation { color:var(--muted); font-size:.875rem; line-height:1.5; margin:0; }
-.login-form-region { width:100%; max-width:27rem; min-width:0; justify-self:end; align-self:start; }
+.login-form-region {
+  position:relative;
+  z-index:1;
+  width:min(22rem,36%);
+  max-width:100%;
+  margin-left:62%;
+}
 .login-form-region>* { max-width:100%; }
-.login-leaf-window { position:absolute; left:0; bottom:0; width:48%; height:50%; overflow:hidden; z-index:-1; pointer-events:none; }
-.login-leaf { position:absolute; left:-3%; bottom:-12%; width:95%; height:110%; color:var(--accent); transform-origin:50% 88%; animation:maple-login-breeze 16s ease-in-out infinite; }
-.login-leaf path { fill:currentColor; fill-opacity:.065; stroke:currentColor; stroke-width:1.2; stroke-opacity:.17; stroke-linejoin:round; }
-.login-leaf .login-leaf-veins { fill:none; stroke-width:1; stroke-opacity:.12; }
-:root[data-theme="dark"] .login-leaf path { fill-opacity:.055; stroke-opacity:.14; }
-:root[data-theme="dark"] .login-leaf .login-leaf-veins { stroke-opacity:.1; }
-.login-motion-toggle { position:absolute; left:0; bottom:.5rem; background:transparent; border:0; color:var(--muted); padding:.4rem 0; font-size:.75rem; font-weight:400; min-height:44px; text-decoration:underline; text-underline-offset:.2em; }
-.login-motion-toggle:hover:not(:disabled) { background:transparent; color:var(--ink); border-color:transparent; }
-.login-motion-toggle:active:not(:disabled) { transform:none; }
-.login-experience[data-motion="paused"] .login-leaf,
-.login-experience:has(.login-form-region :focus) .login-leaf { animation-play-state:paused; }
-@keyframes maple-login-breeze {
-  0%,60%,100% { transform:translate3d(0,0,0) rotate(-8deg); }
-  71% { transform:translate3d(3px,-5px,0) rotate(-6deg); }
-  84% { transform:translate3d(-2px,-2px,0) rotate(-9deg); }
+.login-leaf-window {
+  position:absolute;
+  left:0;
+  bottom:0;
+  width:46%;
+  max-width:44rem;
+  height:68%;
+  pointer-events:none;
+  z-index:-1;
 }
-@media(max-width:800px) {
-  .login-experience { grid-template-columns:minmax(0,1fr); min-height:auto; gap:2rem; padding:1.25rem 0 7rem; }
-  .login-intro { padding-top:0; max-width:33rem; }
-  .login-intro h1 { font-size:clamp(2rem,6vw,2.75rem); max-width:20ch; margin-bottom:1rem; }
-  .login-title-break { display:none; }
-  .login-description { max-width:42ch; }
-  .login-form-region { justify-self:start; max-width:28rem; }
-  .login-leaf-window { width:48%; height:40%; max-height:20rem; }
-  .login-leaf path { fill-opacity:.035; stroke-opacity:.12; }
-  .login-leaf .login-leaf-veins { stroke-opacity:.08; }
+.login-leaf {
+  position:absolute;
+  inset:0;
+  background:url('/images/login-maple-leaf.png') left bottom / contain no-repeat;
+  opacity:.32;
+  transform:translate(-12%,18%) rotate(-12deg) scale(1.2);
+  transform-origin:35% 85%;
 }
-@media(prefers-reduced-motion:reduce) {
-  .login-leaf { animation:none; transform:rotate(-8deg); }
-  .login-motion-toggle { display:none; }
+:root[data-theme="dark"] .login-leaf { opacity:.22; }
+@media(max-width:900px) {
+  .login-experience { min-height:max(38rem,calc(100svh - 10.25rem)); padding:3.5rem 1.5rem 14rem; }
+  .login-form-region { width:min(22rem,100%); margin-inline:auto; }
+  .login-leaf-window { width:70%; height:22rem; bottom:-7rem; }
+  .login-leaf { opacity:.18; }
+  :root[data-theme="dark"] .login-leaf { opacity:.16; }
+}
+@media(max-width:420px) {
+  .login-experience { padding:3rem 1.25rem 13rem; }
+  .login-leaf-window { width:88%; height:19rem; bottom:-6.5rem; }
 }
