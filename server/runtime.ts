@@ -19,6 +19,8 @@ import { DemoJourney, privateGuideEvidence } from './demo-journey.js';
 import { GuideSources } from './guide-sources.js';
 import { loadDemoBindings } from './demo-config.js';
 import { ProviderEvidence } from './provider-evidence.js';
+import { PersonalGuide } from './personal-guide.js';
+import { SurrealPolicyStore } from './policy-store.js';
 
 
 /** Construct real adapters without binding a port or starting a background timer. */
@@ -30,6 +32,7 @@ export async function buildRuntime() {
   let assessments: Assessments | undefined;
   let nativeChat: NativeChat | undefined;
   let demoJourney: DemoJourney | undefined;
+  let personalGuide:PersonalGuide|undefined;
   let database: Surreal | undefined;
   try {
     // Sign-in must work before the first authenticated user can be mapped to AM.
@@ -38,13 +41,15 @@ export async function buildRuntime() {
     config = loadConfig();
     if (config.amAccessMode === 'single-user-development') console.warn('AM_SINGLE_USER_DEVELOPMENT_FULL_ACCESS');
     // Operator-controlled reviewed bundle only. No HTTP/model promotion route exists.
-    const bundle = config.policyFile ? z.strictObject({ versions: z.array(z.unknown()), approvedDigests: z.array(z.string()) })
+    const bundle = config.amAccessMode!=='single-owner-production'&&config.policyFile ? z.strictObject({ versions: z.array(z.unknown()), approvedDigests: z.array(z.string()) })
       .parse(JSON.parse(readFileSync(config.policyFile, 'utf8'))) : { versions: [], approvedDigests: [] };
-    const policies = new PolicyRegistry(bundle.versions, bundle.approvedDigests);
+    let policies = new PolicyRegistry(bundle.versions, bundle.approvedDigests);
     const databaseConfig = loadDatabaseConfig(process.env.NODE_ENV === 'production' ? 'production' : 'development');
     const opened = await openRuntimeJournal(databaseConfig, config.journalPath
       ? { path: config.journalPath, owners: [...config.bindings.keys()] } : undefined);
     database = opened.db;
+    const productionPolicies=config.amAccessMode==='single-owner-production'?new SurrealPolicyStore(database,process.env.MAPLE_POLICY_RELEASE_DIGEST??''):undefined;
+    if(productionPolicies)policies=(await productionPolicies.load()).policies;
     workflow = new Workflow(opened.journal, createAgentMemory(), owner => bindingFor(config!, owner));
     assessments = new Assessments(workflow.journal, workflow, policies);
     // Native raw-turn memory replaces the new-message six-label proposal path.
@@ -72,7 +77,15 @@ export async function buildRuntime() {
           } catch { console.error('DEMO_JOURNEY_SETUP_REQUIRED'); }
         }
         const currentJournal = workflow.journal;
-        assessments = new Assessments(currentJournal, workflow, policies, () => new Date(), owner => nativeInputsReviewed(owner, store, currentJournal));
+        if(production&&productionPolicies&&evidence){
+          const guideStore=new SurrealDemoStore(database,'maple-personal-assessment');await guideStore.ready();
+          personalGuide=new PersonalGuide(guideStore,createDemoMemory(owner=>bindingFor(config!,owner),fetch,'maple-personal-assessment'),productionPolicies.guideSources(),workflow,
+            owner=>nativeInputsReviewed(owner,store,currentJournal),(id,data,owner)=>evidence.save(owner,id,'guide',data));
+        }
+        assessments = new Assessments(currentJournal, workflow, policies, () => new Date(), async owner => {
+          if(productionPolicies)await productionPolicies.assertActive();
+          return nativeInputsReviewed(owner, store, currentJournal);
+        });
       } catch (error) {
         if (config.amAccessMode === 'single-owner-production') throw error;
         console.error('NATIVE_CHAT_SETUP_REQUIRED');
@@ -86,7 +99,7 @@ export async function buildRuntime() {
     console.error(configurationError.code); // No config values or provider errors in logs.
   }
 
-  const app = createApp({ config, authConfig, configurationError, workflow, assessments, nativeChat, demoJourney,
+  const app = createApp({ config, authConfig, configurationError, workflow, assessments, nativeChat, demoJourney,personalGuide,
     webRoot: process.env.MAPLE_WEB_ROOT, operationalStore: 'surrealdb', operationalReady: () => database?.status === 'connected' });
   return {
     app,

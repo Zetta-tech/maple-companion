@@ -3,9 +3,25 @@ import {describe,it,expect} from 'vitest';
 import {createDemoMemory,demoDigest,type DemoEnvelope} from '../server/demo-memory.js';
 import {demoSeed} from '../shared/demo.js';
 import {fictionalCrsEvidence} from '../shared/crs.js';
+import {emptyPersonalIntake,personalProfileSchema} from '../shared/personal-guide.js';
 const owner='user_TestDemo';const entity='maple-demo-'+createHash('sha256').update(owner).digest('hex');
 const binding={ownerId:owner,endpoint:'https://fictional.example.test',context:'test',nativePrincipalId:'principalTest',readKey:'fixture-read',writeKey:'fixture-write'};
 describe('real SDK demo boundary with explicit test transport',()=>{
+  it('separates personal assessment attributes and purposes from demo and canonical employment',async()=>{
+    const profile=personalProfileSchema.parse({...demoSeed,...emptyPersonalIntake,inputPurpose:'reviewed-assessment-inputs',employmentBasis:{revision:1,receiptDigest:'a'.repeat(64)},intervalComplete:false});
+    const envelope:DemoEnvelope={schema:1,purpose:'maple-personal-assessment',ownerId:owner,revision:1,operationId:randomUUID(),previousFactId:null,confirmedAt:'2026-10-25T12:00:00Z',profile};
+    let row:Record<string,unknown>|null=null,posts=0;
+    const personalEntity='maple-assessment-'+createHash('sha256').update(owner).digest('hex');
+    const memory=createDemoMemory(()=>binding,async(input,init)=>{
+      const url=new URL(String(input));
+      if(url.pathname.endsWith('/attributes')){expect(url.searchParams.get('key')).toBe('assessment_inputs');return Response.json({attributes:row?[row]:[],page:{hasMore:false,nextCursor:null}});}
+      posts++;const body=JSON.parse(String(init?.body));expect(body.infer).toBe('triples');expect(body.triples[0].key).toBe('assessment_inputs');expect(body.triples[0].entity.name).toBe(personalEntity);
+      row={id:'personal-fixture',entity:'entity:person/'+personalEntity,key:'assessment_inputs',value:body.triples[0].value,memoryCategory:'identity',scope:[['maple/approved/']],supersedes:null};
+      return Response.json({mode:'triples',preview:false,extraction:{attributes:[row],uncertainties:[],instructions:[],relations:[],actions:[]}});
+    },'maple-personal-assessment');
+    await expect(memory.write(owner,{...envelope,purpose:'maple-fictional-demo'})).rejects.toBeDefined();expect(posts).toBe(0);
+    expect(await memory.read(owner,await memory.write(owner,envelope))).toEqual(envelope);expect(posts).toBe(1);
+  });
   it.each(['legacy','complete CRS'] as const)('writes the confirmed %s profile and verifies the SDK receipt without touching employment_record',async variant=>{
     let row:Record<string,unknown>|null=null;const requests:{method:string;path:string;body:unknown}[]=[];
     const crsEvidence=fictionalCrsEvidence('2026-10-25');crsEvidence.completeEvidenceReviewed='yes';

@@ -1,0 +1,31 @@
+-- Additive, single-owner personal assessment operational metadata; never run at startup.
+-- Profile values live in AM. Pending proposals are cleared after verified commit.
+BEGIN;
+DEFINE TABLE IF NOT EXISTS maple_guide_heads SCHEMAFULL PERMISSIONS NONE;
+DEFINE FIELD IF NOT EXISTS owner ON maple_guide_heads TYPE string;
+DEFINE FIELD IF NOT EXISTS revision ON maple_guide_heads TYPE int;
+DEFINE FIELD IF NOT EXISTS receipt_json ON maple_guide_heads TYPE string | null;
+DEFINE FIELD IF NOT EXISTS epoch ON maple_guide_heads TYPE int;
+DEFINE INDEX IF NOT EXISTS owner_unique ON maple_guide_heads FIELDS owner UNIQUE;
+DEFINE TABLE IF NOT EXISTS maple_guide_proposals SCHEMAFULL PERMISSIONS NONE;
+DEFINE FIELD IF NOT EXISTS owner ON maple_guide_proposals TYPE string;
+DEFINE FIELD IF NOT EXISTS key ON maple_guide_proposals TYPE string;
+DEFINE FIELD IF NOT EXISTS status ON maple_guide_proposals TYPE string;
+DEFINE FIELD IF NOT EXISTS base_revision ON maple_guide_proposals TYPE int;
+DEFINE FIELD IF NOT EXISTS profile_json ON maple_guide_proposals TYPE string | null;
+DEFINE FIELD IF NOT EXISTS digest ON maple_guide_proposals TYPE string;
+DEFINE FIELD IF NOT EXISTS created_at ON maple_guide_proposals TYPE string;
+DEFINE FIELD IF NOT EXISTS confirmed_at ON maple_guide_proposals TYPE string | null;
+DEFINE FIELD IF NOT EXISTS receipt_json ON maple_guide_proposals TYPE string | null;
+DEFINE INDEX IF NOT EXISTS owner_key ON maple_guide_proposals FIELDS owner,key UNIQUE;
+DEFINE TABLE IF NOT EXISTS maple_guide_events SCHEMAFULL PERMISSIONS NONE;
+DEFINE FIELD IF NOT EXISTS owner ON maple_guide_events TYPE string;
+DEFINE FIELD IF NOT EXISTS key ON maple_guide_events TYPE string;
+DEFINE FIELD IF NOT EXISTS digest ON maple_guide_events TYPE string;
+DEFINE FIELD IF NOT EXISTS status ON maple_guide_events TYPE string;
+DEFINE FIELD IF NOT EXISTS profile_revision ON maple_guide_events TYPE int;
+DEFINE FIELD IF NOT EXISTS created_at ON maple_guide_events TYPE string;
+DEFINE FIELD IF NOT EXISTS result_json ON maple_guide_events TYPE string | null;
+DEFINE INDEX IF NOT EXISTS owner_key ON maple_guide_events FIELDS owner,key UNIQUE;
+CREATE ONLY maple_schema:personal_guide_v1 CONTENT {version:1};
+COMMIT;

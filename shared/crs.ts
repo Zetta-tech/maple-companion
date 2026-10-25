@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { policyDateSchema } from './policy.js';
-export const CRS_POLICY_VERSION='2026-11-03.fictional-reviewed-evidence.v2';
+export const CRS_POLICY_VERSION='2026-11-03.reviewed-evidence.v3';
 
 const answer = z.enum(['yes','no','unknown']);
 export const educationLevels = ['less_secondary','secondary','one_year','two_year','bachelors','two_or_more','masters_professional','doctoral'] as const;
@@ -52,6 +52,18 @@ export type CrsCalculation={status:'complete';asOf:string;policyVersion:string;e
 export const noLanguage:LanguageEvidence={status:'not_taken',test:null,date:null,reading:null,writing:null,listening:null,speaking:null,benchmarkConversionReviewed:'no'};
 export const noWork:WorkInterval={status:'none',start:null,end:null,weeklyHours:null,noc:null,eligibilityReviewed:'yes'};
 const english=(level:number):LanguageEvidence=>({status:'tested',test:'CELPIP-General',date:'2026-07-01',reading:level,writing:level,listening:level,speaking:level,benchmarkConversionReviewed:'yes'});
+/** Real intake starts without invented tests, education, experience or bonus answers. */
+export function emptyCrsEvidence(asOf:string,canadianWorkEnd:string|null=null):CrsEvidence {
+  const education:EducationEvidence={level:'unknown',basis:'unknown',ecaDate:null,qualificationReviewed:'unknown'};
+  const language:LanguageEvidence={status:'unknown',test:null,date:null,reading:null,writing:null,listening:null,speaking:null,benchmarkConversionReviewed:'unknown'};
+  const work:WorkInterval={status:'unknown',start:null,end:null,weeklyHours:null,noc:null,eligibilityReviewed:'unknown'};
+  return crsEvidenceSchema.parse({version:1,reviewedForDate:asOf,completeEvidenceReviewed:'unknown',specialCases:'unknown',dateOfBirth:null,
+    education,firstLanguage:'unknown',english:{...language},french:{...language},canadianWorkEnd,canadianEmployer:'unknown',spouseCitizenOrPermanentResident:'unknown',
+    spouse:{education:{...education},language:{...language},languageName:'unknown',canadianWork:{...work}},foreignWork:{...work},
+    tradeCertificate:'unknown',tradeCertificateEligibilityReviewed:'unknown',canadianEducation:'unknown',canadianEducationEligibilityReviewed:'unknown',
+    eligibleSibling:'unknown',siblingEligibilityReviewed:'unknown',nomination:'unknown',nominationEligibilityReviewed:'unknown',
+    offer:{status:'unknown',noc:null,novemberRulesReviewed:'unknown',genuineOfferEvidenceReviewed:'unknown'}});
+}
 /** Offered only by an explicit UI action, then reviewed in the exact profile proposal. */
 export function fictionalCrsEvidence(asOf:string):CrsEvidence {
   return {version:1,reviewedForDate:asOf,completeEvidenceReviewed:'unknown',specialCases:'no',dateOfBirth:'1995-04-15',

@@ -3,10 +3,11 @@ import { AgentMemory } from '@surrealdb/memory';
 import { z } from 'zod';
 import type { Binding } from './am.js';
 import { AppError } from './errors.js';
-import { demoProfileSchema, type DemoProfile, type DemoReceipt } from '../shared/demo.js';
+import { type DemoReceipt } from '../shared/demo.js';
+import { guideProfileSchema, type GuidePurpose } from '../shared/personal-guide.js';
 
 const hash=(text:string)=>createHash('sha256').update(text).digest('hex');
-const envelopeSchema=z.strictObject({schema:z.literal(1),ownerId:z.string(),purpose:z.literal('maple-fictional-demo'),revision:z.number().int().positive(),operationId:z.uuid(),previousFactId:z.string().nullable(),confirmedAt:z.iso.datetime(),profile:demoProfileSchema});
+const envelopeSchema=z.strictObject({schema:z.literal(1),ownerId:z.string(),purpose:z.enum(['maple-fictional-demo','maple-personal-assessment']),revision:z.number().int().positive(),operationId:z.uuid(),previousFactId:z.string().nullable(),confirmedAt:z.iso.datetime(),profile:guideProfileSchema}).refine(e => e.profile.fictional === (e.purpose === 'maple-fictional-demo'));
 export type DemoEnvelope=z.infer<typeof envelopeSchema>;
 function canonical(value:unknown):string {
   if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
@@ -19,16 +20,18 @@ export interface DemoMemory {
   write(owner:string,envelope:DemoEnvelope):Promise<DemoReceipt>;
   explain(owner:string,requestId:string,message:string):Promise<{reply:string;sessionId:string;traceId:string;raw:unknown}>;
 }
-const unavailable=()=>new AppError(503,'DEMO_MEMORY_UNVERIFIED','The demonstration profile could not be verified in memory. No saved-success claim is being made.');
+const unavailable=()=>new AppError(503,'DEMO_MEMORY_UNVERIFIED','Your reviewed information could not be verified in memory. Check its status before relying on it.');
 
 /** One separate fictional entity. Never reads/writes the employment_record entity. */
-export function createDemoMemory(resolve:(owner:string)=>Binding,transport:typeof fetch=fetch):DemoMemory {
+export function createDemoMemory(resolve:(owner:string)=>Binding,transport:typeof fetch=fetch,purpose:GuidePurpose='maple-fictional-demo'):DemoMemory {
+  const fictional=purpose==='maple-fictional-demo';
+  const attributeKey=fictional?'demo_profile':'assessment_inputs';
   function binding(owner:string) {
     const b=resolve(owner);
     if(b.ownerId!==owner || !b.nativePrincipalId || !/^user_[a-zA-Z0-9]+$/.test(owner))throw unavailable();
     return b;
   }
-  const name=(owner:string)=>`maple-demo-${hash(owner)}`;
+  const name=(owner:string)=>`${fictional?'maple-demo':'maple-assessment'}-${hash(owner)}`;
   function client(owner:string,write=false,operationId?:string) {
     const b=binding(owner); const prefix=`/api/v1/${b.context}/`;
     return new AgentMemory({endpoint:b.endpoint,context:b.context,apiKey:write?b.writeKey:b.readKey,maxRetries:0,timeoutMs:45_000,
@@ -38,40 +41,40 @@ export function createDemoMemory(resolve:(owner:string)=>Binding,transport:typeo
         const allowed=method==='GET'&&['attributes','me'].includes(resource)||write&&method==='POST'&&['facts','chat'].includes(resource);
         if(url.origin!==b.endpoint||!url.pathname.startsWith(prefix)||!allowed)throw unavailable();
         const headers=new Headers(init?.headers);
-        if(method==='POST') {if(!operationId)throw unavailable();headers.set('Idempotency-Key',`maple-demo-${hash(JSON.stringify([owner,b.context,resource,operationId]))}`);}
+        if(method==='POST') {if(!operationId)throw unavailable();headers.set('Idempotency-Key',`maple-guide-${hash(JSON.stringify([purpose,owner,b.context,resource,operationId]))}`);}
         return transport(input,{...init,headers,redirect:'error'});
       }});
   }
   async function rows(owner:string) {
-    const result=await client(owner).facts.attributes({entity:`person/${name(owner)}`,key:'demo_profile',limit:100});
+    const result=await client(owner).facts.attributes({entity:`person/${name(owner)}`,key:attributeKey,limit:100});
     if(result.page.hasMore||result.attributes.length>1)throw unavailable();
     return result.attributes;
   }
   async function read(owner:string,receipt:DemoReceipt) {
     const list=await rows(owner);const row=list[0];
-    if(!row||row.id!==receipt.factId||row.entity!==`entity:person/${name(owner)}`||row.key!=='demo_profile'||row.memoryCategory!=='identity'||row.supersededBy||row.validUntil
+    if(!row||row.id!==receipt.factId||row.entity!==`entity:person/${name(owner)}`||row.key!==attributeKey||row.memoryCategory!=='identity'||row.supersededBy||row.validUntil
       ||JSON.stringify(row.scope.map(s=>s.map(v=>v.replace(/\/$/,''))))!==JSON.stringify([['maple/approved']]))throw unavailable();
     let envelope:DemoEnvelope;
     try {envelope=envelopeSchema.parse(JSON.parse(row.value));}catch{throw unavailable();}
-    if(envelope.ownerId!==owner||demoDigest(envelope)!==receipt.digest||(row.supersedes??null)!==envelope.previousFactId)throw unavailable();
+    if(envelope.ownerId!==owner||envelope.purpose!==purpose||demoDigest(envelope)!==receipt.digest||(row.supersedes??null)!==envelope.previousFactId)throw unavailable();
     return envelope;
   }
   return {read,
     async write(owner,input) {
-      const envelope=envelopeSchema.parse(input);if(envelope.ownerId!==owner)throw unavailable();
+      const envelope=envelopeSchema.parse(input);if(envelope.ownerId!==owner||envelope.purpose!==purpose)throw unavailable();
       const before=await rows(owner);
       if(envelope.previousFactId===null ? before.length!==0 : before.length!==1||before[0]?.id!==envelope.previousFactId)throw unavailable();
       if(before[0]) { let previous:DemoEnvelope;try{previous=envelopeSchema.parse(JSON.parse(before[0].value));}catch{throw unavailable();}
-        if(previous.ownerId!==owner||previous.revision!==envelope.revision-1)throw unavailable(); }
+        if(previous.ownerId!==owner||previous.purpose!==purpose||previous.revision!==envelope.revision-1)throw unavailable(); }
       const value=JSON.stringify(envelope);
       try {
         const result=await client(owner,true,envelope.operationId).remember(undefined,{infer:'triples',scopes:[['maple/approved']],triples:[{
-          entity:{type:'person',name:name(owner)},key:'demo_profile',value,memory_category:'identity',source_clause:`Explicitly confirmed fictional demo profile ${envelope.operationId}`,
+          entity:{type:'person',name:name(owner)},key:attributeKey,value,memory_category:'identity',source_clause:`Explicitly confirmed ${fictional?'fictional demo profile':'assessment inputs linked to the canonical employment receipt'} ${envelope.operationId}`,
         }]});
         const attr=result.extraction?.attributes[0];
-        if(result.mode!=='triples'||result.preview||result.extraction?.attributes.length!==1||!attr||attr.value!==value||attr.key!=='demo_profile')throw unavailable();
+        if(result.mode!=='triples'||result.preview||result.extraction?.attributes.length!==1||!attr||attr.value!==value||attr.key!==attributeKey)throw unavailable();
         const receipt={factId:attr.id,digest:demoDigest(envelope)};await read(owner,receipt);return receipt;
-      }catch{throw new AppError(503,'DEMO_WRITE_UNCERTAIN','This demo save may have reached memory but could not be verified. Do not submit it again.');}
+      }catch{throw new AppError(503,'DEMO_WRITE_UNCERTAIN','This save may have reached memory but could not be verified. Do not submit it again.');}
     },
     async explain(owner,requestId,message) {
       let sdk:AgentMemory;
@@ -81,7 +84,7 @@ export function createDemoMemory(resolve:(owner:string)=>Binding,transport:typeo
         if(identity.principalId?.replace(/^principal:/,'')!==b.nativePrincipalId||identity.delegatedPrincipalId)throw unavailable();
       }catch { throw new AppError(503,'GUIDE_NOT_SENT','The guide could not verify its connection. No conversation request was sent. You may try again after checking the connection.'); }
       try {
-        const result=await sdk.chat(message,{scopes:[['maple/conversation']],labels:['maple=fictional_demo','purpose=pathway_research'],suppressMarkers:true});
+        const result=await sdk.chat(message,{scopes:[['maple/conversation']],labels:[`maple=${fictional?'fictional_demo':'personal_guide'}`,'purpose=pathway_research'],suppressMarkers:true});
         if(!result.reply?.trim()||!result.sessionId||!result.traceId)throw unavailable();
         return {reply:result.reply,sessionId:result.sessionId,traceId:result.traceId,raw:result};
       }catch{throw new AppError(503,'GUIDE_RESPONSE_UNCERTAIN','The guide response could not be verified. Its request has been recorded; it will not be sent again automatically.');}
