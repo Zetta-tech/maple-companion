@@ -37,6 +37,9 @@ export function projectExpressEntry(input: GuideProfile, date: string, revision:
   const parsed=completeGuideProfileSchema.safeParse(input);
   if(!parsed.success||(!input.fictional&&!input.intervalComplete))return {...base,outstanding:['Complete the reviewed dates, occupation and consistent qualifying work interval. Unknown details are not assumed or copied from a demonstration.']};
   const profile=parsed.data;
+  if(!profile.fictional&&(profile.currentJob===undefined||profile.workEnd===undefined
+    ||(profile.currentJob?profile.workEnd!==null:profile.workEnd===null)
+    ||(profile.workEnd!==null&&profile.workEnd<profile.workStart)))return {...base,outstanding:['Review the confirmed employment end date and current-job status. Missing or conflicting interval boundaries cannot be scored.']};
   if(profile.crsEvidence){
     if(!Object.entries(crsRuleSourceHashes).every(([id,hash])=>sources.some(s=>s.id===id&&s.bodySha256===hash)))return {...base,outstanding:['The full-score calculation needs the complete reviewed source set matching this calculator version.']};
     const crs=calculateCrs(profile,date);
@@ -52,12 +55,13 @@ export function projectExpressEntry(input: GuideProfile, date: string, revision:
     && profile.fullTimeStudy === 'no' && profile.selfEmployed === 'no' && profile.spouseAccompanying !== 'unknown';
   if (profile.workStart < profile.arrivedInCanada) return { ...base, outstanding:['The work interval begins before the recorded arrival in Canada. Clarify whether this arrival is a later re-entry and document any earlier Canadian stay, or correct the dates. This single-interval calculation cannot resolve that history; no score was calculated.'] };
   if (!knownConditions || profile.workStart > date) return { ...base, outstanding:['Qualifying occupation, duties, Canadian work conditions, spouse status or dates still need review. No score delta was inferred.'] };
-  const elapsed = days(profile.workStart, date);
-  const calendarYears = Number(date.slice(0,4)) - Number(profile.workStart.slice(0,4)) - (date.slice(5) < profile.workStart.slice(5) ? 1 : 0);
+  const intervalEnd = !profile.fictional&&profile.workEnd!==null&&profile.workEnd!==undefined&&profile.workEnd<date?profile.workEnd:date;
+  const elapsed = days(profile.workStart, intervalEnd);
+  const calendarYears = Number(intervalEnd.slice(0,4)) - Number(profile.workStart.slice(0,4)) - (intervalEnd.slice(5) < profile.workStart.slice(5) ? 1 : 0);
   const hours = Math.floor(elapsed / 7) * Math.min(30, profile.weeklyHours);
   // Narrow consistent single-interval calculation. No acceleration by overtime.
   const qualifyingYears = Math.min(5,calendarYears,Math.floor(hours / 1560));
-  if (qualifyingYears < 1 || elapsed > 3653 || profile.workStart.slice(5) === '02-29') return { ...base,outstanding:['This consistent work interval does not establish a supported qualifying year within the ten-year CRS window. Complex or date-boundary history needs review.'] };
+  if (qualifyingYears < 1 || days(profile.workStart,date) > 3653 || profile.workStart.slice(5) === '02-29') return { ...base,outstanding:['This consistent work interval does not establish a supported qualifying year within the ten-year CRS window. Complex or date-boundary history needs review.'] };
   const before = (profile.spouseAccompanying === 'yes' ? [0,35,46,56,63,70] : [0,40,53,64,72,80])[qualifyingYears]!;
   const bonus = 40; // Reviewed occupation-median tier for 21221/21223, not individual salary.
   const conditional = profile.qualifyingExpressEntryOffer !== 'none_reviewed';

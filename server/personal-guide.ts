@@ -47,11 +47,11 @@ export class PersonalGuide {
     const intervalComplete=!!c&&c.singleIntervalComplete==='yes'&&c.conditionsConsistent==='yes'
       &&c.canadianEmployer==='yes'&&c.nocDutiesMatch==='yes'&&c.nocEssentialDutiesMatch==='yes'
       &&!(e.paid==='no'&&c.paid==='yes')&&!(e.authorizedToWork==='no'&&c.authorizedTemporaryResident==='yes')
-      &&(c.ongoing?e.currentJob&&c.hoursPerWeek===e.hoursPerWeek:!e.currentJob&&c.endDate===e.endDate)
+      &&c.hoursPerWeek===e.hoursPerWeek&&(c.ongoing?e.currentJob:!e.currentJob&&c.endDate===e.endDate)
       &&c.startDate===e.startDate;
     const profile=personalProfileSchema.parse({...input.intake,inputPurpose:'reviewed-assessment-inputs',
       employmentBasis:{revision:saved.revision,receiptDigest:fence.receipt.digest},
-      employer:e.employer,jobTitle:e.title,workStart:e.startDate,weeklyHours:e.hoursPerWeek,noc:e.nocCode,duties:e.duties,nocReviewed:e.nocReviewed,
+      employer:e.employer,jobTitle:e.title,workStart:e.startDate,workEnd:e.endDate,currentJob:e.currentJob,weeklyHours:e.hoursPerWeek,noc:e.nocCode,duties:e.duties,nocReviewed:e.nocReviewed,
       physicallyCanada:answer(c?.physicallyInCanada),authorizedWork:answer(c?.authorizedTemporaryResident),
       paidEmployee:c?.paid==='yes'&&c.relationship==='employee'?'yes':c?.paid==='no'||c?.relationship==='self_employed'?'no':'unknown',
       fullTimeStudy:answer(c?.fullTimeStudy),selfEmployed:c?.relationship==='employee'?'no':c?.relationship==='self_employed'?'yes':'unknown',intervalComplete,
@@ -59,6 +59,7 @@ export class PersonalGuide {
     return this.engine.propose(owner,{baseRevision:input.baseRevision,profile});
   }
   confirm(owner:string,id:string,body:unknown){return this.engine.confirm(owner,id,body);}
+  reconcile(owner:string,id:string,body:unknown){return this.engine.reconcile(owner,id,body);}
   discover(owner:string,body:unknown,onDispatch=()=>{}){return this.engine.discover(owner,body,onDispatch);}
   replay(owner:string,body:unknown,onDispatch=()=>{}){return this.engine.replay(owner,body,onDispatch);}
   history(owner:string){return this.engine.history(owner);}

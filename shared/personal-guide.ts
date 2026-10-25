@@ -25,6 +25,8 @@ export const personalProfileSchema = personalIntakeSchema.extend({
   employmentBasis:z.strictObject({revision:z.number().int().positive(),receiptDigest:z.string().regex(/^[a-f0-9]{64}$/)}),
   employer:z.string().min(1).max(200),jobTitle:z.string().min(1).max(200),
   workStart:policyDateSchema,weeklyHours:z.number().positive().max(168).nullable(),
+  // Optional only for receipt compatibility. Missing legacy boundaries cannot be scored.
+  workEnd:policyDateSchema.nullable().optional(),currentJob:z.boolean().optional(),
   noc:z.string().regex(/^\d{5}$/).nullable(),duties:z.string().max(10_000),nocReviewed:z.boolean(),
   physicallyCanada:answer,authorizedWork:answer,paidEmployee:answer,fullTimeStudy:answer,selfEmployed:answer,
   // This is an explicit qualifying interval, not today's hours applied to the past.
@@ -33,7 +35,7 @@ export const personalProfileSchema = personalIntakeSchema.extend({
 export type PersonalProfile = z.infer<typeof personalProfileSchema>;
 export type GuideProfile = DemoProfile | PersonalProfile;
 export type CompleteGuideProfile = Omit<DemoProfile,'fictional'> & {fictional:boolean};
-export const completeGuideProfileSchema = demoProfileSchema.extend({fictional:z.boolean()}).strip();
+export const completeGuideProfileSchema = demoProfileSchema.extend({fictional:z.boolean(),workEnd:policyDateSchema.nullable().optional(),currentJob:z.boolean().optional()}).strip();
 export type GuidePurpose = 'maple-fictional-demo' | 'maple-personal-assessment';
 export const guideProfileSchema = z.union([demoProfileSchema,personalProfileSchema]);
 export type GuideSnapshot = {revision:number;profile:GuideProfile|null;verified:boolean;reviewRequired?:boolean};

@@ -7,6 +7,30 @@ import {emptyPersonalIntake,personalProfileSchema} from '../shared/personal-guid
 const owner='user_TestDemo';const entity='maple-demo-'+createHash('sha256').update(owner).digest('hex');
 const binding={ownerId:owner,endpoint:'https://fictional.example.test',context:'test',nativePrincipalId:'principalTest',readKey:'fixture-read',writeKey:'fixture-write'};
 describe('real SDK demo boundary with explicit test transport',()=>{
+  it('marks a failed pre-read as not started and makes no provider POST',async()=>{
+    const methods:string[]=[];const memory=createDemoMemory(()=>binding,async(_input,init)=>{methods.push(init?.method??'GET');throw Error('GET failed');});
+    const envelope:DemoEnvelope={schema:1,purpose:'maple-fictional-demo',ownerId:owner,revision:1,operationId:randomUUID(),previousFactId:null,confirmedAt:'2026-10-25T12:00:00Z',profile:demoSeed};
+    await expect(memory.write(owner,envelope)).rejects.toMatchObject({code:'GUIDE_WRITE_NOT_STARTED'});expect(methods).toEqual(['GET']);
+  });
+  it.each(['write response','readback'] as const)('finds the exact operation after a lost %s using GET only, never retries the write',async failure=>{
+    const envelope:DemoEnvelope={schema:1,purpose:'maple-fictional-demo',ownerId:owner,revision:1,operationId:randomUUID(),previousFactId:null,confirmedAt:'2026-10-25T12:00:00Z',profile:demoSeed};
+    let row:Record<string,unknown>|null=null,posts=0,failRead=true;
+    const memory=createDemoMemory(()=>binding,async(input,init)=>{
+      if(String(input).includes('/attributes')){
+        if(row&&failure==='readback'&&failRead){failRead=false;throw Error('GET interrupted');}
+        return Response.json({attributes:row?[row]:[],page:{hasMore:false,nextCursor:null}});
+      }
+      posts++;const body=JSON.parse(String(init?.body));row={id:'exact-fact',entity:'entity:person/'+entity,key:'demo_profile',value:body.triples[0].value,memoryCategory:'identity',scope:[['maple/approved/']],supersedes:null};
+      if(failure==='write response')throw Error('POST response interrupted');
+      return Response.json({mode:'triples',preview:false,extraction:{attributes:[row]}});
+    });
+    await expect(memory.write(owner,envelope)).rejects.toMatchObject({code:'DEMO_WRITE_UNCERTAIN'});
+    expect(await memory.reconcile(owner,envelope)).toEqual({factId:'exact-fact',digest:demoDigest(envelope)});
+    expect(await memory.reconcile(owner,{...envelope,operationId:randomUUID()})).toBeNull();
+    expect(await memory.reconcile(owner,{...envelope,profile:{...demoSeed,weeklyHours:29}})).toBeNull();
+    row!.scope=[['different/scope']];await expect(memory.reconcile(owner,envelope)).rejects.toMatchObject({code:'DEMO_MEMORY_UNVERIFIED'});
+    expect(posts).toBe(1);
+  });
   it('separates personal assessment attributes and purposes from demo and canonical employment',async()=>{
     const profile=personalProfileSchema.parse({...demoSeed,...emptyPersonalIntake,inputPurpose:'reviewed-assessment-inputs',employmentBasis:{revision:1,receiptDigest:'a'.repeat(64)},intervalComplete:false});
     const envelope:DemoEnvelope={schema:1,purpose:'maple-personal-assessment',ownerId:owner,revision:1,operationId:randomUUID(),previousFactId:null,confirmedAt:'2026-10-25T12:00:00Z',profile};

@@ -93,6 +93,7 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   app.get('/api/demo/proposals', async(_req,res)=>res.json({proposals:await demo().store.proposals(res.locals.owner)}));
   app.post('/api/demo/proposals', async(req,res)=>res.status(201).json(await demo().propose(res.locals.owner,req.body)));
   app.post('/api/demo/proposals/:id/confirm', async(req,res)=>res.json(await demo().confirm(res.locals.owner,id(req.params.id),req.body)));
+  app.post('/api/demo/proposals/:id/reconcile', async(req,res)=>res.json(await demo().reconcile(res.locals.owner,id(req.params.id),req.body)));
   app.post('/api/demo/proposals/:id/reject', async(req,res)=>{z.strictObject({}).parse(req.body);await demo().store.reject(res.locals.owner,id(req.params.id));res.json({status:'rejected'});});
   app.get('/api/demo/journey', async(_req,res)=>res.json(await demo().history(res.locals.owner)));
   app.post('/api/demo/discover', async(req,res)=>res.json(await demo().discover(res.locals.owner,req.body)));
@@ -103,6 +104,7 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   app.get('/api/guide/proposals',async(_req,res)=>res.json({proposals:await personal().store.proposals(res.locals.owner)}));
   app.post('/api/guide/proposals',async(req,res)=>res.status(201).json(await personal().propose(res.locals.owner,req.body)));
   app.post('/api/guide/proposals/:id/confirm',async(req,res)=>res.json(await personal().confirm(res.locals.owner,id(req.params.id),req.body)));
+  app.post('/api/guide/proposals/:id/reconcile',async(req,res)=>res.json(await personal().reconcile(res.locals.owner,id(req.params.id),req.body)));
   app.post('/api/guide/proposals/:id/reject',async(req,res)=>{z.strictObject({}).parse(req.body);await personal().store.reject(res.locals.owner,id(req.params.id));res.json({status:'rejected'});});
   app.get('/api/guide/journey',async(_req,res)=>res.json(await personal().history(res.locals.owner)));
   app.post('/api/guide/discover',async(req,res)=>res.json(await personal().discover(res.locals.owner,req.body,()=>{res.locals.guideRequestStarted=true;})));

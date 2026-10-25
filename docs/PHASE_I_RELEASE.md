@@ -29,11 +29,11 @@ Coverage is curated C20 and Express Entry/CRS. Broad automated policy discovery/
 
 The authorized separate Vercel maple-companion project was created in zetta-techs-projects, Node24/Express, without Git connection or deployment. app.maplenewsletter.com is attached and ownership verified; DNS remains unconfigured. Vercel requests CNAME target ac26b9ce41802eb1.vercel-dns-017.com. External DNS, apex/www and the newsletter project were not changed.
 
-The user approved replacement of the old mixed AM Context while preserving maple-guide-demo. Automatic approval review rejected irreversible deletion; it did not execute. Both Contexts remain intact. Do not bypass that rejection or call the mixed Context production-clean. No replacement key was created.
+The user manually deleted the old mixed AM Context after the assistant deletion was rejected. A control-plane read verified it absent and the demo Context intact. The approved clean replacement maple-companion-production was created in Oregon and is ready; no test facts have been written into it. Key minting remains blocked: automatic approval review rejected both unrestricted inheritance and a narrower maple/* request, requiring verified least privilege. Neither created a key. Do not retry or route around those denials. Production bindings remain inactive.
 
 Remaining release requirements:
 
-1. Clean production AM target and verified server identity/key configuration; preserve the working demo. Resolve rejected destruction with the user/provider, not an alternate agent deletion route.
+1. Verified least-privilege server credentials for the clean production AM target; preserve the working demo. Current configuration requires separate read/write keys. Scope their needed memory access to maple/approved and maple/conversation, with no management/forget/delete access, and verify effective grants. Resolve the rejected credential creation before retrying.
 2. Separate maple/production operational database, scoped credentials, approved schema and registry seed. Do not relabel development/test.
 3. Clerk production instance/live keys and owned-domain setup. Google production OAuth needs configured credentials; changing sign-in methods is an explicit choice. Test keys on vercel.app are not production authentication.
 4. Real-intake frontend integration/review using the API contract. Never reuse fictional seeds or fictional CRS defaults as personal facts.
@@ -43,8 +43,8 @@ Native correction visibility remains an unresolved release risk; production is n
 
 ## Verification
 
-623 offline tests across 36 files, typecheck, build and CDN packaging passed. Tests exercise actual routes/coordinators/calculators/SDK transports with synthetic fixtures, not live AM inference. Earlier completion-fence changes also passed two real SurrealDB tests. New personal Guide/registry tables still need approved hosted integration testing.
+631 offline tests across 36 files, typecheck and build passed. New regressions cover actual ended employment, legacy missing boundaries, pre-dispatch save release, exact-operation reconciliation after lost responses, owner denial and unknown-outcome holds without duplicate writes. Tests exercise actual routes/coordinators/calculators/SDK transports with synthetic fixtures, not live AM inference. Earlier completion-fence changes also passed two real SurrealDB tests. New personal Guide/registry tables still need approved hosted integration testing.
 
-No public deployment, AM inference, private-memory mutation, data deletion or localhost restart occurred during this preparation. The existing demo remains independently available. The frontend bundle has an existing size warning.
+No public deployment, AM inference, private-memory mutation or localhost restart occurred during this preparation. The assistant did not execute data deletion; the old Context was removed manually by the user. The existing demo remains independently available. The frontend bundle has an existing size warning.
 
 Official references: [Vercel Express](https://vercel.com/docs/frameworks/backend/express), [Git controls](https://vercel.com/docs/project-configuration/git-configuration), [Clerk production](https://clerk.com/docs/guides/development/deployment/vercel).

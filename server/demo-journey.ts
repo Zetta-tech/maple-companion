@@ -5,7 +5,7 @@ import { businessDate } from '../shared/business-date.js';
 import { type JourneyEvent } from '../shared/demo.js';
 import { guideProfileSchema,type GuideSnapshot,type GuideProfile,type GuidePurpose } from '../shared/personal-guide.js';
 import { AppError } from './errors.js';
-import { demoDigest,type DemoMemory } from './demo-memory.js';
+import { demoDigest,GuideWriteNotStarted,type DemoMemory,type DemoEnvelope } from './demo-memory.js';
 import type { DemoStore } from './demo-store.js';
 import type { GuideSources } from './guide-sources.js';
 import { discoverC20,projectExpressEntry } from './discovery.js';
@@ -41,15 +41,33 @@ export class DemoJourney {
   }
   async confirm(owner:string,id:string,body:unknown){z.strictObject({confirm:z.literal(true)}).parse(body);z.uuid().parse(id);
     const prior=await this.store.proposal(owner,id);if(prior.status==='committed')return this.profile(owner);
+    if(['applying','uncertain'].includes(prior.status))return this.reconcile(owner,id,{});
     if(!prior.profile||!(await this.inputsCurrent(owner,prior.profile)))throw new AppError(409,'GUIDE_INPUT_REVIEW_REQUIRED','Employment or conversation memory changed. Review the inputs again.');
     this.assertPurpose(prior.profile);
     const head=await this.store.head(owner);const op=await this.store.claim(owner,id);
     if(op.status==='committed')return this.profile(owner);
     if(!op.profile||!op.confirmedAt)throw new AppError(503,'DEMO_PROPOSAL_INVALID','The exact proposal could not be verified.');
-    try {
-      const receipt=await this.memory.write(owner,{schema:1,purpose:this.purpose,ownerId:owner,revision:op.baseRevision+1,operationId:id,previousFactId:head.receipt?.factId??null,confirmedAt:op.confirmedAt,profile:op.profile});
-      await this.store.complete(owner,id,receipt);return this.profile(owner);
-    }catch(error){await this.store.uncertain(owner,id);throw error;}
+    let receipt;
+    try {receipt=await this.memory.write(owner,{schema:1,purpose:this.purpose,ownerId:owner,revision:op.baseRevision+1,operationId:id,previousFactId:head.receipt?.factId??null,confirmedAt:op.confirmedAt,profile:op.profile});}
+    catch(error){
+      if(error instanceof GuideWriteNotStarted)await this.store.releaseNotStarted(owner,id);
+      else await this.store.uncertain(owner,id);
+      throw error;
+    }
+    try {await this.store.complete(owner,id,receipt);return this.profile(owner);}
+    catch(error){await this.store.uncertain(owner,id);throw error;}
+  }
+  /** Read the exact confirmed operation; never resends a possibly executed AM write. */
+  async reconcile(owner:string,id:string,body:unknown){
+    z.strictObject({}).parse(body);z.uuid().parse(id);
+    const op=await this.store.proposal(owner,id);if(op.status==='committed')return this.profile(owner);
+    if(!['applying','uncertain'].includes(op.status)||!op.profile||!op.confirmedAt||demoDigest(op.profile)!==op.digest)throw new AppError(409,'DEMO_REVIEW_REQUIRED','This operation is not awaiting verification.');
+    this.assertPurpose(op.profile);const head=await this.store.head(owner);
+    if(head.revision!==op.baseRevision)throw new AppError(409,'DEMO_PROFILE_CHANGED','The profile changed. Refresh its status before continuing.');
+    const envelope:DemoEnvelope={schema:1,purpose:this.purpose,ownerId:owner,revision:op.baseRevision+1,operationId:id,previousFactId:head.receipt?.factId??null,confirmedAt:op.confirmedAt,profile:op.profile};
+    const receipt=await this.memory.reconcile(owner,envelope);
+    if(!receipt)throw new AppError(503,'DEMO_WRITE_UNCERTAIN','This exact save is not yet verifiable. It has not been sent again.');
+    await this.store.complete(owner,id,receipt);return this.profile(owner);
   }
   async discover(owner:string,body:unknown,onDispatch=()=>{}){const input=z.strictObject({requestId:z.uuid(),question:guideQuestionSchema,fictional:z.literal(this.fictional)}).parse(body);return this.process(owner,input.requestId,'discovery',input.question,onDispatch);}
   async replay(owner:string,body:unknown,onDispatch=()=>{}){const input=z.strictObject({requestId:z.uuid(),fictional:z.literal(this.fictional)}).parse(body);return this.process(owner,input.requestId,'policy_update',undefined,onDispatch);}

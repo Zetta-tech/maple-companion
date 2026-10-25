@@ -14,6 +14,7 @@ export interface DemoStore {
   head(owner:string):Promise<DemoHead>; proposals(owner:string):Promise<DemoProposal[]>; proposal(owner:string,id:string):Promise<DemoProposal>;
   propose(owner:string,revision:number,profile:GuideProfile):Promise<DemoProposal>; claim(owner:string,id:string):Promise<DemoProposal>;
   complete(owner:string,id:string,receipt:DemoReceipt):Promise<void>; uncertain(owner:string,id:string):Promise<void>;
+  releaseNotStarted(owner:string,id:string):Promise<void>;
   reject(owner:string,id:string):Promise<void>;
   claimEvent(owner:string,id:string,digest:string,revision:number):Promise<JourneyEvent|null>; finishEvent(owner:string,event:JourneyEvent):Promise<void>;
   events(owner:string):Promise<JourneyEvent[]>;
@@ -51,6 +52,10 @@ export class SurrealDemoStore implements DemoStore {
     await tx.query(this.sql("UPDATE $head SET revision=$revision,receipt_json=$receipt WHERE owner=$owner; UPDATE $proposal SET status='committed',receipt_json=$receipt,profile_json=NULL WHERE owner=$owner;"),{head:this.key('maple_demo_heads',owner),proposal:this.key('maple_demo_proposals',owner,id),owner,revision:op.baseRevision+1,receipt:JSON.stringify(receipt)}).retry(false);
   });}
   async uncertain(owner:string,id:string){await this.db.query(this.sql("UPDATE $record SET status='uncertain' WHERE owner=$owner AND status='applying';"),{record:this.key('maple_demo_proposals',owner,id),owner}).retry(false);}
+  async releaseNotStarted(owner:string,id:string){await this.atomic(owner,async tx=>{
+    const [r]=await tx.query<[unknown[]]>(this.sql("UPDATE $record SET status='pending',confirmed_at=NULL WHERE owner=$owner AND status='applying' RETURN AFTER;"),{record:this.key('maple_demo_proposals',owner,id),owner}).retry(false);
+    if(!r.length)throw conflict();
+  });}
   async reject(owner:string,id:string){await this.atomic(owner,async tx=>{const [r]=await tx.query<[{status:string}[]]>(this.sql('SELECT status FROM maple_demo_proposals WHERE owner=$owner AND key=$id;'),{owner,id}).retry(false);if(!r[0])throw missing();if(r[0].status!=='pending')throw conflict();await tx.query(this.sql("UPDATE $record SET status='rejected',profile_json=NULL WHERE owner=$owner;"),{record:this.key('maple_demo_proposals',owner,id),owner}).retry(false);});}
   async claimEvent(owner:string,id:string,digest:string,revision:number):Promise<JourneyEvent|null>{return this.atomic(owner,async tx=>{
     const [existing,heads,active]=await tx.query<[{digest:string;status:string;result_json:string|null}[],{revision:number}[],unknown[]]>(this.sql("SELECT digest,status,result_json FROM maple_demo_events WHERE owner=$owner AND key=$id; SELECT revision FROM maple_demo_heads WHERE owner=$owner; SELECT key FROM maple_demo_events WHERE owner=$owner AND status IN ['processing','uncertain'];"),{owner,id}).retry(false);

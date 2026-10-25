@@ -10,7 +10,8 @@ it('uses real SurrealDB for exact demo approval, owner denial, restart history a
   const db=await connectOperationalDatabase(loadDatabaseConfig('test'));const owner='user_demo'+randomUUID().replaceAll('-',''),other=owner+'other';
   let saved:DemoEnvelope|undefined,writes=0,guideCalls=0;
   // AM transport substitute is explicit: this test proves DB workflow, not native generation.
-  const memory:DemoMemory={async read(o,receipt){if(o!==owner||!saved||demoDigest(saved)!==receipt.digest)throw Error('missing');return saved;},async write(o,input){if(o!==owner)throw Error('foreign');writes++;saved=input;return {factId:'synthetic-fact',digest:demoDigest(input)};},async explain(){guideCalls++;return {reply:'Synthetic transport response, not a live finding',sessionId:'synthetic-session',traceId:'synthetic-trace',raw:{synthetic:true}};}};
+  const memory:DemoMemory={async reconcile(){return null;},async read(o,receipt){if(o!==owner||!saved||demoDigest(saved)!==receipt.digest)throw Error('missing');return saved;},async write(o,input){if(o!==owner)throw Error('foreign');writes++;saved=input;return {factId:'synthetic-fact',digest:demoDigest(input)};},async explain(){guideCalls++;return {reply:'Synthetic transport response, not a live finding',sessionId:'synthetic-session',traceId:'synthetic-trace',raw:{synthetic:true}};}};
+  memory.reconcile=async(o,input)=>o===owner&&saved&&demoDigest(saved)===demoDigest(input)?{factId:'synthetic-fact',digest:demoDigest(saved)}:null;
   const sources={async retrieve(){return {evidence:[],context:'Synthetic transport source'};}};
   try{
     const store=new SurrealDemoStore(db);await store.ready();const service=new DemoJourney(store,memory,sources,()=>{},()=>new Date('2026-10-25T12:00:00Z'));

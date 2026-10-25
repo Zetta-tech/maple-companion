@@ -18,9 +18,14 @@ export const demoDigest=(value:unknown):string=>hash(canonical(value));
 export interface DemoMemory {
   read(owner:string,receipt:DemoReceipt):Promise<DemoEnvelope>;
   write(owner:string,envelope:DemoEnvelope):Promise<DemoReceipt>;
+  reconcile(owner:string,envelope:DemoEnvelope):Promise<DemoReceipt|null>;
   explain(owner:string,requestId:string,message:string):Promise<{reply:string;sessionId:string;traceId:string;raw:unknown}>;
 }
 const unavailable=()=>new AppError(503,'DEMO_MEMORY_UNVERIFIED','Your reviewed information could not be verified in memory. Check its status before relying on it.');
+/** Constructed only while the transport proves no facts POST was dispatched. */
+export class GuideWriteNotStarted extends AppError {
+  constructor(){super(503,'GUIDE_WRITE_NOT_STARTED','Your save was not sent. You can try confirming the same reviewed change again.');}
+}
 
 /** One separate fictional entity. Never reads/writes the employment_record entity. */
 export function createDemoMemory(resolve:(owner:string)=>Binding,transport:typeof fetch=fetch,purpose:GuidePurpose='maple-fictional-demo'):DemoMemory {
@@ -32,7 +37,7 @@ export function createDemoMemory(resolve:(owner:string)=>Binding,transport:typeo
     return b;
   }
   const name=(owner:string)=>`${fictional?'maple-demo':'maple-assessment'}-${hash(owner)}`;
-  function client(owner:string,write=false,operationId?:string) {
+  function client(owner:string,write=false,operationId?:string,onPost=()=>{}) {
     const b=binding(owner); const prefix=`/api/v1/${b.context}/`;
     return new AgentMemory({endpoint:b.endpoint,context:b.context,apiKey:write?b.writeKey:b.readKey,maxRetries:0,timeoutMs:45_000,
       fetchImpl:async(input,init)=>{
@@ -42,6 +47,7 @@ export function createDemoMemory(resolve:(owner:string)=>Binding,transport:typeo
         if(url.origin!==b.endpoint||!url.pathname.startsWith(prefix)||!allowed)throw unavailable();
         const headers=new Headers(init?.headers);
         if(method==='POST') {if(!operationId)throw unavailable();headers.set('Idempotency-Key',`maple-guide-${hash(JSON.stringify([purpose,owner,b.context,resource,operationId]))}`);}
+        if(method==='POST')onPost();
         return transport(input,{...init,headers,redirect:'error'});
       }});
   }
@@ -50,8 +56,7 @@ export function createDemoMemory(resolve:(owner:string)=>Binding,transport:typeo
     if(result.page.hasMore||result.attributes.length>1)throw unavailable();
     return result.attributes;
   }
-  async function read(owner:string,receipt:DemoReceipt) {
-    const list=await rows(owner);const row=list[0];
+  function verifyRow(owner:string,row:Awaited<ReturnType<typeof rows>>[number]|undefined,receipt:DemoReceipt) {
     if(!row||row.id!==receipt.factId||row.entity!==`entity:person/${name(owner)}`||row.key!==attributeKey||row.memoryCategory!=='identity'||row.supersededBy||row.validUntil
       ||JSON.stringify(row.scope.map(s=>s.map(v=>v.replace(/\/$/,''))))!==JSON.stringify([['maple/approved']]))throw unavailable();
     let envelope:DemoEnvelope;
@@ -59,22 +64,32 @@ export function createDemoMemory(resolve:(owner:string)=>Binding,transport:typeo
     if(envelope.ownerId!==owner||envelope.purpose!==purpose||demoDigest(envelope)!==receipt.digest||(row.supersedes??null)!==envelope.previousFactId)throw unavailable();
     return envelope;
   }
+  async function read(owner:string,receipt:DemoReceipt) {return verifyRow(owner,(await rows(owner))[0],receipt);}
   return {read,
-    async write(owner,input) {
+    async reconcile(owner,input) {
       const envelope=envelopeSchema.parse(input);if(envelope.ownerId!==owner||envelope.purpose!==purpose)throw unavailable();
-      const before=await rows(owner);
-      if(envelope.previousFactId===null ? before.length!==0 : before.length!==1||before[0]?.id!==envelope.previousFactId)throw unavailable();
-      if(before[0]) { let previous:DemoEnvelope;try{previous=envelopeSchema.parse(JSON.parse(before[0].value));}catch{throw unavailable();}
-        if(previous.ownerId!==owner||previous.purpose!==purpose||previous.revision!==envelope.revision-1)throw unavailable(); }
-      const value=JSON.stringify(envelope);
+      const row=(await rows(owner))[0];if(!row)return null;
+      // Absence or another current operation is not evidence that a POST never happened.
+      let stored:DemoEnvelope;try{stored=envelopeSchema.parse(JSON.parse(row.value));}catch{throw unavailable();}
+      if(stored.operationId!==envelope.operationId||demoDigest(stored)!==demoDigest(envelope))return null;
+      const receipt={factId:row.id,digest:demoDigest(envelope)};verifyRow(owner,row,receipt);return receipt;
+    },
+    async write(owner,input) {
+      let dispatched=false;
       try {
-        const result=await client(owner,true,envelope.operationId).remember(undefined,{infer:'triples',scopes:[['maple/approved']],triples:[{
+        const envelope=envelopeSchema.parse(input);if(envelope.ownerId!==owner||envelope.purpose!==purpose)throw unavailable();
+        const before=await rows(owner);
+        if(envelope.previousFactId===null ? before.length!==0 : before.length!==1||before[0]?.id!==envelope.previousFactId)throw unavailable();
+        if(before[0]) { let previous:DemoEnvelope;try{previous=envelopeSchema.parse(JSON.parse(before[0].value));}catch{throw unavailable();}
+          if(previous.ownerId!==owner||previous.purpose!==purpose||previous.revision!==envelope.revision-1)throw unavailable(); }
+        const value=JSON.stringify(envelope);
+        const result=await client(owner,true,envelope.operationId,()=>{dispatched=true;}).remember(undefined,{infer:'triples',scopes:[['maple/approved']],triples:[{
           entity:{type:'person',name:name(owner)},key:attributeKey,value,memory_category:'identity',source_clause:`Explicitly confirmed ${fictional?'fictional demo profile':'assessment inputs linked to the canonical employment receipt'} ${envelope.operationId}`,
         }]});
         const attr=result.extraction?.attributes[0];
         if(result.mode!=='triples'||result.preview||result.extraction?.attributes.length!==1||!attr||attr.value!==value||attr.key!==attributeKey)throw unavailable();
         const receipt={factId:attr.id,digest:demoDigest(envelope)};await read(owner,receipt);return receipt;
-      }catch{throw new AppError(503,'DEMO_WRITE_UNCERTAIN','This save may have reached memory but could not be verified. Do not submit it again.');}
+      }catch{if(!dispatched)throw new GuideWriteNotStarted();throw new AppError(503,'DEMO_WRITE_UNCERTAIN','This save may have reached memory but could not be verified. Check this operation’s status before continuing; it will not be sent again automatically.');}
     },
     async explain(owner,requestId,message) {
       let sdk:AgentMemory;

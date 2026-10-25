@@ -22,6 +22,10 @@ For optional real CRS intake use `emptyCrsEvidence(asOf, confirmedEmploymentEndD
 
 The returned proposal includes the exact assembled assessment inputs for review, with employment revision and receipt digest. `POST /api/guide/proposals/:id/confirm` accepts `{"confirm":true}`. Rejection uses the same route suffix `/reject` with `{}`. Pending proposals are listed at `GET /api/guide/proposals`.
 
+Employment snapshots also carry `workEnd` and `currentJob` from the canonical receipt. Ended jobs stop accruing experience at that end date. Legacy snapshots missing either boundary remain readable with unchanged receipt hashes, but cannot produce a score until reviewed again.
+
+For a save error, refresh the proposal list. `GUIDE_WRITE_NOT_STARTED` means the transport proved no facts POST was dispatched and the same reviewed proposal was restored to `pending`; let the user explicitly confirm it again or reject it. Do not retry automatically. An `applying` or `uncertain` operation instead offers **Check save status**, calling `POST /api/guide/proposals/:id/reconcile` with `{}`. That endpoint only reads AM for the exact owner/purpose/operation/revision/content/previous-fact chain and finalizes the existing journal receipt when verified. It never resends a facts POST. No match or unavailable readback retains the hold. Reconfirming an unresolved operation also takes this read-only verification path. A recovered snapshot may still require review if employment or conversation changed meanwhile.
+
 Confirmed inputs are stored in AM under the explicit `maple-personal-assessment` purpose and `assessment_inputs` attribute. They are dated review snapshots linked to canonical employment, not a competing editable employment profile. A changed employment receipt or unresolved native-memory update sets `reviewRequired` and blocks new conclusions until the inputs are reviewed again. Missing interval evidence yields needs-information, not a score.
 
 ## Research and updates
