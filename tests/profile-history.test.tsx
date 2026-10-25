@@ -44,4 +44,8 @@ describe('profile history and its dedicated route',()=>{
     const html=renderToStaticMarkup(<ProfilePage section="overview" employment={null} available={false} loading={false} guide={{snapshot:null,loading:false,error:'Offline',dirty:false}} dirty={false}/>);
     expect(html).toContain('Your Guide records are unavailable');expect(html).not.toContain('No education history added yet');expect(html).not.toContain('Spouse');expect(html).toContain('Back to overview');
   });
+  it('shows an unsaved history draft without representing it as a saved assessment',()=>{
+    const html=renderToStaticMarkup(<ProfilePage section="overview" employment={null} available loading={false} guide={{snapshot:{revision:0,profile:null,intake:emptyPersonalIntake,verified:false,reviewRequired:true,employmentRevision:0},draft:{...emptyPersonalIntake,history},loading:false,error:'',dirty:true}} dirty/>);
+    expect(html).toContain('Example college');expect(html).toContain('CELPIP-General');expect(html).toContain('Unsaved changes');expect(html).not.toContain('These are your saved details');expect(html).toContain('before they can support a result');
+  });
 });

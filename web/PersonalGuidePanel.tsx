@@ -128,7 +128,8 @@ export function PersonalGuidePanel({ request, employment, employmentAvailable, e
   }
   const unresolved = proposals.filter(proposal => !['committed', 'rejected', 'stale'].includes(proposal.status));
   const operationPending = unresolved.length > 0 || !!pendingRequest || events.some(event => ['processing', 'uncertain'].includes(event.status));
-  const canReview = !!employment && employmentRevision !== null && employmentRevision > 0 && !!snapshot && !loading && !busy && !blocked && !operationPending;
+  const canEditDraft = !!snapshot && !loading && !busy && !blocked && !operationPending;
+  const canReview = !!employment && employmentRevision !== null && employmentRevision > 0 && canEditDraft;
   const currentInputs = !!snapshot?.verified && !snapshot.reviewRequired && !historyNeedsReview && snapshot.employmentRevision === employmentRevision && !blocked && !loading;
   const canResearch = currentInputs && !!snapshot?.profile && !busy && !operationPending;
   const needsEmployment = employmentAvailable && !employment && !!snapshot && !loading && !busy && !blocked && !operationPending && !error;
@@ -137,7 +138,7 @@ export function PersonalGuidePanel({ request, employment, employmentAvailable, e
     : unresolved.length || !currentInputs || !snapshot.profile || splitJourney(events).current.some(event => isJourneyStale(event, snapshot.revision, date)) ? 'review' : events.length ? 'saved' : 'empty';
   useEffect(() => onOverviewChange?.(overviewState), [onOverviewChange, overviewState]);
   const profileDirty = !!draft && draftBaseline.current !== null && JSON.stringify(draft) !== draftBaseline.current;
-  useEffect(() => onProfileReadback?.({snapshot,loading,error,dirty:profileDirty}), [snapshot,loading,error,profileDirty,onProfileReadback]);
+  useEffect(() => onProfileReadback?.({snapshot,loading,error,dirty:profileDirty,draft}), [snapshot,loading,error,profileDirty,draft,onProfileReadback]);
   function reviewDetails() {
     if(onProfileReadback) { openProfile('assessment'); return; }
     if (!draft || !toolsDisclosure.current || !intakeDisclosure.current) return;
@@ -194,7 +195,7 @@ export function PersonalGuidePanel({ request, employment, employmentAvailable, e
       {needsEmployment ? <GuideEmploymentSetup pending={employmentPending}/> : !canReview && !loading && !error && <p className="notice" role="status">{blocked ? 'Finish reviewing your earlier information update before editing these details.' : operationPending ? 'Resolve the current request or change before editing. Nothing will be sent again automatically.' : 'Your current employment and Guide records must be available before editing.'}</p>}
       {pendingRequest && <button type="button" className="secondary" disabled={busy} onClick={() => void act(() => refresh(),'guide-feedback')}>Check request status</button>}
       {error && <button type="button" className="secondary" disabled={busy || loading} onClick={() => void act(() => refresh(),'guide-feedback')}>Check connection</button>}
-      {draft && !needsEmployment && <form className="profile-editor-surface" onSubmit={propose}><fieldset disabled={!canReview}><legend className="visually-hidden">Edit profile details</legend><ProfileHistoryEditor section={profileSection} value={draft} onChange={setDraft} date={date} employmentEndDate={employment?.endDate ?? null}/><div className="profile-save-actions"><button type="submit">Review changes</button><p className="profile-note">Nothing is saved until you confirm.</p></div></fieldset></form>}
+      {draft && <form className="profile-editor-surface" onSubmit={propose}><fieldset disabled={!canEditDraft}><legend className="visually-hidden">Edit profile details</legend><ProfileHistoryEditor section={profileSection} value={draft} onChange={setDraft} date={date} employmentEndDate={employment?.endDate ?? null}/><div className="profile-save-actions"><button type="submit" disabled={!canReview}>Review changes</button><p className="profile-note">{needsEmployment ? 'You can prepare this draft now. Confirm employment before reviewing and saving it.' : 'Nothing is saved until you confirm.'}</p></div></fieldset></form>}
     </>}
   </section>;
   return <section className="demo-journey personal-guide" id="journey" aria-labelledby="journey-title">

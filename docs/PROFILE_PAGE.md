@@ -37,6 +37,13 @@ Drafts are kept in memory, not silently written to local storage or AM. Section
 navigation focuses the heading; prerequisite links open and focus the employment
 editor. The global navigation returns to discoveries and requirement checks.
 
+Education, language and personal-detail drafts can be prepared before employment
+is complete. Review/save stays disabled until confirmed employment is available,
+with the setup action beside it. The overview explicitly marks and displays
+unsaved drafts so returning from an editor does not appear to lose an edit.
+One centered profile surface, divided sections and an outside-edge backdrop keep
+the content grounded without adding a separate card around every record.
+
 The profile overview does not show family information. Existing family inputs
 remain in assessment evidence because removing them would change scoring.
 

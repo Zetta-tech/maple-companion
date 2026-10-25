@@ -1,4 +1,10 @@
-.profile-route .dashboard-content { max-width:960px; }
+/* One document surface grounds the whole profile. The edge grid never sits under its text. */
+body:has(.profile-route) { background:var(--surface-subtle); }
+body:has(.profile-route)::before {
+ display:block; height:52rem;
+ mask-image:linear-gradient(to bottom,#000,transparent),linear-gradient(90deg,#000,transparent max(0px,calc((100% - 1440px)/2)),transparent min(100%,calc((100% + 1440px)/2)),#000);
+}
+.profile-route .dashboard-content { width:100%; max-width:960px; justify-self:center; margin-top:1.75rem; padding:1.75rem 2.5rem 2.5rem; background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); }
 .profile-page { padding-bottom:1rem; }
 .profile-back { display:inline-flex; align-items:center; min-height:44px; color:var(--muted); font-size:.875rem; text-decoration:none; margin-bottom:1.25rem; }
 .profile-back:hover { color:var(--ink); text-decoration:underline; }
@@ -7,9 +13,12 @@
 .profile-page-heading h1 { font-size:clamp(2rem,4vw,2.75rem); margin-bottom:.75rem; }
 .profile-page-heading p:last-child { color:var(--muted); max-width:42rem; margin:0; }
 .profile-draft-status { color:var(--warning-ink); background:var(--warning-wash); border-radius:6px; padding:.35rem .65rem; font-size:.8125rem; white-space:nowrap; }
-.profile-summary-section { border-top:1px solid var(--line); padding:1.75rem 0 2rem; }
-.profile-section-heading { display:flex; justify-content:space-between; align-items:baseline; gap:1rem; margin-bottom:1.25rem; }
-.profile-section-heading h2 { font-size:1.25rem; margin:0; }
+.profile-summary-section { display:grid; grid-template-columns:145px minmax(0,1fr); gap:2.25rem; border-top:1px solid var(--line); padding:2rem 0; }
+.profile-summary-section:last-child { padding-bottom:0; }
+.profile-section-heading { display:flex; flex-direction:column; align-items:flex-start; gap:.5rem; }
+.profile-section-heading h2 { font-size:1.125rem; line-height:1.4; margin:0; }
+.profile-section-content { min-width:0; }
+.profile-section-content>:first-child { margin-top:0; }
 .profile-section-heading a { display:inline-flex; align-items:center; min-height:44px; font-size:.875rem; color:var(--ink); font-weight:600; text-decoration:none; }
 .profile-section-heading a:hover { text-decoration:underline; }
 .profile-entry-heading { display:flex; flex-direction:column; gap:.35rem; margin-bottom:.75rem; }
@@ -21,7 +30,7 @@
 .profile-page p,.profile-page dd,.profile-page span { overflow-wrap:anywhere; }
 .profile-note,.profile-empty { color:var(--muted); font-size:.875rem; line-height:1.6; max-width:60ch; margin:.75rem 0 0; }
 .profile-history-entry+.profile-history-entry { margin-top:1.5rem; padding-top:1.5rem; border-top:1px solid var(--line); }
-.profile-language-scores { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; max-width:36rem; margin:1rem 0; }
+.profile-language-scores { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; max-width:36rem; margin:1rem 0; padding:1rem; border-radius:8px; background:var(--surface-subtle); }
 .profile-language-scores dd { margin:0; font-size:1.35rem; font-weight:600; font-variant-numeric:tabular-nums; }
 .profile-language-scores small,.profile-unknown { color:var(--muted); font-size:.75rem; font-weight:400; }
 .profile-readback-status { padding:1.25rem; margin:1rem 0; background:var(--surface-subtle); border-radius:8px; }
@@ -46,7 +55,13 @@
 .profile-history-review .guide-review-values { margin:0 0 1.5rem; }
 .profile-guide-content button { white-space:normal; }
 .profile-route [hidden] { display:none !important; }
+@media(max-width:800px) {
+ .profile-route .dashboard-content { padding:1.5rem; }
+ .profile-summary-section { grid-template-columns:minmax(0,1fr); gap:1rem; }
+ .profile-section-heading { flex-direction:row; align-items:baseline; justify-content:space-between; }
+}
 @media(max-width:600px) {
+ .profile-route .dashboard-content { margin-top:1rem; padding:1.25rem; border-radius:12px; box-shadow:none; }
  .profile-page-heading { flex-direction:column; gap:.75rem; margin-bottom:1.75rem; }
  .profile-summary-section { padding:1.25rem 0 1.75rem; }
  .profile-facts { gap:1.25rem 2rem; }
