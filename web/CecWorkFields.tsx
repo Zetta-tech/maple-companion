@@ -25,7 +25,7 @@ function AnswerField({ label, value, change }: { label: string; value: Answer; c
 export function CecWorkFields({ value, onChange, jobStartDate }: { value?: CecWorkEvidence; onChange: (value: CecWorkEvidence | undefined) => void; jobStartDate?: string }) {
   const update = <K extends keyof CecWorkEvidence,>(field: K, next: CecWorkEvidence[K]) => { if (value) onChange({ ...value, [field]: next }); };
   const startsBeforeJob = !!(value?.startDate && jobStartDate && value.startDate < jobStartDate);
-  return <details className="noc-details"><summary>Evidence for a CEC work-experience check</summary>
+  return <details id="cec-work-evidence" className="noc-details"><summary id="cec-work-evidence-heading">Evidence for a CEC work-experience check</summary>
     <p className="hint">Record one interval in this job with consistent hours and conditions. Current hours alone do not establish past work. A reviewed rule is still required before a check can run.</p>
     <label className="checkbox"><input type="checkbox" checked={value !== undefined} onChange={event => onChange(event.target.checked ? blankCecEvidence() : undefined)} /><span>Include an interval for review</span></label>
     {value && <>

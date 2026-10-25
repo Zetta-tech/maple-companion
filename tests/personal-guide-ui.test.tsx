@@ -7,11 +7,19 @@ import { projectExpressEntry } from '../server/discovery.js';
 import { fixtureSources } from './support/demo-fixture.js';
 import { CrsEvidenceEditor } from '../web/CrsEvidenceEditor.js';
 import { JourneyCard } from '../web/DemoJourneyPanel.js';
-import { normalizePersonalIntakeEndDate, PersonalInputReview } from '../web/PersonalGuidePanel.js';
+import { GuideReviewNotice, normalizePersonalIntakeEndDate, PersonalInputReview } from '../web/PersonalGuidePanel.js';
 import { GuideSaveActions } from '../web/GuideSaveActions.js';
 import { guidePendingAfterFailure, nativePendingAfterFailure, readResponse, RequestError } from '../web/request.js';
 
 describe('personal Guide frontend boundaries', () => {
+  it('offers a named recovery action linked to the existing editor, unavailable until inputs are ready', () => {
+    const ready = renderToStaticMarkup(<GuideReviewNotice disabled={false} onReview={() => {}} />);
+    expect(ready).toContain('>Review Guide details</button>');
+    expect(ready).toContain('type="button"');
+    expect(ready).toContain('aria-controls="personal-guide-tools personal-guide-editor"');
+    expect(ready).not.toContain('disabled');
+    expect(renderToStaticMarkup(<GuideReviewNotice disabled onReview={() => {}} />)).toContain('disabled');
+  });
   it.each([
     ['2026-09-01', '2026-10-01'],
     [null, '2026-10-01'],
