@@ -1,13 +1,53 @@
-# Main-only deployment workflow
+# Main-only release pipeline
 
-GitHub continues running the existing CI workflow on pull requests and pushes to `main`: locked dependency install without lifecycle scripts, hygiene, typecheck, tests, build, hosted packaging and production dependency audit.
+PR checks run in GitHub Actions. Vercel builds and deploys only `main` after this
+configuration is merged and the existing project is connected to the repository.
+It does not run the test suite again.
 
-The Vercel Git rule disables every branch with `**` and explicitly enables `main`. Vercel documents that a matching true rule enables the branch. This includes slash-named feature branches in the disabled set. Vercel runs `npm run build:vercel` and its server bundler, not a second full test suite. Build compute still applies.
+| Stage | Work |
+| --- | --- |
+| Pull request | GitHub: hygiene, locked install, typecheck, tests, build, compiled-entry/static packaging verification, dependency audit |
+| Merge to main | GitHub repeats its main checks; Vercel installs and builds/packages the production app |
+| Other branch push | Vercel automatic deployment disabled, including names containing `/` |
 
-The existing `maple-companion` Vercel project must be connected to `Zetta-tech/maple-companion`, with `main` selected as the Production branch and preview deployments disabled. This change does not create that Git connection, change GitHub branch protection, add auto-merge, or authorize direct pushes. The expected process remains: PR checks pass, a person reviews and merges, then Vercel builds the new main commit.
+Vercel install remains `npm ci --ignore-scripts`. Build remains
+`npm run build:vercel` (TypeScript compilation, Vite build and asset packaging).
+No test command, paid build tier, extra service, deploy token, or new CI deployment
+job is introduced. Build and runtime usage still consume the existing plan's
+allowance; this is not a promise of zero compute.
 
-The configuration is branch-based, not an enforcement mechanism for approved PR merges. GitHub's branch-protection read returned a private-repository plan limitation during setup; no protection was changed or upgrade purchased. A direct push to `main` would also match the Vercel rule, so the reviewed-PR process remains operational policy unless separately enforced in GitHub.
+## Required project connection
 
-This PR does not include the independent UI follow-up or alter application authentication, secrets, data, domains, or the newsletter project. It needs review/merge before the repository-level automatic deployment setting takes effect.
+Verified on 2026-10-25: `maple-companion` exists in `zetta-techs-projects`, but it
+does not appear in Vercel's linked Git project inventory. The Codex browser's
+existing Git settings tab is signed out. The repository rule alone cannot finish
+the connection.
 
-Reference: [Vercel Git configuration](https://vercel.com/docs/project-configuration/git-configuration).
+After signing in, use the existing project's **Settings → Git**:
+
+1. Connect **Zetta-tech/maple-companion** to **maple-companion**, not the newsletter
+   project and not a newly created project.
+2. Confirm **main** as the Production branch and keep preview deployments disabled.
+3. Leave the Ignored Build Step automatic; `git.deploymentEnabled` prevents other
+   branches from triggering builds. An ignore command would run after a deployment
+   is created and would still consume deployment/concurrency quota.
+4. Inspect any GitHub permission request before accepting it. Repository access
+   expansion requires explicit approval; connecting an already authorized
+   repository is different from granting broader access.
+5. After a reviewed merge, verify exactly one deployment for the resulting main
+   SHA, production alias, HTML/asset loading, readiness and sign-in. Inspect any
+   in-flight deployment before considering a manual retry.
+
+Do not merge this PR or trigger a deployment as part of preparation. No OAuth
+grant, Git connection, project setting, or branch protection is changed by this PR.
+
+## Limits
+
+`{"**":false,"main":true}` covers nested branches. Vercel uses minimatch rules,
+and a matching `true` rule wins, so `main` is enabled while other names remain off.
+The rule also matches a direct push to main; it does not itself require a reviewed
+PR or wait for GitHub checks. Existing review/merge discipline remains required.
+No stronger branch-protection or post-merge CI gate is claimed.
+
+Sources: [Git branch configuration](https://vercel.com/docs/project-configuration/git-configuration),
+[Ignored Build Step behavior](https://vercel.com/docs/project-configuration/project-settings#ignored-build-step).
