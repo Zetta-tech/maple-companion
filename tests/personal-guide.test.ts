@@ -95,16 +95,22 @@ describe('personal Guide reuses research with receipt-bound inputs, not a second
     expect((await t.make().history(owner)).events[0]).toEqual(event);
     expect(await t.guide.discover(owner,{requestId,fictional:false,question:'How could I continue working here?'})).toEqual(event);expect(t.memory.explanations).toBe(1);
   });
-  it('calculates a complete personal-purpose total only from explicitly reviewed synthetic test evidence',async()=>{
+  it.each([
+    ['Offline personal-purpose fixture','2027-01-15'],
+    [null,'2027-01-15'],
+    ['Offline personal-purpose fixture',null],
+    [null,null],
+  ])('calculates and reloads a reviewed personal total with optional name %s and permit expiry %s',async(name,permitExpiry)=>{
     const t=setup();const e:Employment={...employment,cecWork:{startDate:employment.startDate,ongoing:true,endDate:null,hoursPerWeek:38,singleIntervalComplete:'yes',conditionsConsistent:'yes',physicallyInCanada:'yes',authorizedTemporaryResident:'yes',paid:'yes',relationship:'employee',physicianException:'no',fullTimeStudy:'no',workArrangement:'onsite',canadianEmployer:'yes',nocDutiesMatch:'yes',nocEssentialDutiesMatch:'yes'}};
     const ep=await t.workflow.propose(owner,{baseRevision:0,employment:e});await t.workflow.confirm(owner,ep.id,{proposalRevision:1});
     const crsEvidence=fictionalCrsEvidence('2026-10-25');crsEvidence.completeEvidenceReviewed='yes';
-    const intake={...emptyPersonalIntake,name:'Offline personal-purpose fixture',arrivedInCanada:'2021-09-01',permitExpiry:'2027-01-15',spouseAccompanying:'yes',qualifyingExpressEntryOffer:'none_reviewed',crsEvidence};
+    const intake={...emptyPersonalIntake,name,arrivedInCanada:'2021-09-01',permitExpiry,spouseAccompanying:'yes',qualifyingExpressEntryOffer:'none_reviewed',crsEvidence};
     const p=await t.guide.propose(owner,{baseRevision:0,employmentRevision:1,intake});await t.guide.confirm(owner,p.id,{confirm:true});
     const result=await t.guide.replay(owner,{requestId:randomUUID(),fictional:false});
     expect(result.discovery?.crs).toMatchObject({status:'complete',before:528,after:568,delta:40,projected:true});
     expect(result.discovery?.summary).not.toContain('fictional');expect(t.memory.explanations).toBe(0);
     expect((await t.make().history(owner)).events[0]?.discovery?.crs).toEqual(result.discovery?.crs);
+    expect((await t.make().profile(owner)).profile).toMatchObject({name,permitExpiry});
     crsEvidence.canadianWorkEnd='2025-01-01';await expect(t.guide.propose(owner,{baseRevision:1,employmentRevision:1,intake})).rejects.toMatchObject({code:'GUIDE_EVIDENCE_CONFLICT'});
   });
   it('invalidates old intake on employment change and refuses stale confirmation before any AM write',async()=>{

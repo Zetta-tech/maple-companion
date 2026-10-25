@@ -34,8 +34,17 @@ export const personalProfileSchema = personalIntakeSchema.extend({
 });
 export type PersonalProfile = z.infer<typeof personalProfileSchema>;
 export type GuideProfile = DemoProfile | PersonalProfile;
-export type CompleteGuideProfile = Omit<DemoProfile,'fictional'> & {fictional:boolean};
-export const completeGuideProfileSchema = demoProfileSchema.extend({fictional:z.boolean(),workEnd:policyDateSchema.nullable().optional(),currentJob:z.boolean().optional()}).strip();
+// Scoring requires the work evidence it uses, without making optional personal
+// identity/status-planning details mandatory or changing stored receipt schemas.
+const personalScoringProfileSchema = personalProfileSchema.extend({
+  arrivedInCanada:policyDateSchema,weeklyHours:z.number().positive().max(168),
+  noc:z.string().regex(/^\d{5}$/),duties:z.string().trim().min(20).max(10_000),
+}).strip();
+export const completeGuideProfileSchema = z.discriminatedUnion('fictional',[
+  demoProfileSchema.extend({workEnd:policyDateSchema.nullable().optional(),currentJob:z.boolean().optional()}).strip(),
+  personalScoringProfileSchema,
+]);
+export type CompleteGuideProfile = z.infer<typeof completeGuideProfileSchema>;
 export type GuidePurpose = 'maple-fictional-demo' | 'maple-personal-assessment';
 export const guideProfileSchema = z.union([demoProfileSchema,personalProfileSchema]);
 export type GuideSnapshot = {revision:number;profile:GuideProfile|null;verified:boolean;reviewRequired?:boolean};

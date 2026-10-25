@@ -35,7 +35,12 @@ export function projectExpressEntry(input: GuideProfile, date: string, revision:
   const base: Discovery = { kind:'express_entry',title:'An official Express Entry change may affect your work points',status:'needs_information',
     summary:'A total CRS score cannot be calculated from these incomplete inputs.',reasons:[],outstanding:[],nextSteps:['Review all CRS inputs and any qualifying offer separately before relying on a total score.'],sources,assessmentDate:date,profileRevision:revision };
   const parsed=completeGuideProfileSchema.safeParse(input);
-  if(!parsed.success||(!input.fictional&&!input.intervalComplete))return {...base,outstanding:['Complete the reviewed dates, occupation and consistent qualifying work interval. Unknown details are not assumed or copied from a demonstration.']};
+  if(!parsed.success){
+    const labels:Record<string,string>={arrivedInCanada:'arrival in Canada',weeklyHours:'weekly hours',noc:'NOC code',duties:'job duties',workStart:'work start date',workEnd:'work end date',currentJob:'current-job status',crsEvidence:'CRS evidence',name:'name',permitExpiry:'permit expiry',employmentBasis:'confirmed employment reference'};
+    const fields=[...new Set(parsed.error.issues.map(issue=>labels[String(issue.path[0])]??'recorded scoring evidence'))];
+    return {...base,outstanding:[`Review the recorded ${fields.join(', ')} before calculating a score. Missing or invalid scoring inputs are not assumed.`]};
+  }
+  if(!input.fictional&&!input.intervalComplete)return {...base,outstanding:['Complete the consistent qualifying work interval review. Unknown work conditions are not assumed.']};
   const profile=parsed.data;
   if(!profile.fictional&&(profile.currentJob===undefined||profile.workEnd===undefined
     ||(profile.currentJob?profile.workEnd!==null:profile.workEnd===null)
