@@ -50,6 +50,11 @@ export function PersonalInputReview({ profile }: { profile: PersonalProfile }) {
   return <><p>Includes your confirmed employment at <strong>{profile.employer}</strong>. Changes are used only after you confirm.</p><ReviewValues value={values} /><details><summary>Saved employment reference</summary><p>Employment revision {employmentBasis.revision}</p><code>{employmentBasis.receiptDigest}</code></details></>;
 }
 
+export function normalizePersonalIntakeEndDate(intake: PersonalIntake | null, endDate: string | null | undefined): PersonalIntake | null {
+  if (endDate === undefined || !intake?.crsEvidence || intake.crsEvidence.canadianWorkEnd === endDate) return intake;
+  return { ...intake, crsEvidence: { ...intake.crsEvidence, canadianWorkEnd: endDate, completeEvidenceReviewed: 'unknown' } };
+}
+
 export function PersonalGuidePanel({ request, employment, employmentRevision, blocked, refreshKey }: Props) {
   const [snapshot, setSnapshot] = useState<PersonalGuideSnapshot | null>(null);
   const [draft, setDraft] = useState<PersonalIntake | null>(null);
@@ -63,6 +68,7 @@ export function PersonalGuidePanel({ request, employment, employmentRevision, bl
   const [date, setDate] = useState(() => businessDate(new Date()));
   const generation = useRef(0);
   const beginNavigation = useFlowNavigation();
+  const employmentEndDate = employment?.endDate;
   const refresh = useCallback(async (resetDraft = false) => {
     const attempt = ++generation.current;
     setLoading(true); setSnapshot(null); setHistoryNeedsReview(true);
@@ -81,9 +87,9 @@ export function PersonalGuidePanel({ request, employment, employmentRevision, bl
       if (pending.status === 'rejected') throw pending.reason;
       if (journey.status === 'rejected') throw journey.reason;
       setSnapshot(profile.value);
-      setDraft(current => resetDraft || !current ? profile.value.intake : current);
+      setDraft(current => normalizePersonalIntakeEndDate(resetDraft || !current ? profile.value.intake : current, employmentEndDate));
     } finally { if (attempt === generation.current) setLoading(false); }
-  }, [request]);
+  }, [request, employmentEndDate]);
   useEffect(() => {
     setError(''); void refresh().catch(reason => setError(reason instanceof Error ? reason.message : 'Your Guide could not be checked.'));
     return () => { generation.current++; };
@@ -92,11 +98,8 @@ export function PersonalGuidePanel({ request, employment, employmentRevision, bl
     setDate(businessDate(new Date())); void refresh().catch(reason => setError(reason instanceof Error ? reason.message : 'Your Guide could not be checked.'));
   }, window, document), [refresh]);
   useEffect(() => {
-    if (!employment) return;
-    setDraft(current => current?.crsEvidence && current.crsEvidence.canadianWorkEnd !== employment.endDate ? {
-      ...current, crsEvidence: { ...current.crsEvidence, canadianWorkEnd: employment.endDate, completeEvidenceReviewed: 'unknown' },
-    } : current);
-  }, [employment?.endDate]);
+    setDraft(current => normalizePersonalIntakeEndDate(current, employmentEndDate));
+  }, [employmentEndDate]);
   async function act(run: () => Promise<void>, target: string) {
     const navigation = beginNavigation(); let destination = target;
     setBusy(true); setError(''); setNotice('');

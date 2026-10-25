@@ -7,11 +7,41 @@ import { projectExpressEntry } from '../server/discovery.js';
 import { fixtureSources } from './support/demo-fixture.js';
 import { CrsEvidenceEditor } from '../web/CrsEvidenceEditor.js';
 import { JourneyCard } from '../web/DemoJourneyPanel.js';
-import { PersonalInputReview } from '../web/PersonalGuidePanel.js';
+import { normalizePersonalIntakeEndDate, PersonalInputReview } from '../web/PersonalGuidePanel.js';
 import { GuideSaveActions } from '../web/GuideSaveActions.js';
 import { guidePendingAfterFailure, nativePendingAfterFailure, readResponse, RequestError } from '../web/request.js';
 
 describe('personal Guide frontend boundaries', () => {
+  it.each([
+    ['2026-09-01', '2026-10-01'],
+    [null, '2026-10-01'],
+    ['2026-10-01', null],
+  ])('normalizes restored CRS end date %s to confirmed employment %s without replacing other evidence', (savedEnd, confirmedEnd) => {
+    const intake = { ...emptyPersonalIntake, name: 'Reviewed name', crsEvidence: { ...fictionalCrsEvidence('2026-10-25'), canadianWorkEnd: savedEnd, completeEvidenceReviewed: 'yes' as const } };
+    const original = structuredClone(intake);
+    // The employment effect has already run with no draft when the saved intake arrives.
+    expect(normalizePersonalIntakeEndDate(null, confirmedEnd)).toBeNull();
+    const restored = normalizePersonalIntakeEndDate(intake, confirmedEnd)!;
+    expect(restored).toEqual({ ...intake, crsEvidence: { ...intake.crsEvidence, canadianWorkEnd: confirmedEnd, completeEvidenceReviewed: 'unknown' } });
+    expect(intake).toEqual(original);
+    expect(restored.crsEvidence!.education).toBe(intake.crsEvidence.education);
+    expect(restored.crsEvidence!.english).toBe(intake.crsEvidence.english);
+    expect(normalizePersonalIntakeEndDate(restored, confirmedEnd)).toBe(restored);
+  });
+  it('normalizes subsequent employment changes while preserving unsaved intake edits', () => {
+    const draft = { ...emptyPersonalIntake, name: 'Unsaved name', canadianOffer: 'yes' as const, crsEvidence: { ...emptyCrsEvidence('2026-10-25'), completeEvidenceReviewed: 'yes' as const } };
+    const ended = normalizePersonalIntakeEndDate(draft, '2026-10-01')!;
+    expect(ended.name).toBe('Unsaved name'); expect(ended.canadianOffer).toBe('yes');
+    expect(ended.crsEvidence!.canadianWorkEnd).toBe('2026-10-01');
+    expect(ended.crsEvidence!.completeEvidenceReviewed).toBe('unknown');
+    expect(normalizePersonalIntakeEndDate(ended, null)!.crsEvidence!.canadianWorkEnd).toBeNull();
+  });
+  it('preserves reviewed evidence when the canonical date matches, and never invents missing employment or CRS evidence', () => {
+    const intake = { ...emptyPersonalIntake, crsEvidence: { ...emptyCrsEvidence('2026-10-25', '2026-10-01'), completeEvidenceReviewed: 'yes' as const } };
+    expect(normalizePersonalIntakeEndDate(intake, '2026-10-01')).toBe(intake);
+    expect(normalizePersonalIntakeEndDate(intake, undefined)).toBe(intake);
+    expect(normalizePersonalIntakeEndDate(emptyPersonalIntake, '2026-10-01')).toBe(emptyPersonalIntake);
+  });
   it('offers readback, never confirmation or discard, while a save is unresolved', () => {
     const actions = { confirm() {}, reconcile() {}, reject() {} };
     for (const status of ['applying', 'uncertain']) {
