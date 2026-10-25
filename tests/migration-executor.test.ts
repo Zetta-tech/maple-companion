@@ -1,7 +1,7 @@
 import { mkdtempSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Journal, envelopeFor } from '../server/journal.js';
 import { readLegacySnapshot, prepareLegacyMigration, type LegacySnapshot } from '../server/legacy-migration.js';
@@ -28,11 +28,14 @@ async function fixture() {
   const claimed = journal.claim(owner, op.id, now);
   const receipt = { factId: 'synthetic-fact', digest: createHash('sha256').update(JSON.stringify(envelopeFor(claimed))).digest('hex') };
   journal.complete(owner, op.id, receipt, now);
-  const chat = journal.beginChat(owner, 1, 'SYNTHETIC TEST: I now work 40 hours.', now);
-  journal.recordChatRemote(owner, chat, 'https://memory.example.test', 'synthetic-context', 'synthetic-session');
-  journal.askHours(owner, chat, 40, 'period', now);
-  journal.recordChatDiagnostic(owner, chat, 'CLARIFICATION_REQUIRED');
-  journal.propose(owner, 1, employment, { ...employment, hoursPerWeek: 40 }, now, chat, true);
+  const chat = randomUUID();
+  const pending = journal.propose(owner, 1, employment, { ...employment, hoursPerWeek: 40 }, now);
+  // Existing storage format remains migratable after the old request path is removed.
+  journal.db.prepare('INSERT INTO chat_previews VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)').run(chat, owner,
+    'SYNTHETIC TEST: I now work 40 hours.', now, new Date(Date.parse(now) + 24 * 3600_000).toISOString(),
+    'proposed', 'https://memory.example.test', 'synthetic-context', 'synthetic-session', pending.id);
+  journal.db.prepare('INSERT INTO chat_clarifications VALUES (?, ?, NULL, ?, ?, ?)').run(chat, owner, 'period', 'actual_weekly_work', now);
+  journal.db.prepare('INSERT INTO chat_diagnostics VALUES (?, ?, ?, NULL, NULL, ?)').run(chat, owner, 'CLARIFICATION_REQUIRED', now);
   const snapshot = readLegacySnapshot(sourcePath);
   const plan = validateLegacyMigration(snapshot, [owner]);
   const options = { workspaceRoot, sourcePath, approvedOwners: [owner], expectedDigest: plan.manifest.sha256 };

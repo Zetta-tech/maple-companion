@@ -2,7 +2,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Surreal } from 'surrealdb';
 import { connectOperationalDatabase, loadDatabaseConfig } from '../server/operational-db.js';
-import { SurrealJournal } from '../server/surreal-journal.js';
+import { SurrealJournal, journalRecordId } from '../server/surreal-journal.js';
 import { envelopeFor } from '../server/journal.js';
 import { Workflow } from '../server/workflow.js';
 import { Assessments } from '../server/assessments.js';
@@ -74,11 +74,17 @@ describe('SurrealDB journal integration (no AM network calls)', () => {
   it('holds expired chat atomically and preserves clarification provenance across connections', async () => {
     const alice = owner('Chat');
     const time = now();
-    const request = await journal.beginChat(alice, 0, 'SYNTHETIC: I work 40 hours.', time);
-    await journal.recordChatRemote(alice, request, 'https://memory.example.test', 'synthetic-context', 'synthetic-session');
-    await journal.askHours(alice, request, 40, 'period', time);
-    expect((await second.pendingHoursClarification(alice, time))?.hours).toBe(40);
-    const proposal = await journal.propose(alice, 0, null, { ...employment, hoursPerWeek: 40 }, time, request, true);
+    const request = randomUUID();
+    const proposal = await journal.propose(alice, 0, null, { ...employment, hoursPerWeek: 40 }, time);
+    // Import the old storage shape directly: the retired composer/writer is absent.
+    await connections[0]!.query('CREATE $preview CONTENT $data; CREATE $clarification CONTENT $answer;', {
+      preview: journalRecordId('chat_previews', alice, request),
+      data: { key: request, owner: alice, base_revision: 0, utterance: 'SYNTHETIC: I work 40 hours.', created_at: time,
+        expires_at: new Date(Date.parse(time) + 24 * 3600_000).toISOString(), status: 'proposed', endpoint: 'https://memory.example.test',
+        context: 'synthetic-context', session_id: 'synthetic-session', proposal_id: proposal.id },
+      clarification: journalRecordId('chat_clarifications', alice, request),
+      answer: { key: request, owner: alice, hours: null, issue: 'period', answer: 'actual_weekly_work', answered_at: time },
+    }).retry(false);
     expect((await second.get(alice, proposal.id)).chat).toMatchObject({ clarificationAnswer: 'actual_weekly_work', periodSource: 'interpretation' });
     const expired = new Date(Date.parse(time) + 25 * 3600_000).toISOString();
     await expect(second.claim(alice, proposal.id, () => expired)).rejects.toMatchObject({ code: 'CHAT_EXPIRED' });

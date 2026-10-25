@@ -8,7 +8,6 @@ import { AppError } from './errors.js';
 import { bindingFor, type AuthConfig, type Config } from './config.js';
 import { Workflow, confirmationSchema } from './workflow.js';
 import { Assessments } from './assessments.js';
-import type { ChatProposals } from './chat-proposals.js';
 import type { NativeChat } from './native-chat.js';
 import type { DemoJourney } from './demo-journey.js';
 import { demoSeed } from '../shared/demo.js';
@@ -25,7 +24,7 @@ export function clerkAuthentication(config: AuthConfig): Authentication {
 }
 
 /** Dependency injection exists for unit tests; index.ts always constructs the real Clerk/AM adapters. */
-export function createApp(options: { config?: Config; authConfig?: AuthConfig; configurationError?: AppError; workflow?: Workflow; assessments?: Assessments; chatProposals?: ChatProposals; nativeChat?: NativeChat; demoJourney?: DemoJourney; authentication?: Authentication; webRoot?: string; operationalStore?: 'surrealdb'; operationalReady?: () => boolean }) {
+export function createApp(options: { config?: Config; authConfig?: AuthConfig; configurationError?: AppError; workflow?: Workflow; assessments?: Assessments; nativeChat?: NativeChat; demoJourney?: DemoJourney; authentication?: Authentication; webRoot?: string; operationalStore?: 'surrealdb'; operationalReady?: () => boolean }) {
   const app = express();
   const authConfig = options.authConfig ?? options.config;
   app.disable('x-powered-by');
@@ -75,7 +74,6 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   });
   app.use('/api', express.json({ limit: '32kb', strict: true }));
   const workflow = () => options.workflow!;
-  const chatProposals = options.config?.amAccessMode === 'single-user-development' ? options.chatProposals : undefined;
   const nativeChat = options.config?.amAccessMode === 'single-user-development' ? options.nativeChat : undefined;
   const native = () => {
     if (!nativeChat) throw new AppError(503, 'NATIVE_CHAT_NOT_READY', 'Native memory setup is pending. Reviewed assessment inputs remain available.');
@@ -104,19 +102,6 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   app.post('/api/native/messages', async (req, res) => res.json(await native().send(res.locals.owner, req.body)));
   app.get('/api/proposals', async (_req, res) => res.json({ proposals: await workflow().journal.list(res.locals.owner) }));
   app.post('/api/proposals', async (req, res) => res.status(201).json(await workflow().propose(res.locals.owner, req.body)));
-  app.get('/api/chat/status', async (_req, res) => res.json({ available: !!chatProposals, syntheticOnly: true,
-    fields: ['hoursPerWeek'], pendingRetentionHours: 24, clarification: await chatProposals?.pending(res.locals.owner) ?? null }));
-  // index.ts only supplies an interpreter for the explicit development trial.
-  app.post('/api/chat/proposals', async (req, res) => {
-    if (!chatProposals) throw new AppError(503, 'CHAT_NOT_AVAILABLE', 'Chat corrections are not available yet. No change was saved.');
-    const result = await chatProposals.propose(res.locals.owner, req.body);
-    res.status(result.kind === 'proposal' ? 201 : 200).json(result);
-  });
-  app.post('/api/chat/clarifications/:id', async (req, res) => {
-    if (!chatProposals) throw new AppError(503, 'CHAT_NOT_AVAILABLE', 'Chat corrections are not available yet. No change was saved.');
-    const result = await chatProposals.answer(res.locals.owner, id(req.params.id), req.body);
-    res.status(result.kind === 'proposal' ? 201 : 200).json(result);
-  });
   app.post('/api/proposals/:id/confirm', async (req, res) => res.json(await workflow().confirm(res.locals.owner, id(req.params.id), req.body)));
   app.post('/api/proposals/:id/reject', async (req, res) => {
     confirmationSchema.parse(req.body);

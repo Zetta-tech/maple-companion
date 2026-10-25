@@ -4,21 +4,17 @@ import type { JournalStore } from './journal-store.js';
 import type { Operation, OperationStatus, Head, ChatPreviewRecord } from './journal.js';
 import type { Employment } from '../shared/employment.js';
 import type { AssessmentRecord } from '../shared/assessment.js';
-import type { HoursAnswer, HoursClarification } from '../shared/chat.js';
-import { validHoursQuestion } from '../shared/chat.js';
 import type { Receipt } from './am.js';
 import { AppError } from './errors.js';
 import { weeklyPeriodWasStated } from './hours-evidence.js';
-import { previewEvidenceSchema, previewReasonSchema, type PreviewEvidence, type PreviewReason } from './preview-diagnostics.js';
 
 type Table = 'heads' | 'operations' | 'notifications' | 'assessments' | 'assessment_notifications'
   | 'chat_previews' | 'chat_diagnostics' | 'chat_clarifications';
 type Row = { id: string; owner: string; base_revision: number; status: OperationStatus;
   old_json: string | null; new_json: string | null; created_at: string; confirmed_at: string | null;
   previous_fact_id: string | null; receipt_json: string | null };
-type ClarificationRow = { id: string; owner: string; hours: number | null; issue: HoursClarification['issue'];
-  answer: HoursAnswer | null; answered_at: string | null };
-type DiagnosticRow = { id: string; reason: PreviewReason; evidence_json: string | null; provider_status: number | null };
+// Read-only provenance from retired hours-chat records. No new clarification writer.
+type ClarificationRow = { issue: 'period' | 'intent' | 'field'; answer: 'actual_weekly_work' | 'availability_only' | 'different_period' | null };
 type NotificationRow = { id: string; operation_id?: string; assessment_id?: string; revision: number; created_at: string };
 type AssessmentRow = { id: string; profile_revision: number; policy_digest: string; assessment_date: string; result_json: string };
 
@@ -137,24 +133,12 @@ export class SurrealJournal implements JournalStore {
     return Promise.all(rows.slice(0, 100).map(row => this.get(owner, row.id)));
   }
   async propose(owner: string, baseRevision: number, oldValue: Employment | null, newValue: Employment,
-    now: string, chatRequestId?: string, clarified = false): Promise<Operation> {
+    now: string): Promise<Operation> {
     return this.atomic(owner, async j => {
       if (await j.active(owner)) throw blocked();
       const head = await j.head(owner);
       if (head.revision !== baseRevision) throw stale();
       const id = randomUUID();
-      if (chatRequestId) {
-        const chat = await j.chatPreview(owner, chatRequestId);
-        if (chat.status !== (clarified ? 'clarifying' : 'interpreting') || chat.base_revision !== baseRevision || chat.expires_at <= now) throw expired();
-        if (clarified) {
-          const question = await j.hoursClarification(owner, chatRequestId, now);
-          if ((question.issue !== 'field' && question.hours !== newValue.hoursPerWeek) || newValue.hoursPerWeek === null || (await j.rows('operations', owner, " AND status = 'pending' LIMIT 1")).length) {
-            throw new AppError(409, 'CHANGE_PENDING', 'Your pending changes need review first.');
-          }
-          await j.patch('chat_clarifications', owner, chatRequestId, { hours: null, answer: 'actual_weekly_work', answered_at: now });
-        }
-        await j.patch('chat_previews', owner, chatRequestId, { status: 'proposed', proposal_id: id });
-      }
       await j.create('operations', owner, id, { base_revision: baseRevision, status: 'pending',
         old_json: oldValue ? JSON.stringify(oldValue) : null, new_json: JSON.stringify(newValue), created_at: now,
         confirmed_at: null, previous_fact_id: head.receipt?.factId ?? null, receipt_json: null });
@@ -238,81 +222,6 @@ export class SurrealJournal implements JournalStore {
     const row = await this.row<ChatPreviewRecord>('chat_previews', owner, id);
     if (!row) throw notFound('CHAT_NOT_FOUND', 'This chat request was not found.');
     return row;
-  }
-  async recoverChat(owner: string) {
-    await this.atomic(owner, j => j.query<void>("UPDATE maple_chat_previews SET status = 'uncertain' WHERE owner = $owner AND status = 'interpreting';", { owner }));
-  }
-  async beginChat(owner: string, baseRevision: number, utterance: string, now: string): Promise<string> {
-    return this.atomic(owner, async j => {
-      await j.expireChat(owner, now);
-      if ((await j.rows('chat_previews', owner, " AND status IN ['blocked','uncertain'] LIMIT 1")).length) throw new AppError(503, 'CHAT_REVIEW_REQUIRED', 'A previous preview needs review. No new preview was sent. You can use the employment form.');
-      if (await j.active(owner) || (await j.rows('operations', owner, " AND status = 'pending' LIMIT 1")).length
-        || (await j.rows('chat_previews', owner, " AND status IN ['interpreting','clarifying'] LIMIT 1")).length) throw new AppError(409, 'CHANGE_PENDING', 'Finish or discard the current change before starting another.');
-      if ((await j.head(owner)).revision !== baseRevision) throw stale();
-      if (!utterance.trim() || utterance.length > 500) throw new Error('Invalid chat request');
-      const id = randomUUID();
-      await j.create('chat_previews', owner, id, { base_revision: baseRevision, utterance, created_at: now,
-        expires_at: new Date(Date.parse(now) + 24 * 60 * 60 * 1000).toISOString(), status: 'interpreting',
-        endpoint: null, context: null, session_id: null, proposal_id: null });
-      return id;
-    });
-  }
-  async recordChatRemote(owner: string, id: string, endpoint: string, context: string, sessionId: string | null) {
-    await this.atomic(owner, async j => {
-      const record = await j.chatPreview(owner, id);
-      if (record.status !== 'interpreting' || (record.endpoint && (record.endpoint !== endpoint || record.context !== context))
-        || (record.session_id && record.session_id !== sessionId)) throw new AppError(409, 'CHAT_REMOTE_CONFLICT', 'The preview metadata needs review.');
-      await j.patch('chat_previews', owner, id, { endpoint, context, session_id: sessionId });
-    });
-  }
-  async askHours(owner: string, id: string, hours: number | null, issue: HoursClarification['issue'], now: string): Promise<HoursClarification> {
-    return this.atomic(owner, async j => {
-      const chat = await j.chatPreview(owner, id);
-      if (chat.status !== 'interpreting' || chat.expires_at <= now || (await j.head(owner)).revision !== chat.base_revision || await j.active(owner)) throw expired();
-      if (!validHoursQuestion(hours, issue)) throw new Error('Invalid clarification');
-      await j.create('chat_clarifications', owner, id, { hours, issue, answer: null, answered_at: null });
-      await j.patch('chat_previews', owner, id, { status: 'clarifying' });
-      return j.hoursClarification(owner, id, now);
-    });
-  }
-  async hoursClarification(owner: string, id: string, now: string): Promise<HoursClarification> {
-    const chat = await this.chatPreview(owner, id);
-    const row = await this.row<ClarificationRow>('chat_clarifications', owner, id);
-    if (!row || chat.status !== 'clarifying' || !validHoursQuestion(row.hours, row.issue) || chat.expires_at <= now) throw notFound('CLARIFICATION_NOT_FOUND', 'This clarification is unavailable or has expired.');
-    return { id, hours: row.hours, issue: row.issue, expiresAt: chat.expires_at };
-  }
-  async pendingHoursClarification(owner: string, now: string): Promise<HoursClarification | null> {
-    const rows = await this.rows<ChatPreviewRecord>('chat_previews', owner, " AND status = 'clarifying' AND expires_at > $now ORDER BY created_at DESC LIMIT 1", { now });
-    return rows[0] ? this.hoursClarification(owner, rows[0].id, now) : null;
-  }
-  async declineHours(owner: string, id: string, answer: HoursAnswer, now: string) {
-    await this.atomic(owner, async j => {
-      await j.hoursClarification(owner, id, now);
-      await j.patch('chat_clarifications', owner, id, { hours: null, answer, answered_at: now });
-      await j.patch('chat_previews', owner, id, { status: 'held', utterance: null });
-    });
-  }
-  async recordChatDiagnostic(owner: string, id: string, reason: PreviewReason, evidence?: PreviewEvidence, httpStatus: number | null = null, onlyIfAbsent = false) {
-    await this.atomic(owner, async j => {
-      const record = await j.chatPreview(owner, id);
-      const now = new Date().toISOString();
-      const safeReason = previewReasonSchema.parse(reason);
-      const safeEvidence = evidence && record.expires_at > now ? JSON.stringify(previewEvidenceSchema.parse(evidence)) : null;
-      if (httpStatus !== null && (!Number.isInteger(httpStatus) || httpStatus < 100 || httpStatus > 599)) throw new Error('Invalid provider status');
-      const old = await j.row<DiagnosticRow>('chat_diagnostics', owner, id);
-      if (onlyIfAbsent && old) return;
-      const data = { reason: safeReason, evidence_json: record.expires_at <= now ? null : safeEvidence ?? old?.evidence_json ?? null,
-        provider_status: httpStatus ?? old?.provider_status ?? null, updated_at: now };
-      if (old) await j.patch('chat_diagnostics', owner, id, data);
-      else await j.create('chat_diagnostics', owner, id, data);
-    });
-  }
-  async finishChat(owner: string, id: string, status: 'held' | 'failed' | 'blocked' | 'uncertain') {
-    await this.atomic(owner, async j => {
-      const chat = await j.chatPreview(owner, id);
-      if (chat.status === 'interpreting') await j.patch('chat_previews', owner, id,
-        { status, utterance: ['held', 'failed'].includes(status) ? null : chat.utterance });
-    });
   }
   async notifications(owner: string) {
     const saved = await this.rows<NotificationRow & { notification_id: string }>('notifications', owner, ' ORDER BY created_at DESC LIMIT 100');

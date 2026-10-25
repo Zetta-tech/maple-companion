@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Journal } from '../server/journal.js';
 import type { JournalStore } from '../server/journal-store.js';
 import { Workflow } from '../server/workflow.js';
-import { createMemoryPreview } from '../server/am-preview.js';
 import { TestMemory } from './support/test-memory.js';
 import type { Employment } from '../shared/employment.js';
 import { Assessments } from '../server/assessments.js';
@@ -74,22 +73,6 @@ describe('asynchronous journal caller safety', () => {
     expect(source.get(owner, proposal.id).status).toBe('applying');
     expect(source.active(owner)).toBe(true);
     expect(memory.writes).toHaveLength(1);
-  });
-
-  it('waits for async session bookkeeping before returning preview candidates', async () => {
-    const started = deferred(), release = deferred();
-    const payload = { mode: 'preview', preview: true, sessionId: 'synthetic-session',
-      extraction: { entities: [], attributes: [], relations: [], actions: [], instructions: [], uncertainties: [] } };
-    const transport = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(payload), { headers: { 'content-type': 'application/json' } }));
-    let returned = false;
-    const result = createMemoryPreview(transport)(binding, 'SYNTHETIC TEST ONLY.', async () => {
-      started.resolve(); await release.promise;
-    }).then(value => { returned = true; return value; });
-    await started.promise;
-    expect(returned).toBe(false);
-    release.resolve();
-    await expect(result).resolves.toMatchObject({ sessionId: 'synthetic-session' });
-    expect(transport).toHaveBeenCalledTimes(1);
   });
 
   it('withholds current assessment conclusions when a database save crosses Toronto midnight', async () => {

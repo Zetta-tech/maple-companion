@@ -10,7 +10,6 @@ import { TestMemory } from './support/test-memory.js';
 import { Assessments } from '../server/assessments.js';
 import { PolicyRegistry, policyDigest } from '../server/policies.js';
 import { syntheticPolicy } from './support/test-policy.js';
-import { ChatProposals } from '../server/chat-proposals.js';
 import { DemoJourney } from '../server/demo-journey.js';
 import { DemoFixtureStore, DemoFixtureMemory, fixtureSources } from './support/demo-fixture.js';
 import { demoSeed } from '../shared/demo.js';
@@ -42,6 +41,22 @@ function app() {
 }
 
 describe('real Clerk verification and HTTP boundaries, with locally generated test JWTs', () => {
+  it.each(['restricted', 'single-user-development'] as const)('removes retired chat routes without exposing another write path in %s', async amAccessMode => {
+    const journal = new Journal(':memory:'); journals.push(journal);
+    const memory = new TestMemory(), instance = { ...config, amAccessMode };
+    const workflow = new Workflow(journal, memory, owner => bindingFor(instance, owner));
+    const application = createApp({ config: instance, workflow });
+    for (const [method, path] of [['get', '/api/chat/status'], ['post', '/api/chat/proposals'], ['post', '/api/chat/clarifications/11111111-1111-4111-8111-111111111111']] as const) {
+      expect((await request(application)[method](path).set('Origin', origin).send({})).status).toBe(401);
+      const result = await request(application)[method](path).set('Origin', origin).auth(token(), { type: 'bearer' }).send({});
+      expect(result.status).toBe(404); expect(result.body.error.code).toBe('NOT_FOUND');
+      expect(result.headers['cache-control']).toBe('no-store');
+      const foreign = await request(application)[method](path).set('Origin', origin).auth(token({ sub: 'user_unmapped' }), { type: 'bearer' }).send({});
+      expect(foreign.body.error.code).toBe('CONTEXT_NOT_PROVISIONED');
+    }
+    expect(memory.reads).toHaveLength(0); expect(memory.writes).toHaveLength(0);
+    expect(journal.list('user_A')).toEqual([]);
+  });
   it('binds demo confirmation and history to Clerk owner and refuses client owner injection', async()=>{
     const journal=new Journal(':memory:');journals.push(journal);
     const dev={...config,amAccessMode:'single-user-development' as const};
@@ -65,55 +80,6 @@ describe('real Clerk verification and HTTP boundaries, with locally generated te
     const application=createApp({config,workflow,demoJourney:new DemoJourney(new DemoFixtureStore(),new DemoFixtureMemory(),fixtureSources)});
     expect((await request(application).get('/api/demo/status').auth(token(),{type:'bearer'})).body.available).toBe(false);
     expect((await request(application).get('/api/demo/profile').auth(token(),{type:'bearer'})).body.error.code).toBe('DEMO_NOT_READY');
-  });
-  it('refuses a supplied chat interpreter in restricted/production composition', async () => {
-    const journal = new Journal(':memory:'); journals.push(journal);
-    const workflow = new Workflow(journal, new TestMemory(), owner => bindingFor(config, owner));
-    let invoked = false;
-    const chatProposals = new ChatProposals(workflow, { async interpret() { invoked = true; return { kind: 'hours', hours: 36 }; } });
-    const application = createApp({ config, workflow, chatProposals });
-    const status = await request(application).get('/api/chat/status').auth(token(), { type: 'bearer' });
-    expect(status.body.available).toBe(false);
-    const result = await request(application).post('/api/chat/proposals').set('Origin', origin).auth(token(), { type: 'bearer' }).send({ baseRevision: 0, message: 'I work 36 hours per week.', syntheticTest: true });
-    expect(result.status).toBe(503); expect(result.body.error.code).toBe('CHAT_NOT_AVAILABLE'); expect(invoked).toBe(false);
-    const answer = await request(application).post('/api/chat/clarifications/11111111-1111-4111-8111-111111111111').set('Origin', origin).auth(token(), { type: 'bearer' }).send({ answer: 'actual_weekly_work' });
-    expect(answer.status).toBe(503); expect(answer.body.error.code).toBe('CHAT_NOT_AVAILABLE');
-  });
-  it('keeps chat unavailable without an explicitly constructed interpreter', async () => {
-    const application = app();
-    const body = { baseRevision: 0, message: 'I work 36 hours per week.' };
-    const missing = await request(application).post('/api/chat/proposals').set('Origin', origin).send(body);
-    expect(missing.status).toBe(401);
-    const mapped = await request(application).post('/api/chat/proposals').set('Origin', origin).auth(token(), { type: 'bearer' }).send(body);
-    expect(mapped.status).toBe(503); expect(mapped.body.error.code).toBe('CHAT_NOT_AVAILABLE');
-    expect(mapped.headers['cache-control']).toBe('no-store');
-    const unmapped = await request(application).post('/api/chat/proposals').set('Origin', origin).auth(token({ sub: 'user_unmapped' }), { type: 'bearer' }).send(body);
-    expect(unmapped.status).toBe(503); expect(unmapped.body.error.code).toBe('CONTEXT_NOT_PROVISIONED');
-  });
-  it('binds chat proposals to the actual Clerk subject and requires a separate confirmation request', async () => {
-    const journal = new Journal(':memory:'); journals.push(journal);
-    const memory = new TestMemory();
-    const workflow = new Workflow(journal, memory, owner => bindingFor(config, owner), () => new Date('2026-10-24T15:00:00Z'));
-    const employment = { employer: 'Synthetic employer', title: 'Synthetic role', duties: '', startDate: '2025-01-01', currentJob: true,
-      endDate: null, hoursPerWeek: 34, countryCode: 'CA', paid: 'yes', authorizedToWork: 'unknown', nocCode: null, nocReviewed: false };
-    const initial = await workflow.propose('user_A', { baseRevision: 0, employment });
-    await workflow.confirm('user_A', initial.id, { proposalRevision: 1 });
-    const interpretedOwners: string[] = [];
-    const chatProposals = new ChatProposals(workflow, { async interpret(owner) { interpretedOwners.push(owner); return { kind: 'hours', hours: 36 }; } });
-    const trialConfig: Config = { ...config, amAccessMode: 'single-user-development', bindings: new Map([['user_A', config.bindings.get('user_A')!]]) };
-    const application = createApp({ config: trialConfig, workflow, chatProposals });
-    const post = (path: string, body: object, jwt = token()) => request(application).post(path).set('Origin', origin).set('x-owner-id', 'user_B').auth(jwt, { type: 'bearer' }).send(body);
-    const body = { baseRevision: 1, message: 'I now work 36 hours per week.', syntheticTest: true };
-    expect((await post('/api/chat/proposals', { ...body, ownerId: 'user_B' })).status).toBe(400);
-    const result = await post('/api/chat/proposals?ownerId=user_B', body);
-    expect(result.status).toBe(201); expect(result.body.kind).toBe('proposal');
-    expect(result.body.proposal).toMatchObject({ ownerId: 'user_A', status: 'pending', baseRevision: 1, oldValue: employment, newValue: { ...employment, hoursPerWeek: 36 } });
-    expect(interpretedOwners).toEqual(['user_A']); expect(memory.writes).toHaveLength(1);
-    expect(journal.notifications('user_A')).toHaveLength(1);
-    expect((await post(`/api/proposals/${result.body.proposal.id}/confirm`, { proposalRevision: 1 }, token({ sub: 'user_B' }))).status).toBe(503);
-    expect((await post(`/api/proposals/${result.body.proposal.id}/confirm`, { proposalRevision: 1 })).status).toBe(200);
-    expect(memory.writes).toHaveLength(2); expect(journal.notifications('user_A')).toHaveLength(2);
-    expect(journal.list('user_B')).toEqual([]);
   });
   it('denies all workspace routes after an owner binding is removed, retaining private records', async () => {
     const bindings = new Map([['user_A', { ownerId: 'user_A', endpoint: 'https://a.example.test', context: 'ctx_a', readKey: 'test-read', writeKey: 'test-write' }]]);
@@ -152,36 +118,6 @@ describe('real Clerk verification and HTTP boundaries, with locally generated te
     expect(journal.assessments('user_A')).toHaveLength(1);
     expect(memory.reads).toHaveLength(reads);
     expect(memory.writes).toHaveLength(1);
-  });
-
-  it('keeps clarification owner-bound across HTTP reload and requires a separate fact confirmation', async () => {
-    const journal = new Journal(':memory:'); journals.push(journal);
-    const memory = new TestMemory(); const trialConfig: Config = { ...config, amAccessMode: 'single-user-development', bindings: new Map(config.bindings) };
-    const workflow = new Workflow(journal, memory, owner => bindingFor(trialConfig, owner));
-    const employment = { employer: 'SYNTHETIC TEST ONLY - HTTP', title: 'Fixture', duties: '', startDate: '2025-01-01', currentJob: true,
-      endDate: null, hoursPerWeek: 38, countryCode: 'CA', paid: 'yes', authorizedToWork: 'unknown', nocCode: null, nocReviewed: false };
-    const initial = await workflow.propose('user_A', { baseRevision: 0, employment }); await workflow.confirm('user_A', initial.id, { proposalRevision: 1 });
-    let previews = 0;
-    const chatProposals = new ChatProposals(workflow, { async interpret() { previews++; return { kind: 'clarify_hours', hours: 40, issue: 'period' }; } });
-    const application = createApp({ config: trialConfig, workflow, chatProposals });
-    const post = (path: string, body: object, jwt = token()) => request(application).post(path).set('Origin', origin).auth(jwt, { type: 'bearer' }).send(body);
-    const result = await post('/api/chat/proposals', { baseRevision: 1, message: 'I now work 40 hours.', syntheticTest: true });
-    expect(result.status).toBe(200); expect(result.body.kind).toBe('clarification');
-    const id = result.body.clarification.id;
-    const status = await request(application).get('/api/chat/status').auth(token(), { type: 'bearer' });
-    expect(status.body.clarification).toEqual(result.body.clarification); expect(status.body).not.toHaveProperty('previewLimitPerDay');
-    expect((await request(application).get('/api/chat/status').auth(token({ sub: 'user_B' }), { type: 'bearer' })).body.clarification).toBeNull();
-    expect((await post(`/api/chat/clarifications/${id}`, { answer: 'actual_weekly_work' }, token({ sub: 'user_B' }))).status).toBe(404);
-    expect((await post(`/api/chat/clarifications/${id}`, { answer: 'actual_weekly_work', owner: 'user_B' })).status).toBe(400);
-    trialConfig.bindings.delete('user_A');
-    expect((await post(`/api/chat/clarifications/${id}`, { answer: 'actual_weekly_work' })).body.error.code).toBe('CONTEXT_NOT_PROVISIONED');
-    trialConfig.bindings.set('user_A', config.bindings.get('user_A')!);
-    const answered = await post(`/api/chat/clarifications/${id}`, { answer: 'actual_weekly_work' });
-    expect(answered.status).toBe(201); expect(answered.body.proposal.chat.clarificationAnswer).toBe('actual_weekly_work');
-    expect(previews).toBe(1); expect(memory.writes).toHaveLength(1);
-    expect((await post(`/api/chat/clarifications/${id}`, { answer: 'actual_weekly_work' })).status).toBe(404);
-    expect((await post(`/api/proposals/${answered.body.proposal.id}/confirm`, { proposalRevision: 1 })).status).toBe(200);
-    expect(memory.writes).toHaveLength(2); expect(journal.notifications('user_A')).toHaveLength(2);
   });
   it('keeps every private data route closed to additional users in the one-key development trial', async () => {
     const trial = loadConfig({ NODE_ENV: 'development', MAPLE_AM_ACCESS_MODE: 'single-user-development', APP_ORIGIN: origin,

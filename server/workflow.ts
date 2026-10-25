@@ -28,13 +28,13 @@ export class Workflow {
       throw new AppError(503, 'MEMORY_UNAVAILABLE', 'Your saved information could not be verified. Please try again later.');
     }
   }
-  async propose(owner: string, body: unknown, chatRequestId?: string, clarified = false) {
+  async propose(owner: string, body: unknown) {
     const input = proposalSchema.parse(body);
     const now = this.now();
     const employment = validateEmployment(input.employment, businessDate(now));
     const current = await this.read(owner);
     if (input.baseRevision !== current.revision) throw new AppError(409, 'STALE_REVISION', 'Your information changed. Reload before reviewing a change.');
-    return await this.journal.propose(owner, input.baseRevision, current.employment, employment, this.now().toISOString(), chatRequestId, clarified);
+    return await this.journal.propose(owner, input.baseRevision, current.employment, employment, this.now().toISOString());
   }
   async confirm(owner: string, id: string, body: unknown) {
     confirmationSchema.parse(body);

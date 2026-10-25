@@ -123,3 +123,16 @@ Existing-memory cleanup inventory is at
 `.local/production-memory-inventory/REPORT.md` with a private exact-ID manifest.
 No forget, purge or session deletion has run. Mixed user-entered details must be
 preserved until a precise cleanup action is approved; labels are not isolation.
+
+Source cleanup follow-up: the unused hours composer, mapper, preview transport,
+legacy request writers and `/api/chat/*` endpoints are removed. Historical record
+readback, provenance, expiry and migration remain. The current offline suite has
+578 passing tests across 30 files (the retired interpreter tests were removed),
+with typecheck/build/hygiene passing. See `CODE_CLEANUP.md`. Hosted tests were not
+rerun for this source-only cleanup; no provider or database mutation was needed.
+The verified localhost process remains on frozen code `3a412d4`, independently of
+the newer source/PR cleanup commit. It has not been restarted for this change.
+
+The private `RESET_OPTIONS.md` beside the inventory records complete Context
+delete/recreate implications. Partial session deletion is withdrawn. No cleanup
+approval or production-clean claim is implied by that decision document.
