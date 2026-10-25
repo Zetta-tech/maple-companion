@@ -40,11 +40,11 @@ export function MapleCompanion({ state = 'idle', cue, compact = false }: { state
     onPointerLeave={() => motion.current?.look(0, 0)} onFocus={() => motion.current?.look(0, 2)} onBlur={() => motion.current?.look(0, 0)}>
     <svg viewBox="24 20 192 200" focusable="false" aria-hidden="true" className="maple-companion-art">
       <defs>
-        <radialGradient id={`${id}-body`} cx="32%" cy="24%" r="81%"><stop stopColor="#e0f1c3"/><stop offset=".42" stopColor="#bddc9a"/><stop offset=".78" stopColor="#94b975"/><stop offset="1" stopColor="#64854f"/></radialGradient>
-        <linearGradient id={`${id}-leaf`} x1="0" y1="0" x2="1" y2="1"><stop stopColor="#d0e7a8"/><stop offset=".5" stopColor="#a0c77a"/><stop offset="1" stopColor="#527b43"/></linearGradient>
-        <linearGradient id={`${id}-eye`} x1="0" y1="0" x2=".4" y2="1"><stop stopColor="#192e22"/><stop offset="1" stopColor="#405a31"/></linearGradient>
-        <radialGradient id={`${id}-cheek`}><stop stopColor="#d6ad78" stopOpacity=".46"/><stop offset="1" stopColor="#d6ad78" stopOpacity="0"/></radialGradient>
-        <radialGradient id={`${id}-glow`}><stop stopColor="#f1f9d5" stopOpacity=".42"/><stop offset="1" stopColor="#f1f9d5" stopOpacity="0"/></radialGradient>
+        <radialGradient id={`${id}-body`} cx="32%" cy="24%" r="81%"><stop stopColor="var(--companion-body-light)"/><stop offset=".42" stopColor="var(--companion-body-mid)"/><stop offset=".78" stopColor="var(--companion-body-shade)"/><stop offset="1" stopColor="var(--companion-body-deep)"/></radialGradient>
+        <linearGradient id={`${id}-leaf`} x1="0" y1="0" x2="1" y2="1"><stop stopColor="var(--companion-leaf-light)"/><stop offset=".5" stopColor="var(--companion-leaf-mid)"/><stop offset="1" stopColor="var(--companion-leaf-deep)"/></linearGradient>
+        <linearGradient id={`${id}-eye`} x1="0" y1="0" x2=".4" y2="1"><stop stopColor="var(--companion-face)"/><stop offset="1" stopColor="var(--companion-eye-shade)"/></linearGradient>
+        <radialGradient id={`${id}-cheek`}><stop stopColor="var(--accent)" stopOpacity=".46"/><stop offset="1" stopColor="var(--accent)" stopOpacity="0"/></radialGradient>
+        <radialGradient id={`${id}-glow`}><stop stopColor="var(--companion-highlight)" stopOpacity=".42"/><stop offset="1" stopColor="var(--companion-highlight)" stopOpacity="0"/></radialGradient>
         <filter id={`${id}-soft`} x="-2%" y="-2%" width="104%" height="104%" colorInterpolationFilters="sRGB">
           <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="8" result="grain"/>
           <feColorMatrix in="grain" type="saturate" values="0"/>

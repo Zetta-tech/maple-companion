@@ -1,18 +1,49 @@
 /* Original Build North character, adapted to the existing dashboard slot. */
-.maple-companion { width:100%; display:grid; grid-template-rows:minmax(0,1fr) auto; color:var(--muted); }
+.maple-companion {
+  /* Sage body, forest leaves and the existing Maple accent in the soft cheek tint. */
+  --companion-body-light:#d6e2d6;
+  --companion-body-mid:#aac2ac;
+  --companion-body-shade:#7e9f86;
+  --companion-body-deep:#426652;
+  --companion-leaf-light:#a7c7ac;
+  --companion-leaf-mid:#6e9777;
+  --companion-leaf-deep:#35583e;
+  --companion-face:#1b2923;
+  --companion-eye-shade:#35483d;
+  --companion-highlight:#e9f1e4;
+  --companion-vein:#d4e2d2;
+  --companion-edge:#3f614c;
+  --companion-brow:#395343;
+  --companion-limb:#7e9f86;
+  --companion-ground:#36523e;
+  width:100%; display:grid; grid-template-rows:minmax(0,1fr) auto; color:var(--muted);
+}
+:root[data-theme="dark"] .maple-companion {
+  --companion-body-light:#d7e5d9;
+  --companion-body-mid:#adc7b3;
+  --companion-body-shade:#80a68b;
+  --companion-body-deep:#4c7159;
+  --companion-leaf-light:#b3cfb7;
+  --companion-leaf-mid:#7da586;
+  --companion-leaf-deep:#42694c;
+  --companion-highlight:#eaf4e9;
+  --companion-vein:#dfebdc;
+  --companion-limb:#88ad93;
+  --companion-ground:#b3c9b5;
+}
 .maple-companion-art { width:100%; height:auto; display:block; overflow:visible; }
-.companion-ground { fill:var(--ink); opacity:.12; transform-origin:120px 204px; }
-.companion-vein { fill:none; stroke:#e2edce; stroke-width:1.5; stroke-linecap:round; opacity:.55; }
-.companion-feature { fill:none; stroke:#263b25; stroke-width:3; stroke-linecap:round; }
-.companion-eye { fill:#263b25; }
-.companion-eye-light { fill:#f5ffe9; }
-.companion-eye-glint { fill:#d1e9ac; opacity:.65; }
-.companion-shell { stroke:#577a47; stroke-opacity:.16; stroke-width:.75; }
-.companion-brow { fill:none; stroke:#48663a; stroke-width:2.4; stroke-linecap:round; opacity:.48; }
+.companion-ground { fill:var(--companion-ground); opacity:.12; transform-origin:120px 204px; }
+.companion-vein { fill:none; stroke:var(--companion-vein); stroke-width:1.5; stroke-linecap:round; opacity:.55; }
+.companion-feature { fill:none; stroke:var(--companion-face); stroke-width:3; stroke-linecap:round; }
+.companion-eye { fill:var(--companion-face); }
+.companion-eye-light { fill:var(--companion-highlight); }
+.companion-eye-glint { fill:var(--companion-vein); opacity:.65; }
+.companion-shell { stroke:var(--companion-edge); stroke-opacity:.16; stroke-width:.75; }
+.companion-brow { fill:none; stroke:var(--companion-brow); stroke-width:2.4; stroke-linecap:round; opacity:.48; }
 .companion-brow-left { transform-origin:98px 112px; }
 .companion-brow-right { transform-origin:142px 112px; }
-.companion-limb { fill:none; stroke:#8aaf6c; stroke-width:9; stroke-linecap:round; }
-.companion-sheen { fill:none; stroke:#f0ffdf; stroke-width:3; stroke-linecap:round; opacity:.3; }
+.companion-limb { fill:none; stroke:var(--companion-limb); stroke-width:9; stroke-linecap:round; }
+.companion-sheen { fill:none; stroke:var(--companion-highlight); stroke-width:3; stroke-linecap:round; opacity:.3; }
 .companion-thinking,.companion-thought-hand,.companion-smile-ready,.companion-concerned,.companion-lids,.companion-ready,.companion-error { opacity:0; }
 .companion-ready { fill:none; stroke:var(--accent); stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
 .companion-error { fill:none; stroke:var(--ink); stroke-width:2.5; stroke-linecap:round; }
