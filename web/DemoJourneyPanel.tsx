@@ -7,6 +7,7 @@ import {CrsEvidenceEditor} from './CrsEvidenceEditor.js';
 import {CrsBreakdown} from './CrsBreakdown.js';
 import { findingHeading, findingLabel, findingReason, isJourneyStale, splitJourney } from './journey-presentation.js';
 import { useFlowNavigation } from './useFlowNavigation.js';
+import { GuideSaveActions } from './GuideSaveActions.js';
 import './DemoJourneyPanel.css';
 type Request=<T>(path:string,body?:unknown)=>Promise<T>;
 type Proposal={id:string;status:string;profile:DemoProfile|null;baseRevision:number};
@@ -74,7 +75,14 @@ export function DemoJourneyPanel({request,onAvailabilityChange}:{request:Request
     const parsed=demoProfileSchema.safeParse(draft);if(!parsed.success)throw Error('Review the demonstration dates, duties and profile fields.');
     const result=await request<Proposal>('/api/demo/proposals',{baseRevision:snapshot.revision,profile:parsed.data});setPending([result]);setNotice('Review this exact fictional profile before saving it to memory.');
   },'demo-profile-review-heading');}
-  async function confirm(proposal:Proposal){await act(async()=>{await request(`/api/demo/proposals/${proposal.id}/confirm`,{confirm:true});await refresh(true);setNotice('The fictional profile was saved and read back from memory.');},'journey-feedback');}
+  async function save(proposal:Proposal, action:'confirm'|'reconcile') { await act(async()=>{
+    if(action==='confirm')setPending(current=>current.map(item=>item.id===proposal.id?{...item,status:'applying'}:item));
+    try {
+      const result=await request<DemoSnapshot>(`/api/demo/proposals/${proposal.id}/${action}`,action==='confirm'?{confirm:true}:{});
+      if(!result.verified||!result.profile)throw Error('The save could not be verified. Check its status before continuing.');
+      await refresh(true);setNotice(action==='confirm'?'The fictional profile was saved and read back from memory.':'Your earlier save was verified. Nothing was sent again.');
+    } catch(reason) { try { await refresh(); } catch { /* Keep the check-only state until readback succeeds. */ } throw reason; }
+  },'journey-feedback'); }
   async function research(kind:'discover'|'policy-replay'){await act(async()=>{
     if(kind==='discover'&&!guideQuestionSchema.safeParse(question).success)throw Error('Enter a question between 1 and 2,000 characters. Nothing was sent.');
     const id=crypto.randomUUID();setRequestPending(id);
@@ -95,7 +103,7 @@ export function DemoJourneyPanel({request,onAvailabilityChange}:{request:Request
   return <section className="demo-journey" aria-labelledby="journey-title" id="journey">
     <div className="journey-intro"><div><h2 id="journey-title" className="visually-hidden" tabIndex={-1}>Your discoveries</h2><p className="journey-profile-label"><span className="demo-tag" title="Fictional demonstration profile">Demo profile</span><span>{snapshot?.profile ? `${snapshot.profile.name}` : loading || busy ? 'Checking your demonstration profile…' : snapshot ? 'Review the fictional profile to begin' : 'Profile could not be verified'}</span></p></div><button className="text-button" aria-label="Refresh journey" disabled={busy || loading} onClick={()=>void act(()=>refresh())}>{busy || loading ? 'Checking…' : 'Refresh'}</button></div>
     {error&&<p id="journey-error" tabIndex={-1} className="notice error" role="alert">{error}</p>}{notice&&<p id="journey-feedback" tabIndex={-1} className="notice" role="status">{notice}</p>}
-    {pending.map((proposal,index)=><section className="review" key={proposal.id}><h3 id={index===0?'demo-profile-review-heading':undefined} tabIndex={-1}>Confirm this fictional profile</h3><p>This saves only the designated demonstration entity in memory. It does not replace your ordinary employment record.</p>{proposal.profile&&<details open><summary>Exact values to save</summary><dl className="demo-review">{Object.entries(proposal.profile).map(([field,value])=><div key={field}><dt>{field.replace(/([A-Z])/g,' $1')}</dt><dd>{value!==null&&typeof value==='object'?<pre>{JSON.stringify(value,null,2)}</pre>:String(value??'Not recorded')}</dd></div>)}</dl></details>}<button disabled={busy||proposal.status!=='pending'} onClick={()=>void confirm(proposal)}>{proposal.status==='pending'?'Confirm and save demo profile':'Save outcome needs checking — do not resubmit'}</button>{proposal.status==='pending'&&<button className="secondary" disabled={busy} onClick={()=>void act(async()=>{await request('/api/demo/proposals/'+proposal.id+'/reject',{});await refresh();setNotice('The demonstration profile change was discarded.');},'journey-feedback')}>Discard demo change</button>}</section>)}
+    {pending.map((proposal,index)=><section className="review" key={proposal.id}><h3 id={index===0?'demo-profile-review-heading':undefined} tabIndex={-1}>Confirm this fictional profile</h3><p>This saves only the designated demonstration entity in memory. It does not replace your ordinary employment record.</p>{proposal.profile&&<details open><summary>Exact values to save</summary><dl className="demo-review">{Object.entries(proposal.profile).map(([field,value])=><div key={field}><dt>{field.replace(/([A-Z])/g,' $1')}</dt><dd>{value!==null&&typeof value==='object'?<pre>{JSON.stringify(value,null,2)}</pre>:String(value??'Not recorded')}</dd></div>)}</dl></details>}<GuideSaveActions demo status={proposal.status} busy={busy} blocked={false} confirm={()=>void save(proposal,'confirm')} reconcile={()=>void save(proposal,'reconcile')} reject={()=>void act(async()=>{await request('/api/demo/proposals/'+proposal.id+'/reject',{});await refresh();setNotice('The demonstration profile change was discarded.');},'journey-feedback')} /></section>)}
 
     {requestPending && <p className="notice" role="status">{busy ? 'Checking the official sources and your saved profile.' : 'This request’s outcome needs checking. Refresh its status before starting another.'}</p>}
     <div className="journey-results" aria-live="polite">{current.map(event=><JourneyCard key={event.id} event={event} revision={snapshot?.verified ? snapshot.revision : null} date={date}/>)}</div>

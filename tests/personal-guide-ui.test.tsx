@@ -7,7 +7,8 @@ import { projectExpressEntry } from '../server/discovery.js';
 import { fixtureSources } from './support/demo-fixture.js';
 import { CrsEvidenceEditor } from '../web/CrsEvidenceEditor.js';
 import { JourneyCard } from '../web/DemoJourneyPanel.js';
-import { GuideSaveActions, PersonalInputReview } from '../web/PersonalGuidePanel.js';
+import { PersonalInputReview } from '../web/PersonalGuidePanel.js';
+import { GuideSaveActions } from '../web/GuideSaveActions.js';
 import { guidePendingAfterFailure, nativePendingAfterFailure, readResponse, RequestError } from '../web/request.js';
 
 describe('personal Guide frontend boundaries', () => {

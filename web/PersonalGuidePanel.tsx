@@ -10,6 +10,7 @@ import { splitJourney } from './journey-presentation.js';
 import { watchAssessmentRefresh } from './assessment-refresh.js';
 import { guidePendingAfterFailure, RequestError } from './request.js';
 import { useFlowNavigation } from './useFlowNavigation.js';
+import { GuideSaveActions } from './GuideSaveActions.js';
 
 type Request = <T>(path: string, body?: unknown) => Promise<T>;
 type Proposal = { id: string; status: string; profile: PersonalProfile | null; baseRevision: number };
@@ -47,12 +48,6 @@ function ReviewValues({ value }: { value: Record<string, unknown> }) {
 export function PersonalInputReview({ profile }: { profile: PersonalProfile }) {
   const { fictional: _fictional, inputPurpose: _purpose, employmentBasis, ...values } = profile;
   return <><p>Includes your confirmed employment at <strong>{profile.employer}</strong>. Changes are used only after you confirm.</p><ReviewValues value={values} /><details><summary>Saved employment reference</summary><p>Employment revision {employmentBasis.revision}</p><code>{employmentBasis.receiptDigest}</code></details></>;
-}
-
-export function GuideSaveActions({ status, busy, blocked, confirm, reconcile, reject }: {
-  status: string; busy: boolean; blocked: boolean; confirm: () => void; reconcile: () => void; reject: () => void;
-}) {
-  return <div className="actions">{status === 'pending' ? <><button disabled={busy || blocked} onClick={confirm}>Confirm and save Guide details</button><button className="secondary" disabled={busy} onClick={reject}>Discard Guide change</button></> : <><p className="hint">This save needs checking. It will not be sent again.</p><button className="secondary" disabled={busy} onClick={reconcile}>Check save status</button></>}</div>;
 }
 
 export function PersonalGuidePanel({ request, employment, employmentRevision, blocked, refreshKey }: Props) {

@@ -316,13 +316,16 @@ main:has(.workspace-heading) { padding-top:1.5rem; }
 .workspace-heading { margin-bottom:.25rem; align-items:center; }
 .workspace-heading h1 { font-size:2.2rem; margin-bottom:0; }
 .workspace-heading>button { margin-top:0; background:transparent; border-color:transparent; font-size:.8rem; color:var(--muted); }
-.workspace-nav { margin-bottom:.75rem; border-bottom:0; }
+.workspace-nav { margin:0; border-bottom:0; padding:0; }
 @media(max-width:520px) {
   .workspace-heading { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; }
   .workspace-heading .eyebrow { font-size:.65rem; letter-spacing:.08em; }
   .workspace-heading h1 { font-size:1.9rem; margin-bottom:0; }
   .workspace-heading p:not(.eyebrow) { display:none; }
   .workspace-heading>button { align-self:end; padding:.4rem .6rem; font-size:.73rem; }
+  .workspace-heading .workspace-nav { gap:0 .8rem; font-size:.73rem; }
+  .workspace-heading .workspace-nav { grid-column:1 / -1; }
+  .workspace-heading>button { white-space:normal; max-width:4.5rem; }
   .journey-intro { display:grid; grid-template-columns:minmax(0,1fr) auto; }
   .journey-profile-label { font-size:.75rem; gap:.25rem .5rem; }
 }
