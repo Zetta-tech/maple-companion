@@ -6,6 +6,7 @@ import type { DemoMemory } from './demo-memory.js';
 import type { GuideSources } from './guide-sources.js';
 import type { Workflow } from './workflow.js';
 import { AppError } from './errors.js';
+import { hasConflictingWorkEvidence } from './cec-work.js';
 
 const reviewNeeded=()=>new AppError(409,'GUIDE_INPUT_REVIEW_REQUIRED','Review the current employment and assessment inputs before continuing.');
 const answer=(value:unknown):'yes'|'no'|'unknown'=>value==='yes'||value==='no'?value:'unknown';
@@ -46,7 +47,7 @@ export class PersonalGuide {
     if(c?.canadianEmployer==='no'&&input.intake.crsEvidence?.canadianEmployer==='yes')throw new AppError(400,'GUIDE_EVIDENCE_CONFLICT','The Canadian-employer answers conflict. Review the employment evidence.');
     const intervalComplete=!!c&&c.singleIntervalComplete==='yes'&&c.conditionsConsistent==='yes'
       &&c.canadianEmployer==='yes'&&c.nocDutiesMatch==='yes'&&c.nocEssentialDutiesMatch==='yes'
-      &&!(e.paid==='no'&&c.paid==='yes')&&!(e.authorizedToWork==='no'&&c.authorizedTemporaryResident==='yes')
+      &&!hasConflictingWorkEvidence(e)
       &&c.hoursPerWeek===e.hoursPerWeek&&(c.ongoing?e.currentJob:!e.currentJob&&c.endDate===e.endDate)
       &&c.startDate===e.startDate;
     const profile=personalProfileSchema.parse({...input.intake,inputPurpose:'reviewed-assessment-inputs',

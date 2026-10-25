@@ -2,6 +2,7 @@ import type { Discovery, SourceEvidence } from '../shared/demo.js';
 import {completeGuideProfileSchema,type GuideProfile} from '../shared/personal-guide.js';
 import {calculateCrs} from './crs.js';
 import {crsRuleSourceHashes} from './crs-sources.js';
+import {workIntervalEnd} from '../shared/work-interval.js';
 const days = (from: string, to: string) => Math.floor((Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / 86_400_000);
 
 /** Reviewed conditions, not a language parser, brand lookup or eligibility decision. */
@@ -44,7 +45,7 @@ export function projectExpressEntry(input: GuideProfile, date: string, revision:
   const profile=parsed.data;
   if(!profile.fictional&&(profile.currentJob===undefined||profile.workEnd===undefined
     ||(profile.currentJob?profile.workEnd!==null:profile.workEnd===null)
-    ||(profile.workEnd!==null&&profile.workEnd<profile.workStart)))return {...base,outstanding:['Review the confirmed employment end date and current-job status. Missing or conflicting interval boundaries cannot be scored.']};
+    ||(profile.workEnd!==null&&(profile.workEnd<profile.workStart||profile.workEnd>date))))return {...base,outstanding:['Review the confirmed employment end date and current-job status. Missing or conflicting interval boundaries cannot be scored.']};
   if(profile.crsEvidence){
     if(!Object.entries(crsRuleSourceHashes).every(([id,hash])=>sources.some(s=>s.id===id&&s.bodySha256===hash)))return {...base,outstanding:['The full-score calculation needs the complete reviewed source set matching this calculator version.']};
     const crs=calculateCrs(profile,date);
@@ -60,7 +61,7 @@ export function projectExpressEntry(input: GuideProfile, date: string, revision:
     && profile.fullTimeStudy === 'no' && profile.selfEmployed === 'no' && profile.spouseAccompanying !== 'unknown';
   if (profile.workStart < profile.arrivedInCanada) return { ...base, outstanding:['The work interval begins before the recorded arrival in Canada. Clarify whether this arrival is a later re-entry and document any earlier Canadian stay, or correct the dates. This single-interval calculation cannot resolve that history; no score was calculated.'] };
   if (!knownConditions || profile.workStart > date) return { ...base, outstanding:['Qualifying occupation, duties, Canadian work conditions, spouse status or dates still need review. No score delta was inferred.'] };
-  const intervalEnd = !profile.fictional&&profile.workEnd!==null&&profile.workEnd!==undefined&&profile.workEnd<date?profile.workEnd:date;
+  const intervalEnd = workIntervalEnd(profile.fictional ? null : profile.workEnd, date);
   const elapsed = days(profile.workStart, intervalEnd);
   const calendarYears = Number(intervalEnd.slice(0,4)) - Number(profile.workStart.slice(0,4)) - (intervalEnd.slice(5) < profile.workStart.slice(5) ? 1 : 0);
   const hours = Math.floor(elapsed / 7) * Math.min(30, profile.weeklyHours);

@@ -14,6 +14,7 @@ import type { Config } from '../server/config.js';
 import {fictionalCrsEvidence} from '../shared/crs.js';
 import {projectExpressEntry} from '../server/discovery.js';
 import {GuideWriteNotStarted} from '../server/demo-memory.js';
+import {evaluateCecWork} from '../server/cec-work.js';
 const owner='user_Personal',origin='https://private.example.test';
 const binding={ownerId:owner,endpoint:'https://memory.example.test',context:'private-test',readKey:'fixture-read',writeKey:'fixture-write'};
 const employment:Employment={employer:'Offline employer',title:'Systems analyst',duties:'Analyze systems requirements and test software against documented needs.',startDate:'2024-01-15',endDate:null,currentJob:true,hoursPerWeek:38,countryCode:'CA',paid:'yes',authorizedToWork:'yes',nocCode:'21221',nocReviewed:true};
@@ -33,6 +34,20 @@ function setup(){
   return {guide,make,workflow,store,memory,ordinary,evidence,http,saveEmployment,saveInputs,setReviewed:(value:boolean)=>{reviewed=value;}};
 }
 describe('personal Guide reuses research with receipt-bound inputs, not a second employment truth',()=>{
+  it.each([false,true])('holds conflicting work location through confirmation, reload and replay (full CRS: %s)',async(fullCrs)=>{
+    const t=setup();const e:Employment={...employment,countryCode:'US',cecWork:{startDate:employment.startDate,ongoing:true,endDate:null,hoursPerWeek:38,singleIntervalComplete:'yes',conditionsConsistent:'yes',physicallyInCanada:'yes',authorizedTemporaryResident:'yes',paid:'yes',relationship:'employee',physicianException:'no',fullTimeStudy:'no',workArrangement:'onsite',canadianEmployer:'yes',nocDutiesMatch:'yes',nocEssentialDutiesMatch:'yes'}};
+    const ep=await t.workflow.propose(owner,{baseRevision:0,employment:e});await t.workflow.confirm(owner,ep.id,{proposalRevision:1});
+    const crsEvidence=fictionalCrsEvidence('2026-10-25');crsEvidence.completeEvidenceReviewed='yes';
+    const intake={...emptyPersonalIntake,arrivedInCanada:'2021-09-01',spouseAccompanying:'yes',qualifyingExpressEntryOffer:'none_reviewed',...(fullCrs?{crsEvidence}:{})};
+    const p=await t.guide.propose(owner,{baseRevision:0,employmentRevision:1,intake});await t.guide.confirm(owner,p.id,{confirm:true});
+    expect(evaluateCecWork(e,'2026-10-25')).toMatchObject({status:'needs_information',reasonCodes:['evidence_conflict']});
+    expect((await t.make().profile(owner)).profile).toMatchObject({intervalComplete:false,physicallyCanada:'yes'});
+    const result=await t.make().replay(owner,{requestId:randomUUID(),fictional:false});
+    expect(result.discovery?.status).toBe('needs_information');expect(result.discovery?.score).toBeUndefined();expect(result.discovery?.crs).toBeUndefined();
+    expect((await t.make().history(owner)).events[0]?.discovery).toEqual(result.discovery);
+    expect((await t.workflow.read(owner)).employment?.countryCode).toBe('US');
+    expect(t.ordinary.writes).toHaveLength(1);expect(t.memory.explanations).toBe(0);
+  });
   it.each([['2024-07-15',undefined],['2025-07-15',35]] as const)('caps ended employment at %s after confirmation and reload',async(endDate,expected)=>{
     const t=setup();const e:Employment={...employment,currentJob:false,endDate,hoursPerWeek:40,cecWork:{startDate:employment.startDate,ongoing:false,endDate,hoursPerWeek:40,singleIntervalComplete:'yes',conditionsConsistent:'yes',physicallyInCanada:'yes',authorizedTemporaryResident:'yes',paid:'yes',relationship:'employee',physicianException:'no',fullTimeStudy:'no',workArrangement:'onsite',canadianEmployer:'yes',nocDutiesMatch:'yes',nocEssentialDutiesMatch:'yes'}};
     const ep=await t.workflow.propose(owner,{baseRevision:0,employment:e});await t.workflow.confirm(owner,ep.id,{proposalRevision:1});
