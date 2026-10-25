@@ -49,6 +49,8 @@ describe('real Clerk verification and HTTP boundaries, with locally generated te
     expect(status.body.available).toBe(false);
     const result = await request(application).post('/api/chat/proposals').set('Origin', origin).auth(token(), { type: 'bearer' }).send({ baseRevision: 0, message: 'I work 36 hours per week.', syntheticTest: true });
     expect(result.status).toBe(503); expect(result.body.error.code).toBe('CHAT_NOT_AVAILABLE'); expect(invoked).toBe(false);
+    const answer = await request(application).post('/api/chat/clarifications/11111111-1111-4111-8111-111111111111').set('Origin', origin).auth(token(), { type: 'bearer' }).send({ answer: 'actual_weekly_work' });
+    expect(answer.status).toBe(503); expect(answer.body.error.code).toBe('CHAT_NOT_AVAILABLE');
   });
   it('keeps chat unavailable without an explicitly constructed interpreter', async () => {
     const application = app();
@@ -123,6 +125,36 @@ describe('real Clerk verification and HTTP boundaries, with locally generated te
     expect(journal.assessments('user_A')).toHaveLength(1);
     expect(memory.reads).toHaveLength(reads);
     expect(memory.writes).toHaveLength(1);
+  });
+
+  it('keeps clarification owner-bound across HTTP reload and requires a separate fact confirmation', async () => {
+    const journal = new Journal(':memory:'); journals.push(journal);
+    const memory = new TestMemory(); const trialConfig: Config = { ...config, amAccessMode: 'single-user-development', bindings: new Map(config.bindings) };
+    const workflow = new Workflow(journal, memory, owner => bindingFor(trialConfig, owner));
+    const employment = { employer: 'SYNTHETIC TEST ONLY - HTTP', title: 'Fixture', duties: '', startDate: '2025-01-01', currentJob: true,
+      endDate: null, hoursPerWeek: 38, countryCode: 'CA', paid: 'yes', authorizedToWork: 'unknown', nocCode: null, nocReviewed: false };
+    const initial = await workflow.propose('user_A', { baseRevision: 0, employment }); await workflow.confirm('user_A', initial.id, { proposalRevision: 1 });
+    let previews = 0;
+    const chatProposals = new ChatProposals(workflow, { async interpret() { previews++; return { kind: 'clarify_hours', hours: 40, issue: 'period' }; } });
+    const application = createApp({ config: trialConfig, workflow, chatProposals });
+    const post = (path: string, body: object, jwt = token()) => request(application).post(path).set('Origin', origin).auth(jwt, { type: 'bearer' }).send(body);
+    const result = await post('/api/chat/proposals', { baseRevision: 1, message: 'I now work 40 hours.', syntheticTest: true });
+    expect(result.status).toBe(200); expect(result.body.kind).toBe('clarification');
+    const id = result.body.clarification.id;
+    const status = await request(application).get('/api/chat/status').auth(token(), { type: 'bearer' });
+    expect(status.body.clarification).toEqual(result.body.clarification); expect(status.body).not.toHaveProperty('previewLimitPerDay');
+    expect((await request(application).get('/api/chat/status').auth(token({ sub: 'user_B' }), { type: 'bearer' })).body.clarification).toBeNull();
+    expect((await post(`/api/chat/clarifications/${id}`, { answer: 'actual_weekly_work' }, token({ sub: 'user_B' }))).status).toBe(404);
+    expect((await post(`/api/chat/clarifications/${id}`, { answer: 'actual_weekly_work', owner: 'user_B' })).status).toBe(400);
+    trialConfig.bindings.delete('user_A');
+    expect((await post(`/api/chat/clarifications/${id}`, { answer: 'actual_weekly_work' })).body.error.code).toBe('CONTEXT_NOT_PROVISIONED');
+    trialConfig.bindings.set('user_A', config.bindings.get('user_A')!);
+    const answered = await post(`/api/chat/clarifications/${id}`, { answer: 'actual_weekly_work' });
+    expect(answered.status).toBe(201); expect(answered.body.proposal.chat.clarificationAnswer).toBe('actual_weekly_work');
+    expect(previews).toBe(1); expect(memory.writes).toHaveLength(1);
+    expect((await post(`/api/chat/clarifications/${id}`, { answer: 'actual_weekly_work' })).status).toBe(404);
+    expect((await post(`/api/proposals/${answered.body.proposal.id}/confirm`, { proposalRevision: 1 })).status).toBe(200);
+    expect(memory.writes).toHaveLength(2); expect(journal.notifications('user_A')).toHaveLength(2);
   });
   it('keeps every private data route closed to additional users in the one-key development trial', async () => {
     const trial = loadConfig({ NODE_ENV: 'development', MAPLE_AM_ACCESS_MODE: 'single-user-development', APP_ORIGIN: origin,

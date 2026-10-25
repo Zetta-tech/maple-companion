@@ -42,13 +42,19 @@ async function setup(response: unknown, path = ':memory:') {
 describe('semantic-first hours flow using captured AM responses and test-only storage', () => {
   it.each(nativeSemanticFixtures)('routes the untouched $category message to native preview before validation', async fixture => {
     const { journal, memory, workflow, fetchImpl, chat } = await setup(fixture.response);
-    const result = await chat.propose(owner, { baseRevision: 1, message: fixture.message, syntheticTest: true });
+    let result = await chat.propose(owner, { baseRevision: 1, message: fixture.message, syntheticTest: true });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const sent = JSON.parse(String(fetchImpl.mock.calls[0]![1]?.body));
     expect(sent.infer).toBe('preview');
     expect(sent.text).toBe(`SYNTHETIC SEMANTIC EVALUATION ONLY. Fictional test person.\nSaved context (background): the currently recorded work total is 38 hours per week.\nUser message (verbatim):\n${fixture.message}`);
     expect(memory.writes).toHaveLength(1); expect(journal.notifications(owner)).toHaveLength(1);
     if (fixture.proposal) {
+      if (fixture.category === 'missing period') {
+        if (result.kind !== 'clarification') throw new Error('period clarification expected');
+        expect(journal.list(owner)).toHaveLength(1);
+        result = await chat.answer(owner, result.clarification.id, { answer: 'actual_weekly_work' });
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+      }
       if (result.kind !== 'proposal') throw new Error('proposal expected');
       expect(result.proposal).toMatchObject({ ownerId: owner, status: 'pending', baseRevision: 1, oldValue: employment, newValue: { ...employment, hoursPerWeek: 37 } });
       expect(result.proposal.chat?.periodSource).toBe(fixture.category === 'missing period' ? 'interpretation' : 'message');
@@ -68,7 +74,7 @@ describe('semantic-first hours flow using captured AM responses and test-only st
     '  I now work 37 hours.\n',
   ])('does not require an exact input sentence: %s', async message => {
     const { chat, fetchImpl, memory } = await setup(nativeSemanticFixtures[1]!.response);
-    expect((await chat.propose(owner, { baseRevision: 1, message, syntheticTest: true })).kind).toBe('proposal');
+    expect((await chat.propose(owner, { baseRevision: 1, message, syntheticTest: true })).kind).toBe(message.includes('hours weekly') ? 'proposal' : 'clarification');
     expect(JSON.parse(String(fetchImpl.mock.calls[0]![1]?.body)).text.endsWith(message)).toBe(true);
     expect(memory.writes).toHaveLength(1);
   });
@@ -100,7 +106,7 @@ describe('semantic-first hours flow using captured AM responses and test-only st
     const response = structuredClone(nativeSemanticFixtures[0]!.response);
     response.extraction.attributes = [{ id: '', entityId: '', key: 'work_hours', value: '37 hours', memoryCategory: 'identity' }];
     const { chat, memory } = await setup(response);
-    expect((await chat.propose(owner, { baseRevision: 1, message: 'I now work 37 hours.', syntheticTest: true })).kind).toBe('clarify');
+    expect(await chat.propose(owner, { baseRevision: 1, message: 'I now work 37 hours.', syntheticTest: true })).toMatchObject({ kind: 'clarification', clarification: { hours: 37, issue: 'period' } });
     expect(memory.writes).toHaveLength(1);
   });
 
@@ -139,7 +145,11 @@ describe('explicit inferred-unit review', () => {
     const directory = mkdtempSync(join(tmpdir(), 'maple-hours-test-')); directories.push(directory);
     const path = join(directory, 'journal.sqlite');
     const { chat, journal, memory, fetchImpl } = await setup(nativeSemanticFixtures[1]!.response, path);
-    const result = await chat.propose(owner, { baseRevision: 1, message, syntheticTest: true });
+    let result = await chat.propose(owner, { baseRevision: 1, message, syntheticTest: true });
+    if (source === 'interpretation') {
+      if (result.kind !== 'clarification') throw new Error('period clarification expected');
+      result = await chat.answer(owner, result.clarification.id, { answer: 'actual_weekly_work' });
+    }
     if (result.kind !== 'proposal') throw new Error('proposal expected');
     expect(result.proposal.chat?.periodSource).toBe(source);
     journal.close(); journals.splice(journals.indexOf(journal), 1);
@@ -150,7 +160,7 @@ describe('explicit inferred-unit review', () => {
       ...stored.chat!, oldHours: stored.oldValue!.hoursPerWeek, newHours: stored.newValue!.hoursPerWeek!,
     }));
     expect(html).toContain('Update weekly hours from 38 to 37?');
-    expect(html.includes('could not clearly link a weekly period')).toBe(source === 'interpretation');
+    expect(html.includes('You clarified that')).toBe(source === 'interpretation');
     expect(html).toContain('changes only weekly hours');
     expect(reopened.head(owner).revision).toBe(1);
     expect(reopened.notifications(owner)).toHaveLength(1);

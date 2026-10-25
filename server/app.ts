@@ -77,11 +77,16 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   app.get('/api/proposals', (_req, res) => res.json({ proposals: workflow().journal.list(res.locals.owner) }));
   app.post('/api/proposals', async (req, res) => res.status(201).json(await workflow().propose(res.locals.owner, req.body)));
   app.get('/api/chat/status', (_req, res) => res.json({ available: !!chatProposals, syntheticOnly: true,
-    fields: ['hoursPerWeek'], previewLimitPerDay: 5, pendingRetentionHours: 24 }));
+    fields: ['hoursPerWeek'], pendingRetentionHours: 24, clarification: chatProposals?.pending(res.locals.owner) ?? null }));
   // index.ts only supplies an interpreter for the explicit development trial.
   app.post('/api/chat/proposals', async (req, res) => {
     if (!chatProposals) throw new AppError(503, 'CHAT_NOT_AVAILABLE', 'Chat corrections are not available yet. No change was saved.');
     const result = await chatProposals.propose(res.locals.owner, req.body);
+    res.status(result.kind === 'proposal' ? 201 : 200).json(result);
+  });
+  app.post('/api/chat/clarifications/:id', async (req, res) => {
+    if (!chatProposals) throw new AppError(503, 'CHAT_NOT_AVAILABLE', 'Chat corrections are not available yet. No change was saved.');
+    const result = await chatProposals.answer(res.locals.owner, id(req.params.id), req.body);
     res.status(result.kind === 'proposal' ? 201 : 200).json(result);
   });
   app.post('/api/proposals/:id/confirm', async (req, res) => res.json(await workflow().confirm(res.locals.owner, id(req.params.id), req.body)));

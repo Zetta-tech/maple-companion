@@ -77,8 +77,12 @@ describe('chat correction proposal boundary (test interpreter only)', () => {
 
   it.each(['I know work 38 hours', 'I now work 38 hours', 'I currenly put in 38 hours each week at my fictional job.'])('interprets natural wording before evidence validation: %s', async message => {
     const { chat, interpret, memory, journal } = await setup(); interpret.mockResolvedValue({ kind: 'hours', hours: 38 });
-    const result = await chat.propose('user_A', request(message));
+    let result = await chat.propose('user_A', request(message));
     expect(interpret).toHaveBeenCalledWith('user_A', message, expect.any(String), 34);
+    if (!message.includes('week')) {
+      if (result.kind !== 'clarification') throw new Error('period clarification expected');
+      result = await chat.answer('user_A', result.clarification.id, { answer: 'actual_weekly_work' });
+    }
     if (result.kind !== 'proposal') throw new Error('proposal expected');
     expect(result.proposal.newValue?.hoursPerWeek).toBe(38);
     expect(result.proposal.chat?.periodSource).toBe(message.includes('week') ? 'message' : 'interpretation');

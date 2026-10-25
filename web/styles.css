@@ -130,3 +130,146 @@ footer { max-width: 1184px; margin: 0 auto; padding: 1.5rem 2rem; border-top: 1p
   footer { padding-inline: 1rem; }
 }
 @media (prefers-reduced-motion: reduce) { button:active:not(:disabled) { transform: none; } }
+
+/* Hallmark · editorial, calm · Maple green · existing workbench layout preserved.
+ * Pre-emit critique: philosophy 4, hierarchy 4, execution 4, specificity 4, restraint 5, variety 4.
+ * Surfaces are roles: the page stays open, only reviews and overlays are elevated. */
+:root {
+  --paper: #f8f8f3;
+  --surface: #ffffff;
+  --surface-subtle: #eff2eb;
+  --surface-elevated: #ffffff;
+  --input: #ffffff;
+  --ink: #25332d;
+  --muted: #59685f;
+  --accent: #286149;
+  --accent-hover: #1d4936;
+  --on-accent: #ffffff;
+  --line: #d5dcd3;
+  --control-border: #7d8b80;
+  --wash: #eaf2e7;
+  --focus: #9a491f;
+  --error-ink: #963d2b;
+  --error-wash: #fff0ea;
+  --success-ink: #286149;
+  --success-wash: #eaf2e7;
+  --warning-ink: #79521a;
+  --warning-wash: #faf0d9;
+  --disabled-ink: #66736b;
+  --disabled-surface: #e8ece5;
+  --backdrop: #15221bb3;
+  --shadow: 0 8px 28px #25332d09;
+  --selection: #c7e3ce;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #141c18;
+  --surface: #1b2620;
+  --surface-subtle: #202d25;
+  --surface-elevated: #25332b;
+  --input: #1a251e;
+  --ink: #edf0e8;
+  --muted: #b1beb3;
+  --accent: #a0d5ae;
+  --accent-hover: #b9e6c4;
+  --on-accent: #152b1e;
+  --line: #3a4a3e;
+  --control-border: #758c7a;
+  --wash: #293f30;
+  --focus: #edb78c;
+  --error-ink: #ffb7a6;
+  --error-wash: #422c27;
+  --success-ink: #a0d5ae;
+  --success-wash: #293f30;
+  --warning-ink: #e8cb91;
+  --warning-wash: #3e3524;
+  --disabled-ink: #a3afa5;
+  --disabled-surface: #263129;
+  --backdrop: #070d0bc9;
+  --shadow: 0 8px 28px #00000026;
+  --selection: #3d6148;
+}
+::selection { background: var(--selection); color: var(--ink); }
+body { background: var(--paper); }
+button { color: var(--on-accent); border-radius: 8px; }
+button:hover:not(:disabled) { border-color: var(--accent-hover); }
+button.secondary { background: transparent; border-color: var(--control-border); color: var(--ink); }
+button.secondary:hover:not(:disabled) { background: var(--surface-subtle); border-color: var(--accent); }
+button:disabled { opacity: 1; background: var(--disabled-surface); color: var(--disabled-ink); border-color: var(--line); }
+input, textarea, select { background: var(--input); border-color: var(--control-border); border-radius: 7px; }
+input:hover:not(:disabled), textarea:hover:not(:disabled), select:hover:not(:disabled) { border-color: var(--accent); }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
+input:disabled, textarea:disabled, select:disabled { background: var(--disabled-surface); color: var(--disabled-ink); opacity: 1; cursor: not-allowed; border-color: var(--line); }
+input:user-invalid, textarea:user-invalid, select:user-invalid, [aria-invalid="true"] { border-color: var(--error-ink); border-width: 2px; }
+option { color: var(--ink); background: var(--input); }
+input:autofill { box-shadow: 0 0 0 1000px var(--input) inset; -webkit-text-fill-color: var(--ink); caret-color: var(--ink); }
+input[type="checkbox"] { accent-color: var(--accent); }
+:focus-visible, #review-heading:focus { outline: 3px solid var(--focus); outline-offset: 3px; }
+.header-actions { margin-left: auto; display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
+.account { display: flex; align-items: center; margin-left: 0; }
+button.theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; padding: .5rem .75rem; font-size: .8rem; }
+.theme-toggle svg { flex: 0 0 auto; }
+.theme-toggle[aria-pressed="true"] { background: var(--wash); border-color: var(--accent); color: var(--accent); }
+.page-heading { margin-bottom: 2.75rem; }
+.section-heading { padding-top: 1.75rem; }
+.section-heading > span { font-variant-numeric: tabular-nums; }
+.form-panel > p { max-width: 38rem; }
+.hint { font-size: .85rem; line-height: 1.55; }
+.noc-details summary { min-height: 44px; display: list-item; align-content: center; }
+.form-actions { padding-top: .25rem; }
+.inbox { border-top-width: 1px; }
+.inbox-note { line-height: 1.6; }
+.notice { color: var(--ink); border-radius: 0 8px 8px 0; }
+.notice.success { color: var(--success-ink); background: var(--success-wash); border-color: var(--success-ink); }
+.notice.warning { color: var(--warning-ink); background: var(--warning-wash); border-color: var(--warning-ink); }
+.notice.error a { color: inherit; }
+.changes { background: var(--surface-subtle); border-radius: 10px; }
+.review { background: var(--surface-elevated); border: 1px solid var(--control-border); border-top: 3px solid var(--accent); border-radius: 10px; box-shadow: var(--shadow); }
+.review:last-child { margin-bottom: 0; }
+.review .comparison-head { color: var(--muted); }
+.comparison-row.changed { border-left: 3px solid var(--accent); padding-left: .7rem; }
+.hours-chat { border-top-width: 1px; }
+.hours-chat > .hint { font-size: .82rem; }
+.workspace-grid { margin-bottom: 3rem; }
+.sign-in { max-width: 27rem; }
+code { overflow-wrap: anywhere; }
+@media (max-width: 520px) {
+  .header-actions { gap: .6rem; }
+  .header-note { display: none; }
+  .site-header { min-height: 76px; }
+  .page-heading { margin-bottom: 2rem; }
+  .account { max-width: 5rem; }
+}
+@media (forced-colors: active) {
+  button, button.secondary, input, textarea, select { border-color: ButtonText; }
+  button:disabled { color: GrayText; border-color: GrayText; }
+  .comparison-row.changed { border-left-color: Highlight; }
+  :focus-visible, #review-heading:focus { outline-color: Highlight; }
+}
+@media (max-width: 360px) {
+  button.theme-toggle { width: 44px; padding-inline: 0; }
+  .theme-toggle span { display: none; }
+}
+.clarification-actions { display: flex; flex-wrap: wrap; gap: .65rem; }
+.clarification-actions button { white-space: normal; text-align: left; }
+
+/* Motion belongs to a deliberate step, never to background refreshes. */
+#review-heading, #hours-clarification-heading, #workspace-feedback,
+#workspace-error, #changes-heading, #chat-heading { scroll-margin-top: 1.5rem; }
+.clarification { padding: 1.35rem 1.5rem; margin-block: 1.5rem; }
+.clarification h3 { font-size: 1.15rem; line-height: 1.45; max-width: 36rem; }
+.clarification > p:not(.eyebrow) { max-width: 40rem; font-size: .9rem; }
+.clarification-actions { gap: .75rem; margin-top: 1.25rem; }
+.clarification-actions button { padding-block: .8rem; line-height: 1.45; }
+.work-progress { font-size: .85rem; color: var(--muted); margin: 1rem 0 0; }
+.review .actions { border-top: 1px solid var(--line); padding-top: 1.25rem; }
+@media (prefers-reduced-motion: no-preference) {
+  button, input, textarea, select { transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; }
+  .clarification, .review { animation: step-appear 160ms ease-out; }
+  @keyframes step-appear { from { opacity: .65; } to { opacity: 1; } }
+}
+@media (max-width: 520px) {
+  .clarification { padding: 1rem; }
+  .clarification-actions { flex-direction: column; align-items: stretch; }
+  .review .actions > button { width: 100%; white-space: normal; }
+}
