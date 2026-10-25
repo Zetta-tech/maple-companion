@@ -1,35 +1,35 @@
 /* Original Build North character, adapted to the existing dashboard slot. */
 .maple-companion {
-  /* Sage body, forest leaves and the existing Maple accent in the soft cheek tint. */
-  --companion-body-light:#d6e2d6;
-  --companion-body-mid:#aac2ac;
-  --companion-body-shade:#7e9f86;
-  --companion-body-deep:#426652;
+  /* Warm coral body, burgundy depth and restrained sage leaves. */
+  --companion-body-light:#f3c9b9;
+  --companion-body-mid:#df9587;
+  --companion-body-shade:#bb6a69;
+  --companion-body-deep:#79434f;
   --companion-leaf-light:#a7c7ac;
   --companion-leaf-mid:#6e9777;
   --companion-leaf-deep:#35583e;
-  --companion-face:#1b2923;
-  --companion-eye-shade:#35483d;
-  --companion-highlight:#e9f1e4;
+  --companion-face:#30252b;
+  --companion-eye-shade:#47404a;
+  --companion-highlight:#ffeadb;
   --companion-vein:#d4e2d2;
-  --companion-edge:#3f614c;
-  --companion-brow:#395343;
-  --companion-limb:#7e9f86;
-  --companion-ground:#36523e;
+  --companion-edge:#754852;
+  --companion-brow:#66434c;
+  --companion-limb:#c68074;
+  --companion-ground:#754852;
   width:100%; display:grid; grid-template-rows:minmax(0,1fr) auto; color:var(--muted);
 }
 :root[data-theme="dark"] .maple-companion {
-  --companion-body-light:#d7e5d9;
-  --companion-body-mid:#adc7b3;
-  --companion-body-shade:#80a68b;
-  --companion-body-deep:#4c7159;
+  --companion-body-light:#f5d1c1;
+  --companion-body-mid:#e4a095;
+  --companion-body-shade:#c77d7b;
+  --companion-body-deep:#8e505d;
   --companion-leaf-light:#b3cfb7;
   --companion-leaf-mid:#7da586;
   --companion-leaf-deep:#42694c;
-  --companion-highlight:#eaf4e9;
+  --companion-highlight:#fff0e6;
   --companion-vein:#dfebdc;
-  --companion-limb:#88ad93;
-  --companion-ground:#b3c9b5;
+  --companion-limb:#d18e83;
+  --companion-ground:#cda7a4;
 }
 .maple-companion-art { width:100%; height:auto; display:block; overflow:visible; }
 .companion-ground { fill:var(--companion-ground); opacity:.12; transform-origin:120px 204px; }
