@@ -15,6 +15,7 @@ import { NotificationCenter, type WorkspaceNotification } from './NotificationCe
 import { useFlowNavigation } from './useFlowNavigation.js';
 import { WorkspaceNavigation } from './WorkspaceNavigation.js';
 import { LoginExperience } from './LoginExperience.js';
+import { DashboardOverview, type GuideOverviewState } from './DashboardOverview.js';
 
 type Snapshot = { revision: number; employment: Employment | null };
 type Proposal = {
@@ -130,6 +131,7 @@ function Workspace() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [journeyAvailable, setJourneyAvailable] = useState(false);
+  const [guideState, setGuideState] = useState<GuideOverviewState>('checking');
   const [notificationStatus, setNotificationStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [loading, setLoading] = useState(true);
   const [activity, setActivity] = useState<'refresh' | 'propose' | 'confirm' | 'reject' | 'reconcile' | null>(null);
@@ -290,11 +292,12 @@ function Workspace() {
   }, [request]);
 
   return <Shell account={<div className="account"><UserButton /></div>} updates={<NotificationCenter notifications={notifications} status={notificationStatus} />}>
-    <div className="page-heading workspace-heading"><h1 className="visually-hidden">Your next steps.</h1><WorkspaceNavigation discoveries={journeyAvailable} /></div>
+    <div className="dashboard-layout"><aside className="dashboard-sidebar"><p className="dashboard-sidebar-label">Workspace</p><WorkspaceNavigation discoveries={journeyAvailable} /><p className="dashboard-sidebar-note">Your information.<br />Your decisions.<br />Evidence you can inspect.</p></aside><div className="dashboard-content">
+    <DashboardOverview employment={snapshot?.employment ?? null} available={snapshot !== null} loading={loading} held={assessmentHold} pending={unresolved.length} discoveries={journeyAvailable} guideState={guideState} />
     {error && <div id="workspace-error" tabIndex={-1} className="notice error" role="alert">{error}</div>}
     {message && <div id="workspace-feedback" tabIndex={-1} className="notice" role="status">{message}</div>}
 
-    <GuideWorkspace request={request} employment={snapshot?.employment ?? null} employmentRevision={snapshot?.revision ?? null} blocked={assessmentHold} refreshKey={memoryEpoch} onAvailabilityChange={setJourneyAvailable} />
+    <GuideWorkspace request={request} employment={snapshot?.employment ?? null} employmentRevision={snapshot?.revision ?? null} blocked={assessmentHold} refreshKey={memoryEpoch} onAvailabilityChange={setJourneyAvailable} onOverviewChange={setGuideState} />
     <div id="profile-workspace" className="profile-workspace">
     <NativeMemoryPanel request={request} onChanged={() => setMemoryEpoch(value => value + 1)} onAssessmentHold={updateAssessmentHold} />
     {review?.chat && review.newValue?.hoursPerWeek !== null && <HoursReviewNote {...review.chat} oldHours={review.oldValue?.hoursPerWeek ?? null} newHours={review.newValue.hoursPerWeek} />}
@@ -310,6 +313,7 @@ function Workspace() {
     </div>
     <AssessmentPanel key={memoryEpoch} request={request} revision={snapshot?.revision ?? null} onAssessed={refreshNotifications} blocked={assessmentHold} />
     </div>
+    </div></div>
   </Shell>;
 }
 

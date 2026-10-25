@@ -6,7 +6,8 @@ import { businessDate } from '../shared/business-date.js';
 import { guideQuestionSchema } from '../shared/guide-request.js';
 import { DemoJourneyPanel, JourneyCard } from './DemoJourneyPanel.js';
 import { CrsEvidenceEditor } from './CrsEvidenceEditor.js';
-import { splitJourney } from './journey-presentation.js';
+import { isJourneyStale, splitJourney } from './journey-presentation.js';
+import type { GuideOverviewState } from './DashboardOverview.js';
 import { watchAssessmentRefresh } from './assessment-refresh.js';
 import { guidePendingAfterFailure, RequestError } from './request.js';
 import { useFlowNavigation } from './useFlowNavigation.js';
@@ -15,7 +16,7 @@ import { ReviewEmploymentLink } from './ReviewEmploymentLink.js';
 
 type Request = <T>(path: string, body?: unknown) => Promise<T>;
 type Proposal = { id: string; status: string; profile: PersonalProfile | null; baseRevision: number };
-type Props = { request: Request; employment: Employment | null; employmentRevision: number | null; blocked: boolean; refreshKey: number; onAvailabilityChange: (available: boolean) => void };
+type Props = { request: Request; employment: Employment | null; employmentRevision: number | null; blocked: boolean; refreshKey: number; onAvailabilityChange: (available: boolean) => void; onOverviewChange?: (state: GuideOverviewState) => void };
 
 export function GuideWorkspace(props: Props) {
   const [mode, setMode] = useState<'loading' | 'personal' | 'demo' | 'error'>('loading');
@@ -30,7 +31,8 @@ export function GuideWorkspace(props: Props) {
     return () => { active = false; };
   }, [props.request, attempt]);
   useEffect(() => { if (mode !== 'demo') props.onAvailabilityChange(true); }, [mode, props.onAvailabilityChange]);
-  if (mode === 'demo') return <DemoJourneyPanel request={props.request} onAvailabilityChange={props.onAvailabilityChange} />;
+  useEffect(() => { if (mode === 'loading' || mode === 'error') props.onOverviewChange?.(mode === 'loading' ? 'checking' : 'unavailable'); }, [mode, props.onOverviewChange]);
+  if (mode === 'demo') return <DemoJourneyPanel request={props.request} onAvailabilityChange={props.onAvailabilityChange} onOverviewChange={props.onOverviewChange} />;
   if (mode === 'loading') return <section id="journey" className="demo-journey"><p role="status">Checking your Guide…</p></section>;
   if (mode === 'error') return <section id="journey" className="demo-journey"><h2>Your Guide could not be checked</h2><p role="alert">Your saved discoveries are unavailable right now.</p><button className="secondary" onClick={() => setAttempt(value => value + 1)}>Check again</button></section>;
   return <PersonalGuidePanel {...props} />;
@@ -60,7 +62,7 @@ export function GuideReviewNotice({ disabled, onReview }: { disabled: boolean; o
   return <div className="notice"><p>Your information changed. Review your Guide details for a current result.</p><button id="guide-review-details" className="secondary" type="button" disabled={disabled} aria-controls="personal-guide-tools personal-guide-editor" onClick={onReview}>Review Guide details</button></div>;
 }
 
-export function PersonalGuidePanel({ request, employment, employmentRevision, blocked, refreshKey }: Props) {
+export function PersonalGuidePanel({ request, employment, employmentRevision, blocked, refreshKey, onOverviewChange }: Props) {
   const [snapshot, setSnapshot] = useState<PersonalGuideSnapshot | null>(null);
   const [draft, setDraft] = useState<PersonalIntake | null>(null);
   const [events, setEvents] = useState<JourneyEvent[]>([]);
@@ -117,6 +119,9 @@ export function PersonalGuidePanel({ request, employment, employmentRevision, bl
   const canReview = !!employment && employmentRevision !== null && employmentRevision > 0 && !!snapshot && !loading && !busy && !blocked && !operationPending;
   const currentInputs = !!snapshot?.verified && !snapshot.reviewRequired && !historyNeedsReview && snapshot.employmentRevision === employmentRevision && !blocked && !loading;
   const canResearch = currentInputs && !!snapshot?.profile && !busy && !operationPending;
+  const overviewState: GuideOverviewState = loading ? 'checking' : pendingRequest || unresolved.some(item => item.status !== 'pending') || events.some(event => ['processing', 'uncertain'].includes(event.status)) ? 'pending' : !snapshot || error || splitJourney(events).current.some(event => event.status === 'not_sent') ? 'unavailable'
+    : unresolved.length || !currentInputs || !snapshot.profile || splitJourney(events).current.some(event => isJourneyStale(event, snapshot.revision, date)) ? 'review' : events.length ? 'saved' : 'empty';
+  useEffect(() => onOverviewChange?.(overviewState), [onOverviewChange, overviewState]);
   function reviewDetails() {
     if (!draft || !toolsDisclosure.current || !intakeDisclosure.current) return;
     const navigation = beginNavigation();
@@ -164,7 +169,7 @@ export function PersonalGuidePanel({ request, employment, employmentRevision, bl
   const { current, history } = splitJourney(events);
   const update = <K extends keyof PersonalIntake>(key: K, value: PersonalIntake[K]) => setDraft(current => current ? { ...current, [key]: value } : current);
   return <section className="demo-journey personal-guide" id="journey" aria-labelledby="journey-title">
-    <div className="journey-intro"><div><h2 id="journey-title" tabIndex={-1}>What matters for you</h2><p className="journey-profile-label">{snapshot?.profile ? 'Based on your reviewed information' : 'Your work options, with the evidence behind them'}</p></div><button className="secondary" disabled={loading || busy} onClick={() => void act(() => refresh(), 'journey-title')}>Refresh</button></div>
+    <div className="journey-intro"><div><h2 id="journey-title" tabIndex={-1}>Your discoveries</h2><p className="journey-profile-label">{snapshot?.profile ? 'Based on your reviewed information' : 'Your work options, with the evidence behind them'}</p></div><button className="secondary" disabled={loading || busy} onClick={() => void act(() => refresh(), 'journey-title')}>Refresh</button></div>
     {error && <p className="notice error" role="alert" id="guide-error" tabIndex={-1}>{error}</p>}
     {notice && <p className="notice" role="status" id="guide-feedback" tabIndex={-1}>{notice}</p>}
     {blocked ? <p className="notice" role="status">Your information is being checked. Review it after the update finishes before relying on a discovery.</p> : snapshot?.reviewRequired || historyNeedsReview && !loading ? <GuideReviewNotice disabled={!draft || loading || busy} onReview={reviewDetails} /> : null}

@@ -8,6 +8,7 @@ import {CrsBreakdown} from './CrsBreakdown.js';
 import { findingHeading, findingLabel, findingReason, isJourneyStale, splitJourney } from './journey-presentation.js';
 import { useFlowNavigation } from './useFlowNavigation.js';
 import { GuideSaveActions } from './GuideSaveActions.js';
+import type { GuideOverviewState } from './DashboardOverview.js';
 import { ScoreImpact } from './ScoreImpact.js';
 import { DiscoveryEvidence } from './DiscoveryEvidence.js';
 import './DemoJourneyPanel.css';
@@ -50,7 +51,7 @@ export function JourneyCard({ event, revision, date = businessDate(new Date()), 
   </article>;
 }
 const answerFields:ReadonlyArray<[keyof DemoProfile,string]>=[['currentStatusValid','Current immigration status is valid'],['canadianOffer','Canadian employment offer exists'],['reciprocalProgramReported','HR reports reciprocal opportunities abroad for Canadians or permanent residents'],['employerPortalOffer','Employer Portal offer is already submitted'],['spouseAccompanying','Spouse is accompanying'],['physicallyCanada','Work was physically in Canada throughout'],['authorizedWork','Work was authorized throughout'],['paidEmployee','Paid employee throughout'],['fullTimeStudy','Any full-time study during this work'],['selfEmployed','Any self-employment during this work']];
-export function DemoJourneyPanel({request,onAvailabilityChange}:{request:Request;onAvailabilityChange?:(available:boolean)=>void}) {
+export function DemoJourneyPanel({request,onAvailabilityChange,onOverviewChange}:{request:Request;onAvailabilityChange?:(available:boolean)=>void;onOverviewChange?:(state:GuideOverviewState)=>void}) {
   const [available,setAvailable]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
   const [snapshot,setSnapshot]=useState<DemoSnapshot|null>(null),[draft,setDraft]=useState<DemoProfile|null>(null),[pending,setPending]=useState<Proposal[]>([]),[events,setEvents]=useState<JourneyEvent[]>([]);
   const [loading,setLoading]=useState(true);
@@ -59,6 +60,8 @@ export function DemoJourneyPanel({request,onAvailabilityChange}:{request:Request
   const [question,setQuestion]=useState('My spouse and I want to keep working in Canada as our permits approach expiry. What should we investigate with my employer?');
   const [requestPending,setRequestPending]=useState<string|null>(null);
   const [date,setDate]=useState(()=>businessDate(new Date()));
+  const overviewState:GuideOverviewState=loading?'checking':requestPending||events.some(event=>['processing','uncertain'].includes(event.status))?'pending':pending.length?'review':error||!snapshot?.verified||splitJourney(events).current.some(event=>event.status==='not_sent')?'unavailable':!snapshot.profile||splitJourney(events).current.some(event=>isJourneyStale(event,snapshot.revision,date))?'review':events.length?'saved':'empty';
+  useEffect(()=>onOverviewChange?.(overviewState),[onOverviewChange,overviewState]);
   useEffect(()=>watchAssessmentRefresh(()=>setDate(businessDate(new Date())),window,document),[]);
   const refresh=useCallback(async(reset=false)=>{
     const status=await request<{available:boolean}>('/api/demo/status');setAvailable(status.available);if(!status.available)return;
