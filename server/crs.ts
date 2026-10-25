@@ -1,6 +1,7 @@
 import {CRS_POLICY_VERSION,crsEvidenceSchema,educationLevels,type CrsCalculation,type CrsLine,type EducationEvidence,type LanguageEvidence,type WorkInterval} from '../shared/crs.js';
-import type {DemoProfile} from '../shared/demo.js';
+import type {CompleteGuideProfile} from '../shared/personal-guide.js';
 import {occupationTier} from './crs-occupation-tiers.js';
+import {workIntervalEnd} from '../shared/work-interval.js';
 
 export const crsPolicyVersion=CRS_POLICY_VERSION;
 const abilities=['reading','writing','listening','speaking'] as const;
@@ -8,7 +9,6 @@ const sum=(rows:CrsLine[])=>rows.reduce((n,row)=>n+row.points,0);
 const line=(id:string,label:string,points:number):CrsLine=>({id,label,points});
 const years=(from:string,to:string)=>Number(to.slice(0,4))-Number(from.slice(0,4))-(to.slice(5)<from.slice(5)?1:0);
 const days=(from:string,to:string)=>(Date.parse(to+'T00:00:00Z')-Date.parse(from+'T00:00:00Z'))/86_400_000;
-const nextDay=(date:string)=>new Date(Date.parse(date+'T00:00:00Z')+86_400_000).toISOString().slice(0,10);
 function intervalYears(w:WorkInterval,label:string,asOf:string,issues:string[],cap:number):number {
   if(w.status==='unknown'||w.eligibilityReviewed!=='yes'){issues.push(`${label}: review eligibility and whether any qualifying interval exists.`);return 0;}
   if(w.status==='none'){
@@ -18,7 +18,7 @@ function intervalYears(w:WorkInterval,label:string,asOf:string,issues:string[],c
   if(!w.start||!w.noc||!w.weeklyHours||!/[0-3]/.test(w.noc[1]!)){issues.push(`${label}: provide one reviewed skilled NOC, start date and weekly hours.`);return 0;}
   const windowStart=String(Number(asOf.slice(0,4))-10)+asOf.slice(4);
   if(w.start>asOf||w.end&&w.end>asOf||w.end&&w.end<w.start||w.start.slice(5)==='02-29'||w.start<windowStart){issues.push(`${label}: review dates within the ten-year window; complex or boundary history is not supported.`);return 0;}
-  const through=w.end?nextDay(w.end):asOf;
+  const through=workIntervalEnd(w.end,asOf);
   return Math.max(0,Math.min(cap,years(w.start,through),Math.floor(Math.floor(days(w.start,through)/7)*Math.min(30,w.weeklyHours)/1560)));
 }
 
@@ -56,7 +56,7 @@ function language(e:LanguageEvidence,name:'english'|'french',label:string,asOf:s
   return abilities.map(a=>e[a]??0);
 }
 
-export function calculateCrs(profile:DemoProfile,asOf:string):CrsCalculation {
+export function calculateCrs(profile:CompleteGuideProfile,asOf:string):CrsCalculation {
   const parsed=crsEvidenceSchema.safeParse(profile.crsEvidence);
   if(!parsed.success)return {status:'needs_information',reasons:['Complete the optional CRS evidence section before requesting a total score.']};
   const e=parsed.data,issues:string[]=[];
@@ -95,7 +95,7 @@ export function calculateCrs(profile:DemoProfile,asOf:string):CrsCalculation {
   if(e.canadianEducation!=='none'&&e.canadianEducation!=='unknown'&&educationRank<2)issues.push('Canadian post-secondary study conflicts with the recorded highest education level.');
   if(e.canadianEducation==='three_year_or_eligible_graduate'&&educationRank<4)issues.push('The 30-point Canadian-study category conflicts with the recorded credential level.');
   if(e.offer.status==='unknown'||e.offer.novemberRulesReviewed!=='yes')issues.push('Review the qualifying-offer alternative under the November 3 rules.');
-  if(e.offer.status==='none'&&(e.offer.noc!==null||profile.qualifyingExpressEntryOffer!=='none_reviewed'))issues.push('The CRS no-offer answer conflicts with the demo offer assessment.');
+  if(e.offer.status==='none'&&(e.offer.noc!==null||profile.qualifyingExpressEntryOffer!=='none_reviewed'))issues.push('The CRS no-offer answer conflicts with the reviewed offer assessment.');
   if(e.offer.status==='qualifying'&&(!e.offer.noc||e.offer.genuineOfferEvidenceReviewed!=='yes'||profile.qualifyingExpressEntryOffer!=='reviewed_offer'))issues.push('Confirm the genuine qualifying offer, its reviewed NOC and matching offer assessment.');
   if(e.offer.status==='qualifying'&&profile.canadianOffer!=='yes')issues.push('The qualifying-offer claim conflicts with an absent or unconfirmed Canadian employment offer. Reconcile the offer answers before calculating a total.');
 
@@ -139,5 +139,5 @@ export function calculateCrs(profile:DemoProfile,asOf:string):CrsCalculation {
   if(issues.length)return {status:'needs_information',reasons:[...new Set(issues)]};
   return {status:'complete',asOf,policyVersion:crsPolicyVersion,effectiveFrom:'2026-11-03',projected:asOf<'2026-11-03',before,after,delta:after-before,core,spouse,transferability,additional,totals,
     labourMarket:{workDuration,highWageBonus,workAlternative,offerAlternative,selected,selectedAlternative:workAlternative===offerAlternative?'tie':workAlternative>offerAlternative?'work':'offer'},
-    assumptions:['Fictional, manually reviewed scoring evidence for this date; documents were not independently authenticated.','One consistent interval per work category, one foreign NOC, no overlapping foreign/Canadian work; eligibility was explicitly reviewed.','Both policy versions use identical facts and date; no future birthdays, work anniversaries or new facts are assumed.','The calculation is not an Express Entry eligibility decision, invitation forecast or officer-approved score.']};
+    assumptions:[(profile.fictional?'Fictional, manually reviewed':'Manually reviewed')+' scoring evidence for this date; documents were not independently authenticated.','One consistent interval per work category, one foreign NOC, no overlapping foreign/Canadian work; eligibility was explicitly reviewed.','Both policy versions use identical facts and date; no future birthdays, work anniversaries or new facts are assumed.','The calculation is not an Express Entry eligibility decision, invitation forecast or officer-approved score.']};
 }

@@ -101,6 +101,14 @@ export class SurrealJournal implements JournalStore {
   async active(owner: string): Promise<boolean> {
     return (await this.rows('operations', owner, " AND status IN ['applying', 'uncertain'] LIMIT 1")).length > 0;
   }
+  async assessmentFence(owner: string): Promise<Head & { active: boolean }> {
+    this.checkOwner(owner);
+    // One statement snapshot, rather than separately awaited head/active reads.
+    const value = await this.query<{ heads: { revision: number; receipt_json: string | null }[]; active: boolean }>(
+      "RETURN { heads: (SELECT revision, receipt_json FROM maple_heads WHERE owner = $owner AND key = $owner LIMIT 1), active: array::len((SELECT key FROM maple_operations WHERE owner = $owner AND status IN ['applying','uncertain'] LIMIT 1)) > 0 };", { owner });
+    const head = value.heads[0];
+    return { revision: head?.revision ?? 0, receipt: head?.receipt_json ? JSON.parse(head.receipt_json) : null, active: value.active };
+  }
   async get(owner: string, id: string): Promise<Operation> {
     const row = await this.row<Row>('operations', owner, id);
     if (!row) throw notFound('PROPOSAL_NOT_FOUND', 'This change was not found.');

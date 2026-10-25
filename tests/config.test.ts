@@ -7,6 +7,28 @@ const env = { APP_ORIGIN: 'http://localhost:3000', CLERK_PUBLISHABLE_KEY: 'pk_te
   MAPLE_AM_BINDINGS_FILE: 'test-bindings', MAPLE_JOURNAL_PATH: '.local/test-operations.sqlite',
   AM_A_READ_KEY: 'fixture-read-only', AM_A_WRITE_KEY: 'fixture-write-only' };
 describe('fail-closed configuration', () => {
+  const productionBinding = { ...binding, nativePrincipalId: 'reviewedPrincipal', nativeScope: 'maple/conversation' };
+  const productionEnv = { ...env, NODE_ENV: 'production', APP_ORIGIN: 'https://maple.example.test',
+    CLERK_PUBLISHABLE_KEY: 'pk_live_fixture', CLERK_SECRET_KEY: 'sk_live_fixture', MAPLE_AM_ACCESS_MODE: 'single-owner-production',
+    MAPLE_AM_BINDINGS_FILE: undefined, MAPLE_AM_BINDINGS_JSON: JSON.stringify([productionBinding]) };
+  it('accepts one explicit production owner with live auth and env-referenced bindings without filesystem config', () => {
+    const config = loadConfig(productionEnv, () => { throw Error('Must not read a file'); });
+    expect(config.amAccessMode).toBe('single-owner-production');
+    expect(bindingFor(config, 'user_A').nativePrincipalId).toBe('reviewedPrincipal');
+    expect(() => bindingFor(config, 'user_B')).toThrow('not configured');
+  });
+  it.each([
+    { NODE_ENV: 'development' }, { APP_ORIGIN: 'http://localhost:3000' }, { APP_ORIGIN: 'https://localhost' },
+    { CLERK_PUBLISHABLE_KEY: 'pk_test_fixture', CLERK_SECRET_KEY: 'sk_test_fixture' },
+  ])('rejects production mode with development auth or an unsafe origin %#', change => {
+    expect(() => loadConfig({ ...productionEnv, ...change })).toThrow('requires a fixed HTTPS origin');
+  });
+  it('does not silently extend the development full-key exception or choose between two binding sources', () => {
+    expect(() => loadConfig({ ...productionEnv, AM_A_WRITE_KEY: env.AM_A_READ_KEY })).toThrow('invalid');
+    expect(() => loadConfig({ ...productionEnv, MAPLE_AM_BINDINGS_FILE: 'another-binding' })).toThrow('invalid');
+    expect(() => loadConfig({ ...productionEnv, MAPLE_AM_BINDINGS_JSON: JSON.stringify([binding]) })).toThrow('invalid');
+    expect(() => loadConfig({ ...productionEnv, MAPLE_AM_BINDINGS_JSON: JSON.stringify([productionBinding, { ...productionBinding, ownerId: 'user_B' }]) })).toThrow('invalid');
+  });
   const developmentBinding = { ...binding };
   const developmentEnv = { ...env, NODE_ENV: 'development', MAPLE_AM_ACCESS_MODE: 'single-user-development',
     AM_A_READ_KEY: 'fixture-full-access-key', AM_A_WRITE_KEY: 'fixture-full-access-key' };

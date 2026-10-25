@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { NATIVE_MESSAGE_MAX_LENGTH, nativeMessageTextSchema, nativeStatusText, type NativeMessageResult, type NativeProfile } from '../shared/native-chat.js';
 import { nativePendingAfterFailure } from './request.js';
+import { NativeAssessmentGate, sendWithAssessmentHold } from './native-assessment-gate.js';
 import './NativeMemoryPanel.css';
 
 const statusHeading = {
@@ -43,39 +44,45 @@ export function NativeMemoryView({ profile, history, loading = false }: {
   </div>;
 }
 
-export function NativeMemoryPanel({ request, onChanged }: {
-  request: <T>(path: string, body?: unknown) => Promise<T>; onChanged: () => void;
+const noAssessmentHold = (_held: boolean) => {};
+export function NativeMemoryPanel({ request, onChanged, onAssessmentHold = noAssessmentHold }: {
+  request: <T>(path: string, body?: unknown) => Promise<T>; onChanged: () => void; onAssessmentHold?: (held: boolean) => void;
 }) {
+  const assessmentGate = useMemo(() => new NativeAssessmentGate(onAssessmentHold), [onAssessmentHold]);
   const [available, setAvailable] = useState(false);
   const [profile, setProfile] = useState<NativeProfile | null>(null);
   const [history, setHistory] = useState<NativeMessageResult[]>([]);
   const [message, setMessage] = useState('');
   const [synthetic, setSynthetic] = useState(false);
+  const [syntheticOnly, setSyntheticOnly] = useState(true);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const [notSent, setNotSent] = useState(false);
   const [requestId, setRequestId] = useState<string | null>(null);
   async function refresh() {
+    assessmentGate.checking();
     setBusy(true); setError(''); setNotSent(false); setProfile(null);
     try {
-      const status = await request<{ available: boolean; history: NativeMessageResult[] }>('/api/native/status');
-      setAvailable(status.available); setHistory(status.history);
+      const status = await request<{ available: boolean; history: NativeMessageResult[]; syntheticOnly?: boolean }>('/api/native/status');
+      setAvailable(status.available); setHistory(status.history); setSyntheticOnly(status.syntheticOnly !== false);
+      assessmentGate.refresh(status.history);
       if (requestId && status.history.some(item => item.requestId === requestId && item.status !== 'processing')) { setRequestId(null); setMessage(''); }
       if (status.available) setProfile(await request<NativeProfile>('/api/native/profile'));
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Current memory could not be verified.'); }
     finally { setBusy(false); }
   }
-  useEffect(() => { void refresh(); }, [request]);
+  useEffect(() => { void refresh(); }, [request, assessmentGate]);
   async function send(event: FormEvent) {
     event.preventDefault();
-    if (!synthetic || !message.trim() || busy || !available || requestId) return;
+    if ((syntheticOnly && !synthetic) || !message.trim() || busy || !available || requestId) return;
     if (!nativeMessageTextSchema.safeParse(message).success) {
       setNotSent(true); setError('Keep each update to 5,000 characters or fewer. Shorten it and send it again.'); return;
     }
     const id = crypto.randomUUID();
     setRequestId(id); setBusy(true); setError(''); setNotSent(false); setProfile(null);
     try {
-      const result = await request<NativeMessageResult>('/api/native/messages', { requestId: id, message, syntheticTest: true });
+      const result = await sendWithAssessmentHold(assessmentGate, id,
+        () => request<NativeMessageResult>('/api/native/messages', { requestId: id, message, syntheticTest: syntheticOnly }));
       setHistory(current => [result, ...current.filter(item => item.requestId !== id)]);
       setRequestId(null); setMessage(''); onChanged();
       setProfile(await request<NativeProfile>('/api/native/profile'));
@@ -104,13 +111,13 @@ export function NativeMemoryPanel({ request, onChanged }: {
     <NativeMemoryView profile={profile} history={history} loading={busy} />
     <form className="memory-composer" onSubmit={send}><h3>Share an update</h3>
       <p className="hint">Correct a detail or tell us what has changed, in your own words.</p>
-      <p className="memory-test-note">Test version: use fictional information only. Your messages may be stored.</p>
+      {syntheticOnly && <p className="memory-test-note">Test version: use fictional information only. Your messages may be stored.</p>}
       <fieldset disabled={!available || busy || unresolved || requestId !== null}>
       <legend className="visually-hidden">Update remembered information</legend>
       <label>What has changed?<textarea rows={3} maxLength={NATIVE_MESSAGE_MAX_LENGTH} aria-describedby="native-message-size" value={message} onChange={event => setMessage(event.target.value)} /></label>
       <p className="hint" id="native-message-size">Up to 5,000 characters per update.</p>
-      <label className="checkbox"><input type="checkbox" checked={synthetic} onChange={event => setSynthetic(event.target.checked)} /><span>This message contains fictional test information.</span></label>
-      <button type="submit" disabled={!synthetic || !message.trim() || busy}>{busy && requestId ? 'Sending…' : 'Send'}</button>
+      {syntheticOnly && <label className="checkbox"><input type="checkbox" checked={synthetic} onChange={event => setSynthetic(event.target.checked)} /><span>This message contains fictional test information.</span></label>}
+      <button type="submit" disabled={(syntheticOnly && !synthetic) || !message.trim() || busy}>{busy && requestId ? 'Sending…' : 'Send'}</button>
       <p className="hint">Sending stores your message. The assessment inputs below change only when you review and save them.</p>
     </fieldset><p className="hint memory-conversation-note">Conversational replies are not available yet.</p></form>
     </div>

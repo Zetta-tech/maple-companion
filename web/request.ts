@@ -1,7 +1,7 @@
-type ApiErrorBody = { error?: { code?: string; message?: string; nativeRequestState?: unknown } };
+type ApiErrorBody = { error?: { code?: string; message?: string; nativeRequestState?: unknown; guideRequestState?: unknown } };
 
 export class RequestError extends Error {
-  constructor(message: string, readonly code: string, readonly nativeRequestState?: 'not_started') { super(message); }
+  constructor(message: string, readonly code: string, readonly nativeRequestState?: 'not_started', readonly guideRequestState?: 'not_started') { super(message); }
 }
 
 export async function readResponse<T>(response: Response): Promise<T> {
@@ -11,7 +11,8 @@ export async function readResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const failure = body as ApiErrorBody;
     throw new RequestError(failure?.error?.message ?? 'The request could not be completed.', failure?.error?.code ?? 'REQUEST_FAILED',
-      failure?.error?.nativeRequestState === 'not_started' ? 'not_started' : undefined);
+      failure?.error?.nativeRequestState === 'not_started' ? 'not_started' : undefined,
+      failure?.error?.guideRequestState === 'not_started' ? 'not_started' : undefined);
   }
   return body as T;
 }
@@ -20,4 +21,8 @@ export async function readResponse<T>(response: Response): Promise<T> {
  * alone (including a proxy/provider 413 or 429) says nothing about side effects. */
 export function nativePendingAfterFailure(requestId: string | null, error: unknown): string | null {
   return error instanceof RequestError && error.nativeRequestState === 'not_started' ? null : requestId;
+}
+
+export function guidePendingAfterFailure(requestId: string | null, error: unknown): string | null {
+  return error instanceof RequestError && error.guideRequestState === 'not_started' ? null : requestId;
 }

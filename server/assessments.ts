@@ -39,8 +39,11 @@ export class Assessments {
       results: evaluatePolicy(selected, employment, date),
     };
     const stored = await this.journal.saveAssessment(owner, record);
-    // A network-backed save can cross Toronto midnight after the earlier check.
-    return this.view(stored, assessmentDate(this.now()) === date && await this.evidenceStillReviewed(owner) ? 'current' : 'stale');
+    // A delayed save response/callback can cross a confirmation or date boundary.
+    const reviewed = await this.evidenceStillReviewed(owner);
+    const fence = await this.journal.assessmentFence(owner);
+    return this.view(stored, reviewed && this.matchesFence(stored, fence)
+      && assessmentDate(this.now()) === date ? 'current' : 'stale');
   }
   async list(owner: string): Promise<AssessmentView[]> {
     return this.verify(owner, await this.journal.assessments(owner));
@@ -62,18 +65,21 @@ export class Assessments {
       currentRevision = snapshot.revision;
     }
     catch { return records.map(record => this.view(record, 'unverified')); }
-    const head = await this.journal.head(owner);
-    const active = await this.journal.active(owner);
     if (!await this.evidenceStillReviewed(owner)) return records.map(record => this.view(record, 'unverified'));
+    // Must follow the final callback, which itself can await a concurrent save.
+    const fence = await this.journal.assessmentFence(owner);
     date = assessmentDate(this.now());
     return records.map(record => {
       let currentPolicy = false;
       try { currentPolicy = this.policies.active(record.policy.id, date).digest === record.policy.digest; } catch { /* No approved current rule => stale. */ }
       const current = currentPolicy && record.assessmentDate === date && record.profileRevision === currentRevision
-        && head.revision === currentRevision && !active
-        && JSON.stringify(record.evidence) === JSON.stringify(head.receipt);
+        && this.matchesFence(record, fence);
       return this.view(record, current ? 'current' : 'stale');
     });
+  }
+  private matchesFence(record: AssessmentRecord, fence: Awaited<ReturnType<JournalStore['assessmentFence']>>) {
+    return !fence.active && fence.revision === record.profileRevision
+      && JSON.stringify(record.evidence) === JSON.stringify(fence.receipt);
   }
   private view(record: AssessmentRecord, freshness: AssessmentView['freshness']): AssessmentView {
     const { ownerId: _owner, evidence: _evidence, ...publicToOwner } = record;

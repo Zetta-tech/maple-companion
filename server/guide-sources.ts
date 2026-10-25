@@ -19,13 +19,17 @@ export function mainText(html: string): string {
   return main.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi,' ').replace(/<!--[^]*?-->/g,' ').replace(/<[^>]+>/g,' ')
     .replace(/&nbsp;|&#160;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#39;|&apos;/g,"'").replace(/&quot;/g,'"').replace(/\s+/g,' ').trim();
 }
-const sourceSchema = z.object({id:z.enum(['c20','c20_update','ee_changes','ee_tiers','crs_criteria','crs_language','crs_education']),title:z.string(),url:z.string(),text:z.string().min(100),bodySha256:z.string().regex(/^[a-f0-9]{64}$/),retrievedAt:z.iso.datetime(),reviewedAt:z.iso.datetime(),publishedAt:z.string().optional(),effectiveFrom:z.string().optional()});
+const sourceSchema = z.strictObject({id:z.enum(['c20','c20_update','ee_changes','ee_tiers','crs_criteria','crs_language','crs_education']),title:z.string(),url:z.string(),text:z.string().min(100),bodySha256:z.string().regex(/^[a-f0-9]{64}$/),retrievedAt:z.iso.datetime(),reviewedAt:z.iso.datetime(),publishedAt:z.string().optional(),effectiveFrom:z.string().optional()});
 export type ReviewedGuideSource = z.infer<typeof sourceSchema>;
+export function validateGuideSources(input:unknown){
+  const sources=z.array(sourceSchema).min(4).max(7).parse(input);
+  if(new Set(sources.map(s=>s.id)).size!==sources.length||['c20','c20_update','ee_changes','ee_tiers'].some(id=>!sources.some(s=>s.id===id))||sources.some(s=>s.url!==guideUrls[s.id]||sourceHash(s.text)!==s.bodySha256))throw new AppError(503,'SOURCE_BUNDLE_INVALID','The reviewed source bundle is invalid.');
+  return sources;
+}
 export class GuideSources {
   private sources: ReviewedGuideSource[];
-  constructor(file: string, private transport: typeof fetch = fetch) {
-    this.sources = z.array(sourceSchema).min(4).max(7).parse(JSON.parse(readFileSync(file,'utf8')));
-    if (new Set(this.sources.map(s=>s.id)).size !== this.sources.length || ['c20','c20_update','ee_changes','ee_tiers'].some(id=>!this.sources.some(s=>s.id===id)) || this.sources.some(s=>s.url !== guideUrls[s.id] || sourceHash(s.text)!==s.bodySha256)) throw new AppError(503,'SOURCE_BUNDLE_INVALID','The reviewed source bundle is invalid.');
+  constructor(fileOrRecords: string|ReviewedGuideSource[], private transport: typeof fetch = fetch) {
+    this.sources = validateGuideSources(typeof fileOrRecords==='string'?JSON.parse(readFileSync(fileOrRecords,'utf8')):fileOrRecords);
   }
   async retrieve(kind: 'c20'|'express_entry'|'express_entry_full'): Promise<{evidence:SourceEvidence[]; context:string}> {
     if(kind==='express_entry_full'&&['crs_criteria','crs_language','crs_education'].some(id=>!this.sources.some(s=>s.id===id)))throw new AppError(503,'CRS_SOURCES_REQUIRED','The complete CRS source bundle needs review before a total can be calculated.');

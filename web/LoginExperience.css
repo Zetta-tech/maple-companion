@@ -1,0 +1,92 @@
+/* The user's reference informs composition, while Maple supplies the palette. */
+main:has(.login-experience) { max-width:none; padding:0; min-height:0; }
+body:has(.login-experience)::before { display:none; }
+body:has(.login-experience) {
+  background:var(--paper);
+}
+.login-experience {
+  position:relative;
+  isolation:isolate;
+  overflow:clip;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  align-items:center;
+  min-height:calc(100svh - 10.25rem);
+  padding:3rem 0;
+}
+/* Post-ITA's 84px Maple-red grid, static with softly masked edges. */
+.login-experience::before,
+.login-form-region::after {
+  content:"";
+  position:absolute;
+  pointer-events:none;
+  z-index:-2;
+  background-image:linear-gradient(90deg,rgba(220,38,38,.095) 1px,transparent 1px),linear-gradient(180deg,rgba(220,38,38,.073) 1px,transparent 1px);
+  background-size:84px 84px;
+  mask-image:linear-gradient(90deg,transparent,#000 18%,#000 68%,transparent 100%),linear-gradient(180deg,transparent,#000 20%,#000 50%,transparent 100%);
+  mask-composite:intersect;
+}
+/* Use Maple's lighter dark-theme accent so the grid reads on charcoal
+ * without raising the background surface or competing with the form. */
+:root[data-theme="dark"] .login-experience::before,
+:root[data-theme="dark"] .login-form-region::after {
+  background-image:linear-gradient(90deg,color-mix(in srgb,var(--accent) 22%,transparent) 1px,transparent 1px),linear-gradient(180deg,color-mix(in srgb,var(--accent) 18%,transparent) 1px,transparent 1px);
+}
+.login-experience::before {
+  left:0;
+  top:0;
+  width:54%;
+  height:52%;
+}
+.login-form-region {
+  position:relative;
+  z-index:1;
+  grid-column:2;
+  justify-self:center;
+  width:min(22rem,calc(100% - 4rem));
+  max-width:100%;
+  margin:0;
+}
+.login-form-region>* { max-width:100%; }
+/* Anchor the mirrored accent below the actual form, including Clerk's
+ * verification/error content. Short screens simply leave less decoration. */
+.login-form-region::after {
+  top:calc(100% + 2rem);
+  right:calc(50% - 25vw);
+  width:54vw;
+  height:max(0px,calc((100svh - 10.25rem) / 2 - 50% - 2rem));
+  transform:rotate(180deg);
+}
+.login-leaf-window {
+  position:absolute;
+  left:0;
+  bottom:0;
+  width:46%;
+  max-width:44rem;
+  height:68%;
+  pointer-events:none;
+  z-index:-1;
+}
+.login-leaf {
+  position:absolute;
+  inset:0;
+  background:url('/images/login-maple-leaf.png') left bottom / contain no-repeat;
+  opacity:.32;
+  transform:translate(-12%,18%) rotate(-12deg) scale(1.2);
+  transform-origin:35% 85%;
+}
+:root[data-theme="dark"] .login-leaf { opacity:.22; }
+@media(max-width:900px) {
+  /* Keep the mobile accents in the space above and below the form. */
+  .login-experience::before { width:80%; height:3rem; background-position:0 1.5rem; }
+  .login-form-region::after { right:calc(50% - 50vw); width:80vw; height:8rem; }
+  .login-experience { display:block; min-height:max(38rem,calc(100svh - 10.25rem)); padding:3.5rem 1.5rem 14rem; }
+  .login-form-region { width:min(22rem,100%); margin-inline:auto; }
+  .login-leaf-window { width:70%; height:22rem; bottom:-5rem; }
+  .login-leaf { opacity:.18; }
+  :root[data-theme="dark"] .login-leaf { opacity:.16; }
+}
+@media(max-width:420px) {
+  .login-experience { padding:3rem 1.25rem 13rem; }
+  .login-leaf-window { width:88%; height:19rem; bottom:-4.5rem; }
+}

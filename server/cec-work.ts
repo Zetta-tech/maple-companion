@@ -1,6 +1,7 @@
 import { validateEmployment, type Employment } from '../shared/employment.js';
 import type { CecReason } from '../shared/cec-evidence.js';
 import type { PolicyCriterionResult } from '../shared/policy.js';
+import { workIntervalEnd } from '../shared/work-interval.js';
 
 type Outcome = Pick<PolicyCriterionResult, 'status' | 'scope' | 'reasonCodes'>;
 const result = (status: Outcome['status'], ...reasonCodes: CecReason[]): Outcome => ({ status, scope: 'recorded_work_interval', reasonCodes });
@@ -8,6 +9,16 @@ const day = (date: string) => Date.parse(date + 'T00:00:00Z');
 const iso = (date: Date) => date.toISOString().slice(0, 10);
 // Feb 29 rolls to March 1 in a non-leap year; never round an incomplete year up.
 const yearsFrom = (date: string, years: number) => iso(new Date(Date.UTC(Number(date.slice(0, 4)) + years, Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)))));
+
+/** Shared consistency check before either CEC or Guide trusts interval evidence. */
+export function hasConflictingWorkEvidence(employment: Employment): boolean {
+  const evidence = employment.cecWork;
+  if (!evidence) return false;
+  const disagrees = (a: string, b: string) => ['yes', 'no'].includes(a) && ['yes', 'no'].includes(b) && a !== b;
+  return disagrees(employment.paid, evidence.paid)
+    || disagrees(employment.authorizedToWork, evidence.authorizedTemporaryResident)
+    || employment.countryCode !== 'CA' && evidence.physicallyInCanada === 'yes';
+}
 
 /** Draft algorithm, reachable only through an explicitly reviewed/allowlisted policy.
  * No conversation context, current-hours assumption, NOC suggestion or full-program verdict.
@@ -19,9 +30,7 @@ export function evaluateCecWork(input: Employment | null, assessmentDate: string
   if (!evidence) return result('needs_information', 'interval_missing');
   if (evidence.singleIntervalComplete !== 'yes') return result('needs_information', 'history_needs_review');
   if (evidence.conditionsConsistent !== 'yes') return result('needs_information', 'conditions_unknown');
-  const disagrees = (a: string, b: string) => ['yes', 'no'].includes(a) && ['yes', 'no'].includes(b) && a !== b;
-  if (disagrees(employment.paid, evidence.paid) || disagrees(employment.authorizedToWork, evidence.authorizedTemporaryResident)
-    || (employment.countryCode !== 'CA' && evidence.physicallyInCanada === 'yes')) return result('needs_information', 'evidence_conflict');
+  if (hasConflictingWorkEvidence(employment)) return result('needs_information', 'evidence_conflict');
   if (evidence.ongoing && employment.hoursPerWeek !== null && evidence.hoursPerWeek !== null && employment.hoursPerWeek !== evidence.hoursPerWeek) return result('needs_information', 'current_hours_conflict');
   const unknown: CecReason[] = [], excluded: CecReason[] = [];
   const answer = (value: string, expected: 'yes' | 'no', missing: CecReason, failure: CecReason) => {
@@ -51,7 +60,7 @@ export function evaluateCecWork(input: Employment | null, assessmentDate: string
   const from = [evidence.startDate, yearsFrom(assessmentDate, -3)].sort().at(-1)!;
   // Closed interval includes its stated actual last day. Ongoing work excludes the
   // application day, because the basis is experience gained before applying today.
-  const until = evidence.ongoing ? assessmentDate : [iso(new Date(day(evidence.endDate!) + 86_400_000)), assessmentDate].sort()[0]!;
+  const until = workIntervalEnd(evidence.ongoing ? null : evidence.endDate, assessmentDate);
   if (until <= from) return result('not_met', 'outside_window');
   // The reviewed sources do not specify leap-day anniversary/clipping rules.
   // Hold potentially material edge cases rather than present our convention as law.

@@ -1,8 +1,31 @@
 import { describe,it,expect } from 'vitest';
 import { demoSeed } from '../shared/demo.js';
 import { discoverC20,projectExpressEntry } from '../server/discovery.js';
+import {completeGuideProfileSchema,type PersonalProfile} from '../shared/personal-guide.js';
+import {fictionalCrsEvidence} from '../shared/crs.js';
+import {fixtureSources} from './support/demo-fixture.js';
 const date='2026-10-25';
 describe('source-reviewed personalized discovery',()=>{
+  const personal:PersonalProfile={...demoSeed,fictional:false,name:null,permitExpiry:null,inputPurpose:'reviewed-assessment-inputs',employmentBasis:{revision:1,receiptDigest:'a'.repeat(64)},workEnd:null,currentJob:true,intervalComplete:true};
+  it.each([['arrivedInCanada','arrival in Canada'],['weeklyHours','weekly hours'],['noc','NOC code']] as const)('identifies missing %s without requiring optional personal details', (field,label)=>{
+    const result=projectExpressEntry({...personal,[field]:null},date,1,[]);
+    expect(result.status).toBe('needs_information');expect(result.outstanding.join(' ')).toContain(label);
+    expect(result.score).toBeUndefined();expect(result.crs).toBeUndefined();
+  });
+  it('retains demo-only required fields while allowing nullable personal non-scoring fields',()=>{
+    expect(completeGuideProfileSchema.safeParse(personal).success).toBe(true);
+    expect(projectExpressEntry(personal,date,1,[]).score?.before).toBe(46);
+    for(const field of ['name','permitExpiry'])expect(completeGuideProfileSchema.safeParse({...demoSeed,[field]:null}).success).toBe(false);
+  });
+  it('still withholds personal totals for unreviewed work or CRS evidence',async()=>{
+    const sources=(await fixtureSources.retrieve('express_entry_full')).evidence;
+    const profile={...personal,crsEvidence:fictionalCrsEvidence(date)};
+    expect(projectExpressEntry(profile,date,1,sources).crs?.status).toBe('needs_information');
+    profile.crsEvidence.completeEvidenceReviewed='yes';
+    const result=projectExpressEntry({...profile,intervalComplete:false},date,1,sources);
+    expect(result.status).toBe('needs_information');expect(result.crs).toBeUndefined();
+    expect(result.outstanding.join(' ')).toContain('qualifying work interval');
+  });
   it('surfaces C20 from the offer and reported reciprocal program, not employer branding',()=>{
     for(const employer of ['Northstar Fictional','Other Fictional Employer'])expect(discoverC20({...demoSeed,employer},date,1,[]).status).toBe('potential_pathway');
     const noProgram=discoverC20({...demoSeed,reciprocalProgramReported:'unknown'},date,1,[]);

@@ -63,6 +63,9 @@ export class Journal {
     return row ? { revision: row.revision, receipt: row.receipt_json ? JSON.parse(row.receipt_json) : null } : { revision: 0, receipt: null };
   }
   active(owner: string) { return !!this.db.prepare("SELECT 1 FROM operations WHERE owner=? AND status IN ('applying','uncertain')").get(owner); }
+  assessmentFence(owner: string): Head & { active: boolean } {
+    return this.transaction(() => ({ ...this.head(owner), active: this.active(owner) }));
+  }
   get(owner: string, id: string): Operation {
     const row = this.db.prepare('SELECT * FROM operations WHERE id=? AND owner=?').get(id, owner) as Row | undefined;
     if (!row) throw new AppError(404, 'PROPOSAL_NOT_FOUND', 'This change was not found.');

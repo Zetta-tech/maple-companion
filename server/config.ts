@@ -7,7 +7,7 @@ import { AppError } from './errors.js';
 const authRequired = ['APP_ORIGIN', 'CLERK_PUBLISHABLE_KEY', 'CLERK_SECRET_KEY'] as const;
 const required = [...authRequired, 'MAPLE_AM_BINDINGS_FILE'] as const;
 export type AuthConfig = { origin: string; publishableKey: string; secretKey: string; jwtKey?: string };
-export type AmAccessMode = 'restricted' | 'single-user-development';
+export type AmAccessMode = 'restricted' | 'single-user-development' | 'single-owner-production';
 export type Config = AuthConfig & { amAccessMode: AmAccessMode; journalPath?: string; policyFile?: string; bindings: Map<string, Binding> };
 const identityFields = {
   ownerId: z.string().regex(/^user_[a-zA-Z0-9]+$/), endpoint: z.string(), context: z.string().regex(/^[a-zA-Z0-9_-]+$/),
@@ -45,16 +45,23 @@ export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, read = (path: string) => readFileSync(path, 'utf8')): Config {
-  const missing = required.filter(key => !env[key]?.trim());
+  const missing = required.filter(key => !(key === 'MAPLE_AM_BINDINGS_FILE' && env.MAPLE_AM_BINDINGS_JSON?.trim()) && !env[key]?.trim());
   if (missing.length) throw new AppError(503, 'CONFIGURATION_REQUIRED', `Configuration required: ${missing.join(', ')}. No data was saved.`);
   const auth = loadAuthConfig(env);
   try {
-    const amAccessMode = z.enum(['restricted', 'single-user-development']).parse(env.MAPLE_AM_ACCESS_MODE ?? 'restricted');
+    const amAccessMode = z.enum(['restricted', 'single-user-development', 'single-owner-production']).parse(env.MAPLE_AM_ACCESS_MODE ?? 'restricted');
     if (amAccessMode === 'single-user-development') {
       const origin = new URL(auth.origin);
       if (env.NODE_ENV !== 'development' || origin.protocol !== 'http:' || !['localhost', '127.0.0.1'].includes(origin.hostname)
         || !auth.publishableKey.startsWith('pk_test_') || !auth.secretKey.startsWith('sk_test_')) {
         throw new AppError(503, 'DEVELOPMENT_MODE_REJECTED', 'Single-user AM development requires NODE_ENV=development, a loopback HTTP origin and Clerk test keys. No data was saved.');
+      }
+    }
+    if (amAccessMode === 'single-owner-production') {
+      const origin = new URL(auth.origin);
+      if (env.NODE_ENV !== 'production' || origin.protocol !== 'https:' || ['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname)
+        || !auth.publishableKey.startsWith('pk_live_') || !auth.secretKey.startsWith('sk_live_')) {
+        throw new AppError(503, 'PRODUCTION_MODE_REJECTED', 'The single-owner production mode requires a fixed HTTPS origin and Clerk production keys.');
       }
     }
     // Optional legacy source is retained only for migration verification, never runtime writes.
@@ -63,8 +70,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, read = (path: s
     const contexts = new Set<string>();
     const endpoints = new Set<string>();
     const keys = new Set<string>();
-    const rawBindings: unknown = JSON.parse(read(env.MAPLE_AM_BINDINGS_FILE!));
-    const entries = (amAccessMode === 'single-user-development' ? bindingSchema.length(1) : bindingSchema).parse(rawBindings);
+    if (env.MAPLE_AM_BINDINGS_JSON?.trim() && env.MAPLE_AM_BINDINGS_FILE?.trim()) throw new Error();
+    // Inline JSON contains identity/host/key ENV NAMES only, never key values.
+    const rawBindings: unknown = JSON.parse(env.MAPLE_AM_BINDINGS_JSON?.trim() || read(env.MAPLE_AM_BINDINGS_FILE!));
+    const entries = (amAccessMode !== 'restricted' ? bindingSchema.length(1) : bindingSchema).parse(rawBindings);
     for (const entry of entries) {
       const endpoint = new URL(entry.endpoint);
       if (endpoint.origin !== entry.endpoint || endpoint.protocol !== 'https:' || endpoint.username || endpoint.password) throw new Error();
@@ -72,7 +81,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, read = (path: s
       const writeKey = env[entry.writeKeyEnv]?.trim();
       if (!readKey || !writeKey) throw new AppError(503, 'CONFIGURATION_REQUIRED', `Configuration required: ${[...new Set([entry.readKeyEnv, entry.writeKeyEnv])].join(', ')}. No data was saved.`);
       if (bindings.has(entry.ownerId) || contexts.has(entry.context) || endpoints.has(endpoint.origin)
-        || (amAccessMode === 'restricted' && readKey === writeKey) || keys.has(readKey) || keys.has(writeKey)) throw new Error();
+        || (amAccessMode !== 'single-user-development' && readKey === writeKey) || keys.has(readKey) || keys.has(writeKey)
+        || (amAccessMode === 'single-owner-production' && !entry.nativePrincipalId)) throw new Error();
       contexts.add(entry.context); endpoints.add(endpoint.origin); keys.add(readKey); keys.add(writeKey);
       bindings.set(entry.ownerId, { ownerId: entry.ownerId, endpoint: endpoint.origin, context: entry.context, readKey, writeKey,
         ...(entry.nativePrincipalId ? { nativePrincipalId: entry.nativePrincipalId, nativeScope: entry.nativeScope } : {}) });
