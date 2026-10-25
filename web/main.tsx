@@ -8,6 +8,7 @@ import './styles.css';
 import { AssessmentPanel } from './AssessmentPanel.js';
 import { HoursChat } from './HoursChat.js';
 import { HoursReviewNote } from './HoursReviewNote.js';
+import { useFlowNavigation } from './useFlowNavigation.js';
 import type { HoursAnswer, HoursClarification } from '../shared/chat.js';
 
 type Snapshot = { revision: number; employment: Employment | null };
@@ -141,7 +142,9 @@ function Workspace() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [activity, setActivity] = useState<'refresh' | 'propose' | 'chat' | 'clarify' | 'confirm' | 'reject' | 'reconcile' | null>(null);
+  const busy = activity !== null;
+  const beginNavigation = useFlowNavigation();
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [reviewId, setReviewId] = useState<string | null>(null);
@@ -212,10 +215,10 @@ function Workspace() {
   }
 
   async function refresh() {
-    setBusy(true); setError(''); setMessage('');
+    setActivity('refresh'); setError(''); setMessage('');
     try { await load(snapshot === null); setMessage('Your saved information and change statuses are up to date.'); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Your information could not be refreshed.'); }
-    finally { setBusy(false); }
+    finally { setActivity(null); }
   }
 
   async function propose(event: FormEvent<HTMLFormElement>) {
@@ -227,21 +230,25 @@ function Workspace() {
       setError(parsed.error.issues.map((issue) => `${fields.find(([key]) => key === issue.path[0])?.[1] ?? 'Employment'}: ${issue.message}`).join(' '));
       return;
     }
-    setBusy(true);
+    const navigation = beginNavigation();
+    let destination = 'workspace-error';
+    setActivity('propose');
     try {
       const proposal = await request<Proposal>('/api/proposals', { baseRevision: snapshot.revision, employment: parsed.data });
       setProposals((current) => [proposal, ...current.filter((item) => item.id !== proposal.id)]);
       setReviewId(proposal.id);
       setMessage('Your change is ready for review. It has not been saved to your employment record.');
-      requestAnimationFrame(() => document.getElementById('review-heading')?.focus());
+      destination = 'review-heading';
     } catch (reason) {
       setError(`Your employment record has not been changed. ${reason instanceof Error ? reason.message : 'The proposal could not be created.'}`);
-    } finally { setBusy(false); }
+    } finally { setActivity(null); navigation.complete(destination); }
   }
 
   async function proposeChat(text: string): Promise<boolean> {
     if (!snapshot || !canEdit) return false;
-    setBusy(true); setError(''); setMessage(''); setChatFallback(false);
+    const navigation = beginNavigation();
+    let destination = 'workspace-error';
+    setActivity('chat'); setError(''); setMessage(''); setChatFallback(false);
     try {
       const result = await request<{ kind: string; proposal?: Proposal; message?: string; formHref?: string; clarification?: HoursClarification }>('/api/chat/proposals', {
         baseRevision: snapshot.revision, message: text, syntheticTest: true,
@@ -252,23 +259,26 @@ function Workspace() {
         setProposals(current => [proposal, ...current.filter(item => item.id !== proposal.id)]);
         setReviewId(proposal.id);
         setMessage('Your chat correction is ready for review. Your employment record has not changed.');
-        requestAnimationFrame(() => document.getElementById('review-heading')?.focus());
+        destination = 'review-heading';
         return true;
       }
       setMessage(result.message ?? 'No change was proposed. Please use the employment form.');
       setChatFallback(result.kind === 'unavailable' && result.formHref === '#employment-heading');
+      destination = result.clarification ? 'hours-clarification-heading' : 'workspace-feedback';
       return false;
     } catch (reason) {
       setError(`Your employment record was not changed by this chat request. ${reason instanceof Error ? reason.message : 'The preview could not be completed.'}`);
       // Refresh possible pending state after a lost response; never replay.
       try { await load(); } catch { /* Existing load applies successful status reads. */ }
       return false;
-    } finally { setBusy(false); }
+    } finally { setActivity(null); navigation.complete(destination); }
   }
 
   async function answerChat(answer: HoursAnswer) {
     if (!chatClarification || !canEdit) return;
-    setBusy(true); setError(''); setMessage('');
+    const navigation = beginNavigation();
+    let destination = 'workspace-error';
+    setActivity('clarify'); setError(''); setMessage('');
     try {
       const result = await request<{ kind: string; proposal?: Proposal; message?: string }>(`/api/chat/clarifications/${encodeURIComponent(chatClarification.id)}`, { answer });
       setChatClarification(null);
@@ -277,16 +287,21 @@ function Workspace() {
         setProposals(current => [proposal, ...current.filter(item => item.id !== proposal.id)]);
         setReviewId(proposal.id);
         setMessage('Your clarification prepared a change for review. Your employment record has not changed.');
-        requestAnimationFrame(() => document.getElementById('review-heading')?.focus());
-      } else setMessage(result.message ?? 'Your employment record is unchanged.');
+        destination = 'review-heading';
+      } else {
+        setMessage(result.message ?? 'Your employment record is unchanged.');
+        destination = 'workspace-feedback';
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Your answer could not be processed. Refresh status before trying again.');
       try { await load(); } catch { /* Recover pending state without replaying. */ }
-    } finally { setBusy(false); }
+    } finally { setActivity(null); navigation.complete(destination); }
   }
 
   async function decide(proposal: Proposal, decision: 'confirm' | 'reject') {
-    setBusy(true); setError(''); setMessage('');
+    const navigation = beginNavigation();
+    let destination = 'workspace-error';
+    setActivity(decision); setError(''); setMessage('');
     try {
       const outcome = await request<{ status: string }>(`/api/proposals/${encodeURIComponent(proposal.id)}/${decision}`, { proposalRevision: proposal.proposalRevision });
       await load(decision === 'confirm' && outcome.status === 'committed');
@@ -297,6 +312,7 @@ function Workspace() {
       } else {
         setMessage('This change is still being checked. Its save is not confirmed; review its status before making another change.');
       }
+      destination = 'workspace-feedback';
     } catch (reason) {
       setError(`${decision === 'confirm' ? 'We could not confirm that this change was saved. Check its status before retrying.' : 'We could not confirm that the proposal was discarded.'} ${reason instanceof Error ? reason.message : 'Please refresh the status.'}`);
       if (decision === 'confirm' && reason instanceof RequestError
@@ -309,11 +325,11 @@ function Workspace() {
       }
       // Do not replay an uncertain write. Read-only refresh can reveal its durable status.
       try { await load(); } catch { /* Successful status/inbox reads have still been applied. */ }
-    } finally { setBusy(false); }
+    } finally { setActivity(null); navigation.complete(destination); }
   }
 
   async function reconcile(proposal: Proposal) {
-    setBusy(true); setError(''); setMessage('');
+    setActivity('reconcile'); setError(''); setMessage('');
     try {
       const outcome = await request<{ status: string }>(`/api/proposals/${encodeURIComponent(proposal.id)}/reconcile`, {});
       await load(outcome.status === 'committed');
@@ -322,7 +338,7 @@ function Workspace() {
         : 'This save is still unconfirmed. The change has not been sent again. Check its status later.');
     } catch (reason) {
       setError(`The save status could not be confirmed. ${reason instanceof Error ? reason.message : 'Please try checking again later.'}`);
-    } finally { setBusy(false); }
+    } finally { setActivity(null); }
   }
 
   const review = proposals.find((proposal) => proposal.id === reviewId && proposal.status === 'pending');
@@ -334,20 +350,20 @@ function Workspace() {
   }, [request]);
 
   return <Shell account={<div className="account"><UserButton /></div>}>
-    <div className="page-heading"><div><p className="eyebrow">Your information</p><h1>Let’s start with your work.</h1><p>Record one job, then review the details before saving.</p></div><button type="button" className="secondary" disabled={busy || loading} onClick={refresh}>{busy ? 'Please wait…' : 'Refresh status'}</button></div>
-    {error && <div className="notice error" role="alert">{error}</div>}
-    {message && <div className="notice" role="status">{message}{chatFallback && <> <a href="#employment-heading">Employment form</a></>}</div>}
-    <HoursChat available={chatAvailable} disabled={!canEdit} busy={busy} onPropose={proposeChat} clarification={chatClarification} onAnswer={answerChat}
+    <div className="page-heading"><div><p className="eyebrow">Your information</p><h1>Let’s start with your work.</h1><p>Record one job, then review the details before saving.</p></div><button type="button" className="secondary" disabled={busy || loading} onClick={refresh}>{activity === 'refresh' ? 'Refreshing…' : 'Refresh status'}</button></div>
+    {error && <div id="workspace-error" tabIndex={-1} className="notice error" role="alert">{error}</div>}
+    {message && <div id="workspace-feedback" tabIndex={-1} className="notice" role="status">{message}{chatFallback && <> <a href="#employment-heading">Employment form</a></>}</div>}
+    <HoursChat available={chatAvailable} disabled={!canEdit} busy={busy} activity={activity === 'chat' ? 'preview' : activity === 'clarify' ? 'clarification' : undefined} onPropose={proposeChat} clarification={chatClarification} onAnswer={answerChat}
       blockedBy={unresolved.some(proposal => ['applying', 'uncertain'].includes(proposal.status)) ? 'save' : unresolved.length ? 'pending' : !loading && snapshot === null ? 'unavailable' : undefined} />
     {review?.chat && review.newValue?.hoursPerWeek !== null && <HoursReviewNote {...review.chat} oldHours={review.oldValue?.hoursPerWeek ?? null} newHours={review.newValue.hoursPerWeek} />}
     {loading && <p role="status">Loading your saved information…</p>}
     {!loading && !snapshot && <p className="muted">Your saved information is unavailable. Use Refresh status to reconnect before editing.</p>}
 
-    {unresolved.length > 0 && <section className="changes" aria-labelledby="changes-heading"><h2 id="changes-heading">Changes to review</h2><p className="muted">Finish or discard the current change before starting another.</p><ul className="change-list">{unresolved.map((proposal) => <li key={proposal.id}><div><strong>{proposal.newValue.title} · {proposal.newValue.employer}</strong><span className="status-label">{proposal.status === 'pending' ? 'Awaiting your confirmation' : `${proposal.status} — save not confirmed`}</span></div>{proposal.status === 'pending' && <button className="secondary" type="button" disabled={busy} onClick={() => { setReviewId(proposal.id); requestAnimationFrame(() => document.getElementById('review-heading')?.focus()); }}>Review change</button>}{['applying', 'uncertain'].includes(proposal.status) && <button className="secondary" type="button" disabled={busy} onClick={() => reconcile(proposal)}>Check save status</button>}</li>)}</ul></section>}
+    {unresolved.length > 0 && <section className="changes" aria-labelledby="changes-heading"><h2 id="changes-heading" tabIndex={-1}>Changes to review</h2><p className="muted">Finish or discard the current change before starting another.</p><ul className="change-list">{unresolved.map((proposal) => <li key={proposal.id}><div><strong>{proposal.newValue.title} · {proposal.newValue.employer}</strong><span className="status-label">{proposal.status === 'pending' ? 'Awaiting your confirmation' : `${proposal.status} — save not confirmed`}</span></div>{proposal.status === 'pending' && <button className="secondary" type="button" disabled={busy} onClick={() => { const navigation = beginNavigation(); setReviewId(proposal.id); navigation.complete('review-heading'); }}>Review change</button>}{['applying', 'uncertain'].includes(proposal.status) && <button className="secondary" type="button" disabled={busy} onClick={() => reconcile(proposal)}>Check save status</button>}</li>)}</ul></section>}
 
-    {review && <section className="review" aria-labelledby="review-heading"><p className="eyebrow">Nothing changes until you confirm</p><h2 id="review-heading" tabIndex={-1}>Review this exact change</h2><p>Confirmation applies only to the values below. If your saved information has changed since this proposal was made, Maple will ask you to review again.</p><div className="comparison"><div className="comparison-head" aria-hidden="true"><span>Detail</span><span>Currently saved</span><span>Proposed</span></div>{fields.map(([key, label]) => <div className={`comparison-row${displayValue(review.oldValue, key) !== displayValue(review.newValue, key) ? ' changed' : ''}`} key={key}><strong>{label}</strong><div><span className="mobile-label">Currently saved</span>{displayValue(review.oldValue, key)}</div><div><span className="mobile-label">Proposed</span>{displayValue(review.newValue, key)}</div></div>)}</div><div className="actions"><button type="button" disabled={busy} onClick={() => decide(review, 'confirm')}>{busy ? 'Please wait…' : 'Confirm and save'}</button><button type="button" className="secondary" disabled={busy} onClick={() => decide(review, 'reject')}>Discard change</button></div></section>}
+    {review && <section className="review" aria-labelledby="review-heading"><p className="eyebrow">Nothing changes until you confirm</p><h2 id="review-heading" tabIndex={-1}>Review this exact change</h2><p>Confirmation applies only to the values below. If your saved information has changed since this proposal was made, Maple will ask you to review again.</p><div className="comparison"><div className="comparison-head" aria-hidden="true"><span>Detail</span><span>Currently saved</span><span>Proposed</span></div>{fields.map(([key, label]) => <div className={`comparison-row${displayValue(review.oldValue, key) !== displayValue(review.newValue, key) ? ' changed' : ''}`} key={key}><strong>{label}</strong><div><span className="mobile-label">Currently saved</span>{displayValue(review.oldValue, key)}</div><div><span className="mobile-label">Proposed</span>{displayValue(review.newValue, key)}</div></div>)}</div><div className="actions"><button type="button" disabled={busy} onClick={() => decide(review, 'confirm')}>{activity === 'confirm' ? 'Saving confirmed change…' : 'Confirm and save'}</button><button type="button" className="secondary" disabled={busy} onClick={() => decide(review, 'reject')}>{activity === 'reject' ? 'Discarding…' : 'Discard change'}</button></div></section>}
 
-    <div className="workspace-grid"><section className="form-panel" aria-labelledby="employment-heading"><div className="section-heading"><h2 id="employment-heading">Employment details</h2><span className="muted">{snapshot ? (snapshot.employment ? `Saved revision ${snapshot.revision}` : 'No saved record') : 'Saved record unavailable'}</span></div><p className="muted">Enter what you know. Leave hours blank if you are unsure; keep other unknown answers as “Unknown”.</p><form onSubmit={propose}><fieldset disabled={!canEdit}><legend className="visually-hidden">Your employment record</legend><div className="field-grid"><label>Employer<input name="employer" autoComplete="organization" value={form.employer} maxLength={200} required onChange={(event) => update('employer', event.target.value)} /></label><label>Job title<input name="title" autoComplete="organization-title" value={form.title} maxLength={200} required onChange={(event) => update('title', event.target.value)} /></label></div><div className="field-grid"><label>Start date<input type="date" name="startDate" value={form.startDate} required onChange={(event) => update('startDate', event.target.value)} /></label><label>Country code<input name="countryCode" value={form.countryCode} placeholder="For example, CA" minLength={2} maxLength={2} pattern="[A-Z]{2}" required onChange={(event) => update('countryCode', event.target.value.toUpperCase())} /><span className="hint">Two-letter country code for where you worked.</span></label></div><label className="checkbox"><input type="checkbox" checked={form.currentJob} onChange={(event) => setForm((current) => ({ ...current, currentJob: event.target.checked, endDate: null }))} /><span>I currently work in this job</span></label>{!form.currentJob && <label>Actual end date<input type="date" name="endDate" value={form.endDate ?? ''} required onChange={(event) => update('endDate', event.target.value || null)} /></label>}<label>Hours per week <span className="optional">(optional)</span><input name="hoursPerWeek" type="number" min="0.01" max="168" step="any" value={form.hoursPerWeek ?? ''} onChange={(event) => update('hoursPerWeek', event.target.value === '' ? null : Number(event.target.value))} /><span className="hint">Leave blank if unknown.</span></label><div className="field-grid"><AnswerField label="Was this paid work?" value={form.paid} onChange={(value) => update('paid', value)} /><AnswerField label="Were you authorized to work?" value={form.authorizedToWork} onChange={(value) => update('authorizedToWork', value)} /></div><label>What were your main duties? <span className="optional">(optional)</span><textarea name="duties" rows={4} value={form.duties} maxLength={10_000} onChange={(event) => update('duties', event.target.value)} /><span className="hint">Describe your actual work. Duties are needed before recording a NOC code.</span></label><details className="noc-details"><summary>Add a NOC code you have reviewed</summary><p className="hint">A job title alone is not enough to choose a NOC code. Review its description against your duties before adding it.</p><label>NOC code<input name="nocCode" inputMode="numeric" pattern="[0-9]{5}" maxLength={5} value={form.nocCode ?? ''} onChange={(event) => setForm((current) => ({ ...current, nocCode: event.target.value || null, nocReviewed: false }))} /></label><label className="checkbox"><input type="checkbox" disabled={!form.nocCode || !canEdit} checked={form.nocReviewed} onChange={(event) => update('nocReviewed', event.target.checked)} /><span>I reviewed this NOC code against my job duties.</span></label></details><div className="form-actions"><button type="submit">Review change</button><p className="hint">You will see the exact change before confirming.</p></div></fieldset></form></section>
+    <div className="workspace-grid"><section className="form-panel" aria-labelledby="employment-heading"><div className="section-heading"><h2 id="employment-heading">Employment details</h2><span className="muted">{snapshot ? (snapshot.employment ? `Saved revision ${snapshot.revision}` : 'No saved record') : 'Saved record unavailable'}</span></div><p className="muted">Enter what you know. Leave hours blank if you are unsure; keep other unknown answers as “Unknown”.</p><form onSubmit={propose}><fieldset disabled={!canEdit}><legend className="visually-hidden">Your employment record</legend><div className="field-grid"><label>Employer<input name="employer" autoComplete="organization" value={form.employer} maxLength={200} required onChange={(event) => update('employer', event.target.value)} /></label><label>Job title<input name="title" autoComplete="organization-title" value={form.title} maxLength={200} required onChange={(event) => update('title', event.target.value)} /></label></div><div className="field-grid"><label>Start date<input type="date" name="startDate" value={form.startDate} required onChange={(event) => update('startDate', event.target.value)} /></label><label>Country code<input name="countryCode" value={form.countryCode} placeholder="For example, CA" minLength={2} maxLength={2} pattern="[A-Z]{2}" required onChange={(event) => update('countryCode', event.target.value.toUpperCase())} /><span className="hint">Two-letter country code for where you worked.</span></label></div><label className="checkbox"><input type="checkbox" checked={form.currentJob} onChange={(event) => setForm((current) => ({ ...current, currentJob: event.target.checked, endDate: null }))} /><span>I currently work in this job</span></label>{!form.currentJob && <label>Actual end date<input type="date" name="endDate" value={form.endDate ?? ''} required onChange={(event) => update('endDate', event.target.value || null)} /></label>}<label>Hours per week <span className="optional">(optional)</span><input name="hoursPerWeek" type="number" min="0.01" max="168" step="any" value={form.hoursPerWeek ?? ''} onChange={(event) => update('hoursPerWeek', event.target.value === '' ? null : Number(event.target.value))} /><span className="hint">Leave blank if unknown.</span></label><div className="field-grid"><AnswerField label="Was this paid work?" value={form.paid} onChange={(value) => update('paid', value)} /><AnswerField label="Were you authorized to work?" value={form.authorizedToWork} onChange={(value) => update('authorizedToWork', value)} /></div><label>What were your main duties? <span className="optional">(optional)</span><textarea name="duties" rows={4} value={form.duties} maxLength={10_000} onChange={(event) => update('duties', event.target.value)} /><span className="hint">Describe your actual work. Duties are needed before recording a NOC code.</span></label><details className="noc-details"><summary>Add a NOC code you have reviewed</summary><p className="hint">A job title alone is not enough to choose a NOC code. Review its description against your duties before adding it.</p><label>NOC code<input name="nocCode" inputMode="numeric" pattern="[0-9]{5}" maxLength={5} value={form.nocCode ?? ''} onChange={(event) => setForm((current) => ({ ...current, nocCode: event.target.value || null, nocReviewed: false }))} /></label><label className="checkbox"><input type="checkbox" disabled={!form.nocCode || !canEdit} checked={form.nocReviewed} onChange={(event) => update('nocReviewed', event.target.checked)} /><span>I reviewed this NOC code against my job duties.</span></label></details><div className="form-actions"><button type="submit">{activity === 'propose' ? 'Preparing review…' : 'Review change'}</button><p className="hint">You will see the exact change before confirming.</p></div></fieldset></form></section>
       <aside className="inbox" aria-labelledby="notifications-heading"><p className="eyebrow">Notification centre</p><h2 id="notifications-heading">Your updates</h2>{notifications.length === 0 ? <p className="muted">No updates yet.</p> : <ul>{notifications.map((notification) => <li key={notification.id}><strong>{notification.kind === 'assessed' ? 'Private requirement check completed' : 'Employment information saved'}</strong><p>Revision {notification.revision}</p><time dateTime={notification.createdAt}>{new Date(notification.createdAt).toLocaleString()}</time></li>)}</ul>}<p className="inbox-note">Confirmed saves and completed private checks appear here. Pending changes remain in your review list.</p></aside>
     </div>
     <AssessmentPanel request={request} revision={snapshot?.revision ?? null} onAssessed={refreshNotifications} />

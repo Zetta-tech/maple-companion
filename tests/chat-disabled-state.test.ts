@@ -23,4 +23,16 @@ describe('explanation beside a disabled chat composer', () => {
     const html = renderToStaticMarkup(createElement(HoursChat, { available: true, disabled: false, busy: false, onPropose: async () => false }));
     expect(html).not.toContain('Chat is paused'); expect(html).not.toContain('<fieldset disabled');
   });
+  it('describes an in-flight preview without implying it is saving', () => {
+    const html = renderToStaticMarkup(createElement(HoursChat, { available: true, disabled: true, busy: true, activity: 'preview', onPropose: async () => false }));
+    expect(html).toContain('Interpreting your correction');
+    expect(html).toContain('Your saved record is unchanged.');
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('<fieldset disabled');
+  });
+  it('does not label unrelated workspace activity as a model preview', () => {
+    const html = renderToStaticMarkup(createElement(HoursChat, { available: true, disabled: true, busy: true, onPropose: async () => false }));
+    expect(html).not.toContain('Interpreting your correction');
+    expect(html).not.toContain('Checking the meaning');
+  });
 });
