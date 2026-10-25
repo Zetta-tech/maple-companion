@@ -3,5 +3,5 @@
   "framework": "express",
   "buildCommand": "npm run build:vercel",
   "installCommand": "npm ci --ignore-scripts",
-  "git": { "deploymentEnabled": false }
+  "git": { "deploymentEnabled": { "**": false, "main": true } }
 }
