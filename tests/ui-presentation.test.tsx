@@ -7,10 +7,51 @@ import { fixtureSources } from './support/demo-fixture.js';
 import { JourneyCard } from '../web/DemoJourneyPanel.js';
 import { findingReason, splitJourney } from '../web/journey-presentation.js';
 import { NotificationCenter } from '../web/NotificationCenter.js';
+import { AssessmentNextStep } from '../web/AssessmentPanel.js';
+import { DiscoveryEvidence } from '../web/DiscoveryEvidence.js';
+import { CrsBreakdown } from '../web/CrsBreakdown.js';
 
 const date='2026-10-25';
 const base:JourneyEvent={id:'current',kind:'discovery',status:'completed',createdAt:date+'T08:00:00Z',profileRevision:2};
 describe('results-first presentation preserves the meaning of backend outcomes',()=>{
+  it('offers a usable next step before any assessment without implying a policy was activated', () => {
+    const empty = renderToStaticMarkup(<AssessmentNextStep hasInputs={false} hasPolicies={false} />);
+    expect(empty).toContain('href="#employment-heading"');
+    expect(empty).toContain('Add employment information');
+    expect(empty).toContain('does not activate a policy');
+    const reviewed = renderToStaticMarkup(<AssessmentNextStep hasInputs hasPolicies />);
+    expect(reviewed).toContain('href="#cec-work-evidence-heading"');
+    expect(reviewed).toContain('Review work evidence');
+    expect(reviewed).not.toContain('does not activate a policy');
+  });
+  it('puts the changing work term before unchanged factors and keeps the offer-max branch honest', async () => {
+    const evidence = fictionalCrsEvidence(date); evidence.completeEvidenceReviewed = 'yes';
+    const discovery = projectExpressEntry({ ...demoSeed, crsEvidence: evidence }, date, 2, (await fixtureSources.retrieve('express_entry_full')).evidence);
+    const result = discovery.crs;
+    if (result?.status !== 'complete') throw Error('Fixture is incomplete');
+    const html = renderToStaticMarkup(<JourneyCard event={{ ...base, kind: 'policy_update', discovery }} revision={2} date={date} />);
+    expect(html.match(/>Review score breakdown</g)).toHaveLength(1);
+    expect(html.indexOf('What changes: work points')).toBeLessThan(html.indexOf('Other core factors'));
+    expect(html).toContain(`${result.before} − ${result.labourMarket.workDuration} + ${result.labourMarket.selected} =`);
+    expect(html).not.toContain('<dt>Canadian work duration</dt>');
+    const offer = renderToStaticMarkup(<CrsBreakdown result={{ ...result, labourMarket: { ...result.labourMarket, selectedAlternative: 'offer' } }} />);
+    expect(offer).toContain('The qualifying offer alternative is higher');
+    expect(offer).not.toContain('Work-duration points plus the eligible high-wage bonus are higher');
+  });
+  it('keeps exact source provenance inspectable in one closed disclosure, after the readable source list', async () => {
+    const discovery = discoverC20(demoSeed, date, 2, (await fixtureSources.retrieve()).evidence);
+    const html = renderToStaticMarkup(<DiscoveryEvidence discovery={discovery} />);
+    const at = html.indexOf('<details class="source-provenance">');
+    expect(at).toBeGreaterThan(0);
+    expect(html.match(/<details/g)).toHaveLength(1);
+    for (const source of discovery.sources) {
+      expect(html.slice(0, at)).toContain(source.url);
+      expect(html.slice(0, at)).not.toContain(source.bodySha256);
+      expect(html.slice(at)).toContain(source.bodySha256);
+      expect(html.slice(at)).toContain(source.retrievedAt);
+      expect(html.slice(at)).toContain(source.reviewedAt);
+    }
+  });
   it('shows C20 reason and next action before disclosure, retaining all conditions and sources',async()=>{
     const discovery=discoverC20(demoSeed,date,2,(await fixtureSources.retrieve()).evidence);
     const html=renderToStaticMarkup(<JourneyCard event={{...base,discovery}} revision={2} date={date}/>);

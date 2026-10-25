@@ -60,6 +60,8 @@ describe('remembered details presentation', () => {
     expect(html).toContain('<fieldset disabled=""');
     expect(html).toContain('Your messages may be stored');
     expect(html).toContain('Conversational replies are not available yet');
+    expect(html.indexOf('Sending stores your message.')).toBeLessThan(html.indexOf('<textarea'));
+    expect(html).toContain('aria-describedby="native-message-purpose native-message-size"');
     expect(html).not.toContain('Send to AM');
   });
 });

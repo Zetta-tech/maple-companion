@@ -17,10 +17,14 @@ export function DiscoveryEvidence({ discovery: d }: { discovery: Discovery }) {
       <h4>Official sources</h4>
       <ul className="source-list">{d.sources.map(source => <li key={source.id}>
         <a href={source.url} target="_blank" rel="noreferrer">{source.title}<span className="visually-hidden"> (opens in a new tab)</span></a>
-        <small>Checked {new Date(source.retrievedAt).toLocaleString()}{source.effectiveFrom && ` · Effective ${source.effectiveFrom}`}</small>
-        <small>Reviewed {new Date(source.reviewedAt).toLocaleString()}{source.publishedAt && ` · Published ${source.publishedAt}`}</small>
-        <small className="source-fingerprint">Source version · SHA-256 <code>{source.bodySha256}</code></small>
+        <small>Reviewed <time dateTime={source.reviewedAt}>{new Date(source.reviewedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</time>{source.effectiveFrom && ` · Effective ${source.effectiveFrom}`}</small>
       </li>)}</ul>
+      {d.sources.length > 0 && <details className="source-provenance"><summary>Source versions and verification times</summary><dl>{d.sources.map(source => <div key={source.id}>
+        <dt>{source.title}</dt><dd>
+          <p>Retrieved <time dateTime={source.retrievedAt}>{new Date(source.retrievedAt).toLocaleString()}</time><br />Reviewed <time dateTime={source.reviewedAt}>{new Date(source.reviewedAt).toLocaleString()}</time>{source.publishedAt && <><br />Published {source.publishedAt}</>}</p>
+          <p className="source-fingerprint">SHA-256 <code>{source.bodySha256}</code></p>
+        </dd>
+      </div>)}</dl></details>}
     </section>
   </div>;
 }
