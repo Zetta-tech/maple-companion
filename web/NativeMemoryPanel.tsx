@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { nativeStatusText, type NativeMessageResult, type NativeProfile } from '../shared/native-chat.js';
+import { NATIVE_MESSAGE_MAX_LENGTH, nativeMessageTextSchema, nativeStatusText, type NativeMessageResult, type NativeProfile } from '../shared/native-chat.js';
+import { nativePendingAfterFailure } from './request.js';
 import './NativeMemoryPanel.css';
 
 const statusHeading = {
@@ -52,9 +53,10 @@ export function NativeMemoryPanel({ request, onChanged }: {
   const [synthetic, setSynthetic] = useState(false);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
+  const [notSent, setNotSent] = useState(false);
   const [requestId, setRequestId] = useState<string | null>(null);
   async function refresh() {
-    setBusy(true); setError(''); setProfile(null);
+    setBusy(true); setError(''); setNotSent(false); setProfile(null);
     try {
       const status = await request<{ available: boolean; history: NativeMessageResult[] }>('/api/native/status');
       setAvailable(status.available); setHistory(status.history);
@@ -67,8 +69,11 @@ export function NativeMemoryPanel({ request, onChanged }: {
   async function send(event: FormEvent) {
     event.preventDefault();
     if (!synthetic || !message.trim() || busy || !available || requestId) return;
+    if (!nativeMessageTextSchema.safeParse(message).success) {
+      setNotSent(true); setError('Keep each update to 5,000 characters or fewer. Shorten it and send it again.'); return;
+    }
     const id = crypto.randomUUID();
-    setRequestId(id); setBusy(true); setError(''); setProfile(null);
+    setRequestId(id); setBusy(true); setError(''); setNotSent(false); setProfile(null);
     try {
       const result = await request<NativeMessageResult>('/api/native/messages', { requestId: id, message, syntheticTest: true });
       setHistory(current => [result, ...current.filter(item => item.requestId !== id)]);
@@ -76,8 +81,9 @@ export function NativeMemoryPanel({ request, onChanged }: {
       setProfile(await request<NativeProfile>('/api/native/profile'));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'The message outcome is unknown. Refresh status before submitting again.');
-      // Retain the unresolved request ID. Refresh reads status; it never replays ingestion.
-      onChanged();
+      const pending = nativePendingAfterFailure(id, reason);
+      if (pending === null) { setRequestId(null); setNotSent(true); }
+      else onChanged(); // Possible write: refresh reads status; never replay ingestion.
     } finally { setBusy(false); }
   }
   const unresolved = history.some(item => item.status === 'processing' || item.status === 'uncertain');
@@ -86,9 +92,11 @@ export function NativeMemoryPanel({ request, onChanged }: {
     <div className="section-heading"><h2 id="native-memory-heading">Your remembered information</h2><button type="button" className="secondary" disabled={busy} onClick={refresh}>Refresh memory</button></div>
     <p className="memory-intro">See what is remembered, then share anything that has changed.</p>
     {!available && !busy && !error && <p className="memory-caution">Profile updates aren't available yet. You can still review the assessment inputs below.</p>}
-    {error && <div className="notice error" role="alert"><strong>{requestId ? 'Update status unknown' : 'Your details could not be checked'}</strong>
-      <p>Refresh to check the latest status.{requestId && ' Please do not send the message again yet.'}</p>
-      <details><summary>More details</summary><p>{error}</p></details></div>}
+    {error && <div className="notice error" role="alert"><strong>{notSent ? 'Message not sent' : requestId ? 'Update status unknown' : 'Your details could not be checked'}</strong>
+      {notSent ? <p>{error} Your message is still here to edit and send when you're ready.</p>
+        : <><p>Refresh to check the latest status.{requestId && ' Please do not send the message again yet.'}</p>
+          <details><summary>More details</summary><p>{error}</p></details></>}
+    </div>}
     {(unresolved || requestId) && <p className="memory-caution" role="status">{processing
       ? 'Your message is being processed. Please wait before sending anything else.'
       : "We couldn't confirm whether your earlier update finished. Refresh its status before sending anything else."}</p>}
@@ -99,7 +107,8 @@ export function NativeMemoryPanel({ request, onChanged }: {
       <p className="memory-test-note">Test version: use fictional information only. Your messages may be stored.</p>
       <fieldset disabled={!available || busy || unresolved || requestId !== null}>
       <legend className="visually-hidden">Update remembered information</legend>
-      <label>What has changed?<textarea rows={3} value={message} onChange={event => setMessage(event.target.value)} /></label>
+      <label>What has changed?<textarea rows={3} maxLength={NATIVE_MESSAGE_MAX_LENGTH} aria-describedby="native-message-size" value={message} onChange={event => setMessage(event.target.value)} /></label>
+      <p className="hint" id="native-message-size">Up to 5,000 characters per update.</p>
       <label className="checkbox"><input type="checkbox" checked={synthetic} onChange={event => setSynthetic(event.target.checked)} /><span>This message contains fictional test information.</span></label>
       <button type="submit" disabled={!synthetic || !message.trim() || busy}>{busy && requestId ? 'Sending…' : 'Send'}</button>
       <p className="hint">Sending stores your message. The assessment inputs below change only when you review and save them.</p>

@@ -136,3 +136,15 @@ the newer source/PR cleanup commit. It has not been restarted for this change.
 The private `RESET_OPTIONS.md` beside the inventory records complete Context
 delete/recreate implications. Partial session deletion is withdrawn. No cleanup
 approval or production-clean claim is implied by that decision document.
+
+Native-composer review correction: definitive API rejections before native dispatch
+now carry an explicit `nativeRequestState: not_started` receipt. The client releases
+its pending ID only with that receipt, preserving the message for editing. A status
+code alone, lost/unreadable response, or any claim/send uncertainty retains the hold.
+Shared 5,000-character validation fits the existing 32 KiB JSON body limit even with
+escaped characters; it is not a usage quota. Offline HTTP regressions cover actual
+Express body rejection, the existing rate limiter, no-claim history, subsequent
+edited submission and provider/claim uncertainty. No model calls or live browser
+actions were used for this fix; the verified running build remains unchanged.
+After this correction, all 585 offline tests across 30 files, typecheck, build and
+tracked-file hygiene pass. The current bundle is 522.12 kB and retains its size warning.

@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import { RequestError, readResponse } from './request.js';
 import { ClerkProvider, SignIn, UserButton, useAuth } from '@clerk/react';
 import { StrictMode, useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -23,23 +24,6 @@ type Proposal = {
   chat?: { utterance: string; expiresAt: string; periodSource: 'message' | 'interpretation'; clarificationAnswer?: 'actual_weekly_work'; clarificationSource?: 'user_entered' };
 };
 type Notification = { id: string; operationId: string | null; assessmentId: string | null; kind: 'saved' | 'assessed'; createdAt: string; revision: number };
-type ApiErrorBody = { error?: { code?: string; message?: string } };
-
-class RequestError extends Error {
-  constructor(message: string, readonly code: string) { super(message); }
-}
-
-async function readResponse<T>(response: Response): Promise<T> {
-  let body: unknown;
-  try { body = await response.json(); }
-  catch { throw new RequestError('The server returned an unreadable response. Check your connection and try again.', 'INVALID_RESPONSE'); }
-  if (!response.ok) {
-    const failure = body as ApiErrorBody;
-    throw new RequestError(failure.error?.message ?? 'The request could not be completed.', failure.error?.code ?? 'REQUEST_FAILED');
-  }
-  return body as T;
-}
-
 const blankEmployment: Employment = {
   employer: '', title: '', duties: '', startDate: '', currentJob: true, endDate: null,
   hoursPerWeek: null, countryCode: '', paid: 'unknown', authorizedToWork: 'unknown',
@@ -153,7 +137,7 @@ function Workspace() {
 
   const request = useCallback(async <T,>(path: string, body?: unknown): Promise<T> => {
     const token = await getToken();
-    if (!token) throw new RequestError('Your session has ended. Sign in again before continuing.', 'UNAUTHENTICATED');
+    if (!token) throw new RequestError('Your session has ended. Sign in again before continuing.', 'UNAUTHENTICATED', path === '/api/native/messages' ? 'not_started' : undefined);
     let response: Response;
     try {
       response = await fetch(path, {

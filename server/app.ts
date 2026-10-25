@@ -8,7 +8,7 @@ import { AppError } from './errors.js';
 import { bindingFor, type AuthConfig, type Config } from './config.js';
 import { Workflow, confirmationSchema } from './workflow.js';
 import { Assessments } from './assessments.js';
-import type { NativeChat } from './native-chat.js';
+import { nativeMessageSchema, type NativeChat } from './native-chat.js';
 import type { DemoJourney } from './demo-journey.js';
 import { demoSeed } from '../shared/demo.js';
 
@@ -99,7 +99,14 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   app.get('/api/native/status', async (_req, res) => res.json({ available: !!nativeChat, syntheticOnly: true,
     history: nativeChat ? await nativeChat.history(res.locals.owner) : [] }));
   app.get('/api/native/profile', async (_req, res) => res.json(await native().profile(res.locals.owner)));
-  app.post('/api/native/messages', async (req, res) => res.json(await native().send(res.locals.owner, req.body)));
+  app.post('/api/native/messages', async (req, res) => {
+    const channel = native();
+    const message = nativeMessageSchema.parse(req.body);
+    // Claim failures may be ambiguous too. From this point onward, no error may
+    // assert that the native request was never started, regardless of status/code.
+    res.locals.nativeRequestStarted = true;
+    res.json(await channel.send(res.locals.owner, message));
+  });
   app.get('/api/proposals', async (_req, res) => res.json({ proposals: await workflow().journal.list(res.locals.owner) }));
   app.post('/api/proposals', async (req, res) => res.status(201).json(await workflow().propose(res.locals.owner, req.body)));
   app.post('/api/proposals/:id/confirm', async (req, res) => res.json(await workflow().confirm(res.locals.owner, id(req.params.id), req.body)));
@@ -118,13 +125,19 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   app.get('/api/assessments/:id', async (req, res) => res.json(await assessments!.get(res.locals.owner, id(req.params.id))));
   app.use('/api', (_req, _res, next) => next(new AppError(404, 'NOT_FOUND', 'This endpoint was not found.')));
   app.use(express.static(options.webRoot ?? resolve('dist/web')));
-  const errors: ErrorRequestHandler = (error, _req, res, _next) => {
-    if (error instanceof ZodError) { res.status(400).json({ error: { code: 'VALIDATION_FAILED', message: 'Review the submitted fields and dates. No change was saved.' } }); return; }
-    if (error instanceof AppError) { res.status(error.status).json({ error: { code: error.code, message: error.message } }); return; }
-    if (error?.type === 'entity.too.large') { res.status(413).json({ error: { code: 'BODY_TOO_LARGE', message: 'The submitted information is too long. No change was saved.' } }); return; }
-    if (error?.type === 'entity.parse.failed') { res.status(400).json({ error: { code: 'INVALID_JSON', message: 'The submitted information could not be read. No change was saved.' } }); return; }
+  const errors: ErrorRequestHandler = (error, req, res, _next) => {
+    // This marker comes only from our known server execution boundary, never an
+    // exception's properties or a provider/proxy HTTP status.
+    const beforeNative = req.method === 'POST' && req.path === '/api/native/messages' && res.locals.nativeRequestStarted !== true;
+    const nativeReceipt = beforeNative ? { nativeRequestState: 'not_started' } : {};
+    if (error instanceof ZodError) { res.status(400).json({ error: { code: 'VALIDATION_FAILED', message: res.locals.nativeRequestStarted === true
+      ? 'This update could not be verified. Check its status before sending it again.'
+      : 'Review the submitted fields and dates. No change was saved.', ...nativeReceipt } }); return; }
+    if (error instanceof AppError) { res.status(error.status).json({ error: { code: error.code, message: error.message, ...nativeReceipt } }); return; }
+    if (error?.type === 'entity.too.large') { res.status(413).json({ error: { code: 'BODY_TOO_LARGE', message: 'The submitted information is too long. Shorten your message and send it again.', ...nativeReceipt } }); return; }
+    if (error?.type === 'entity.parse.failed') { res.status(400).json({ error: { code: 'INVALID_JSON', message: 'The submitted information could not be read. No change was saved.', ...nativeReceipt } }); return; }
     // Do not reflect provider payloads, tokens, database paths, or personal values.
-    res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'This request could not be completed. Check the change status before submitting again.' } });
+    res.status(503).json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'This request could not be completed. Check the change status before submitting again.', ...nativeReceipt } });
   };
   app.use(errors);
   return app;

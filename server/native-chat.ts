@@ -5,9 +5,9 @@ import { z } from 'zod';
 import { AppError } from './errors.js';
 import { createNativeMemory, type NativeBinding } from './native-memory.js';
 import type { NativeChatStore } from './native-chat-store.js';
-import { nativeStatusText, type NativeMessageResult, type NativeProfile } from '../shared/native-chat.js';
+import { nativeMessageTextSchema, nativeStatusText, type NativeMessageResult, type NativeProfile } from '../shared/native-chat.js';
 
-export const nativeMessageSchema = z.strictObject({ requestId: z.uuid(), message: z.string().min(1), syntheticTest: z.literal(true) });
+export const nativeMessageSchema = z.strictObject({ requestId: z.uuid(), message: nativeMessageTextSchema, syntheticTest: z.literal(true) });
 type NativePort = ReturnType<typeof createNativeMemory>;
 export type NativeDiagnostic = (owner: string, requestId: string, evidence: unknown) => Promise<void>;
 

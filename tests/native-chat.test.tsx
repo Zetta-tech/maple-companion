@@ -5,7 +5,8 @@ import request from 'supertest';
 import { NativeChat } from '../server/native-chat.js';
 import type { NativeChatStore } from '../server/native-chat-store.js';
 import type { NativeSession, createNativeMemory } from '../server/native-memory.js';
-import { nativeStatusText, type NativeMessageResult } from '../shared/native-chat.js';
+import { NATIVE_MESSAGE_MAX_LENGTH, nativeMessageTextSchema, nativeStatusText, type NativeMessageResult } from '../shared/native-chat.js';
+import { nativePendingAfterFailure, readResponse, RequestError } from '../web/request.js';
 import { NativeMemoryPanel, NativeMemoryView } from '../web/NativeMemoryPanel.js';
 import { createApp } from '../server/app.js';
 import { Workflow } from '../server/workflow.js';
@@ -113,6 +114,8 @@ describe('native memory workflow (test transport only)', () => {
     expect(html).toContain('Your messages may be stored');
     expect(html).toContain('Conversational replies are not available yet');
     expect(html).not.toContain('Send to AM memory');
+    expect(html).toContain(`maxLength="${NATIVE_MESSAGE_MAX_LENGTH}"`);
+    expect(html).toContain('Up to 5,000 characters per update.');
   });
   it('escapes native text instead of executing markup', () => {
     const html = renderToStaticMarkup(<NativeMemoryView profile={{ checkedAt: new Date().toISOString(), complete: true,
@@ -124,6 +127,100 @@ describe('native memory workflow (test transport only)', () => {
     await expect(chat.send(owner, { requestId: randomUUID(), message: 'hello', syntheticTest: true, ownerId: 'user_bob' })).rejects.toThrow();
     await expect(chat.send(owner, { requestId: randomUUID(), message: 'hello', syntheticTest: false })).rejects.toThrow();
     expect(memory.remember).not.toHaveBeenCalled();
+  });
+});
+
+describe('native composer pre-send receipts versus uncertain outcomes', () => {
+  function http() {
+    const fixture = setup(), journal = new Journal(':memory:');
+    const config = { origin: 'http://localhost:3000', publishableKey: 'pk_test_fixture', secretKey: 'sk_test_fixture',
+      amAccessMode: 'single-user-development' as const, bindings: new Map([[owner, binding]]) };
+    const authentication = { middleware: (_req: any, _res: any, next: () => void) => next(), owner: () => owner };
+    const app = createApp({ config, nativeChat: fixture.chat, workflow: new Workflow(journal, new TestMemory(), () => binding), authentication });
+    const claim = vi.spyOn(fixture.store, 'claim');
+    const post = (body: object) => request(app).post('/api/native/messages').set('Origin', config.origin).send(body);
+    return { ...fixture, journal, app, post, claim };
+  }
+  async function apiError(response: { status: number; body: unknown }) {
+    try { await readResponse(new Response(JSON.stringify(response.body), { status: response.status })); }
+    catch (error) { return error; }
+    throw Error('Expected API rejection');
+  }
+  it('aligns client/server length checks with a payload that always fits the JSON body limit', async () => {
+    const f = http();
+    try {
+      const body = { requestId: randomUUID(), message: '\u0000'.repeat(NATIVE_MESSAGE_MAX_LENGTH), syntheticTest: true };
+      expect(Buffer.byteLength(JSON.stringify(body))).toBeLessThan(32 * 1024);
+      expect(nativeMessageTextSchema.safeParse(body.message).success).toBe(true);
+      for (const message of [' ', 'x'.repeat(NATIVE_MESSAGE_MAX_LENGTH + 1)]) {
+        expect(nativeMessageTextSchema.safeParse(message).success).toBe(false);
+        const response = await f.post({ ...body, message });
+        expect(response.status).toBe(400);
+        expect(response.body.error).toMatchObject({ code: 'VALIDATION_FAILED', nativeRequestState: 'not_started' });
+        expect(nativePendingAfterFailure(body.requestId, await apiError(response))).toBeNull();
+      }
+      expect(f.claim).not.toHaveBeenCalled(); expect(f.memory.remember).not.toHaveBeenCalled();
+    } finally { f.journal.close(); }
+  });
+  it('releases the pending ID on an actual Express 32 KiB rejection without a history record', async () => {
+    const f = http(), id = randomUUID();
+    try {
+      const response = await f.post({ requestId: id, message: 'x'.repeat(33 * 1024), syntheticTest: true });
+      expect(response.status).toBe(413);
+      expect(response.body.error).toMatchObject({ code: 'BODY_TOO_LARGE', nativeRequestState: 'not_started' });
+      expect(nativePendingAfterFailure(id, await apiError(response))).toBeNull();
+      expect(f.claim).not.toHaveBeenCalled(); expect(f.memory.createSession).not.toHaveBeenCalled();
+      expect(await f.chat.history(owner)).toEqual([]);
+      // A deliberate edited resubmission can proceed; the app does not retry automatically.
+      const next = await f.post({ requestId: randomUUID(), message: 'Synthetic correction.', syntheticTest: true });
+      expect(next.status).toBe(200); expect(f.memory.remember).toHaveBeenCalledTimes(1);
+    } finally { f.journal.close(); }
+  });
+  it('releases only the application rate limiter rejection before native dispatch', async () => {
+    const f = http(), id = randomUUID();
+    try {
+      for (let i = 0; i < 60; i++) await request(f.app).get('/api/session').expect(200);
+      const response = await f.post({ requestId: id, message: 'Synthetic correction.', syntheticTest: true });
+      expect(response.status).toBe(429);
+      expect(response.body.error).toMatchObject({ code: 'RATE_LIMITED', nativeRequestState: 'not_started' });
+      expect(nativePendingAfterFailure(id, await apiError(response))).toBeNull();
+      expect(f.claim).not.toHaveBeenCalled(); expect(f.memory.remember).not.toHaveBeenCalled();
+      expect(await f.chat.history(owner)).toEqual([]);
+    } finally { f.journal.close(); }
+  });
+  it.each([413, 429, 503])('does not infer no-send from HTTP %s after dispatch/claim begins', async status => {
+    const f = http(), id = randomUUID();
+    try {
+      // A claim transport can fail after committing. Neither its status nor a
+      // forged error property may become a pre-send receipt from the serializer.
+      f.claim.mockRejectedValueOnce(Object.assign(new AppError(status, 'RATE_LIMITED', 'Check status.'), { nativeRequestState: 'not_started' }));
+      const response = await f.post({ requestId: id, message: 'Synthetic correction.', syntheticTest: true });
+      expect(response.status).toBe(status); expect(response.body.error).not.toHaveProperty('nativeRequestState');
+      expect(nativePendingAfterFailure(id, await apiError(response))).toBe(id);
+      expect(f.claim).toHaveBeenCalledTimes(1); expect(f.memory.remember).not.toHaveBeenCalled();
+    } finally { f.journal.close(); }
+  });
+  it('retains uncertainty on interrupted response/invalid JSON/proxy rejection, without automatic retry', async () => {
+    const id = randomUUID();
+    expect(nativePendingAfterFailure(id, new RequestError('Interrupted', 'CONNECTION_INTERRUPTED'))).toBe(id);
+    expect(nativePendingAfterFailure(id, new TypeError('Failed to fetch'))).toBe(id);
+    let invalid: unknown;
+    try { await readResponse(new Response('not JSON', { status: 413 })); } catch (error) { invalid = error; }
+    expect(nativePendingAfterFailure(id, invalid)).toBe(id);
+    for (const status of [413, 429]) {
+      const proxy = await apiError({ status, body: { error: { code: 'RATE_LIMITED', message: 'Proxy rejected.' } } });
+      expect(nativePendingAfterFailure(id, proxy)).toBe(id);
+    }
+    expect(nativePendingAfterFailure(id, { nativeRequestState: 'not_started' })).toBe(id);
+    const f = http();
+    try {
+      f.memory.remember.mockRejectedValueOnce(new TypeError('Connection lost after possible persistence'));
+      const response = await f.post({ requestId: id, message: 'Synthetic correction.', syntheticTest: true });
+      expect(response.status).toBe(200); expect(response.body.status).toBe('uncertain');
+      expect(response.body).not.toHaveProperty('nativeRequestState');
+      expect(f.memory.remember).toHaveBeenCalledTimes(1);
+      expect(await f.chat.history(owner)).toEqual([expect.objectContaining({ requestId: id, status: 'uncertain' })]);
+    } finally { f.journal.close(); }
   });
 });
 

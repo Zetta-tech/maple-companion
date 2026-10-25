@@ -1,3 +1,11 @@
+import { z } from 'zod';
+
+// 5,000 UTF-16 units fit within Express's 32 KiB JSON body limit even when
+// each unit is escaped as six ASCII bytes, plus the UUID/consent envelope.
+// This is a per-message payload bound, not a request or spending quota.
+export const NATIVE_MESSAGE_MAX_LENGTH = 5_000;
+export const nativeMessageTextSchema = z.string().min(1).max(NATIVE_MESSAGE_MAX_LENGTH).refine(value => !!value.trim());
+
 export type NativeFact = { entity: string; key: string; value: string };
 export type NativeMessageResult = {
   requestId: string;
