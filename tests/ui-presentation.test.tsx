@@ -5,7 +5,7 @@ import { fictionalCrsEvidence, CRS_POLICY_VERSION } from '../shared/crs.js';
 import { discoverC20, projectExpressEntry } from '../server/discovery.js';
 import { fixtureSources } from './support/demo-fixture.js';
 import { JourneyCard } from '../web/DemoJourneyPanel.js';
-import { splitJourney } from '../web/journey-presentation.js';
+import { findingReason, splitJourney } from '../web/journey-presentation.js';
 import { NotificationCenter } from '../web/NotificationCenter.js';
 
 const date='2026-10-25';
@@ -15,7 +15,7 @@ describe('results-first presentation preserves the meaning of backend outcomes',
     const discovery=discoverC20(demoSeed,date,2,(await fixtureSources.retrieve()).evidence);
     const html=renderToStaticMarkup(<JourneyCard event={{...base,discovery}} revision={2} date={date}/>);
     const firstDisclosure=html.indexOf('<details>');
-    expect(html.indexOf(discovery.reasons.at(-1)!)).toBeLessThan(firstDisclosure);
+    expect(html.indexOf(findingReason(discovery))).toBeLessThan(firstDisclosure);
     expect(html.indexOf(discovery.nextSteps[0]!)).toBeLessThan(firstDisclosure);
     expect(html.slice(0,firstDisclosure)).toContain('Eligibility not established');
     for(const item of discovery.outstanding) expect(html).toContain(item.replaceAll("'",'&#x27;'));

@@ -7,7 +7,7 @@ import { ThemeProvider, ThemeToggle, clerkAppearance } from './Theme.js';
 import { employmentSchema, type Employment } from '../shared/employment.js';
 import './styles.css';
 import { AssessmentPanel } from './AssessmentPanel.js';
-import { DemoJourneyPanel } from './DemoJourneyPanel.js';
+import { GuideWorkspace } from './PersonalGuidePanel.js';
 import { CecWorkFields, CecWorkReview } from './CecWorkFields.js';
 import { HoursReviewNote } from './HoursReviewNote.js';
 import { NativeMemoryPanel } from './NativeMemoryPanel.js';
@@ -288,11 +288,11 @@ function Workspace() {
   }, [request]);
 
   return <Shell account={<div className="account"><UserButton /></div>} updates={<NotificationCenter notifications={notifications} status={notificationStatus} />}>
-    <div className="page-heading workspace-heading"><div><p className="eyebrow">Your private workspace</p><h1>Your next steps.</h1><p>Discoveries, changes and the information behind them.</p></div><button type="button" className="secondary" disabled={busy || loading} onClick={refresh}>{activity === 'refresh' ? 'Refreshing…' : 'Refresh status'}</button></div>
+    <div className="page-heading workspace-heading"><div><h1>Your next steps.</h1></div><button type="button" className="secondary" disabled={busy || loading} onClick={refresh}>{activity === 'refresh' ? 'Refreshing…' : 'Refresh status'}</button></div>
     {error && <div id="workspace-error" tabIndex={-1} className="notice error" role="alert">{error}</div>}
     {message && <div id="workspace-feedback" tabIndex={-1} className="notice" role="status">{message}</div>}
     <nav className="workspace-nav" aria-label="Workspace sections">{journeyAvailable && <a href="#journey">Discoveries</a>}<a href="#profile-workspace">Your information</a><a href="#assessment-heading">Requirement checks</a></nav>
-    <DemoJourneyPanel request={request} onAvailabilityChange={setJourneyAvailable} />
+    <GuideWorkspace request={request} employment={snapshot?.employment ?? null} employmentRevision={snapshot?.revision ?? null} blocked={assessmentHold} refreshKey={memoryEpoch} onAvailabilityChange={setJourneyAvailable} />
     <div id="profile-workspace" className="profile-workspace">
     <NativeMemoryPanel request={request} onChanged={() => setMemoryEpoch(value => value + 1)} onAssessmentHold={updateAssessmentHold} />
     {review?.chat && review.newValue?.hoursPerWeek !== null && <HoursReviewNote {...review.chat} oldHours={review.oldValue?.hoursPerWeek ?? null} newHours={review.newValue.hoursPerWeek} />}

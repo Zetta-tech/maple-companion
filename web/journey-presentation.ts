@@ -31,7 +31,7 @@ export function findingHeading(discovery: Discovery) {
     if (crs.delta < 0) return `A policy update ${crs.projected ? 'could reduce' : 'reduces'} your CRS by ${Math.abs(crs.delta)} points`;
     return 'This policy update leaves your CRS unchanged';
   }
-  if (discovery.kind === 'c20' && discovery.status === 'potential_pathway') return 'C20: another work option to explore';
+  if (discovery.kind === 'c20' && discovery.status === 'potential_pathway') return 'A possible work permit through your employer';
   return discovery.title;
 }
 
@@ -49,5 +49,5 @@ export function findingReason(discovery: Discovery) {
     if (work.highWageBonus > 0) return `Your reviewed Canadian-work evidence includes a ${work.highWageBonus}-point high-wage increase under the announced rules.`;
     return `The policy comparison uses ${work.selected} points from your reviewed work evidence, replacing ${work.workDuration}.`;
   }
-  return discovery.kind === 'c20' && discovery.status === 'potential_pathway' ? discovery.reasons.at(-1) ?? discovery.summary : discovery.summary;
+  return discovery.kind === 'c20' && discovery.status === 'potential_pathway' ? (discovery.reasons.at(-1) ?? discovery.summary).replace('operates an international reciprocal-employment program. This makes an employer-backed C20 inquiry relevant.', 'has an international work-exchange program.') : discovery.summary;
 }

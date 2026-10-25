@@ -54,6 +54,7 @@ export function NativeMemoryPanel({ request, onChanged, onAssessmentHold = noAss
   const [history, setHistory] = useState<NativeMessageResult[]>([]);
   const [message, setMessage] = useState('');
   const [synthetic, setSynthetic] = useState(false);
+  const [syntheticOnly, setSyntheticOnly] = useState(true);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const [notSent, setNotSent] = useState(false);
@@ -62,8 +63,8 @@ export function NativeMemoryPanel({ request, onChanged, onAssessmentHold = noAss
     assessmentGate.checking();
     setBusy(true); setError(''); setNotSent(false); setProfile(null);
     try {
-      const status = await request<{ available: boolean; history: NativeMessageResult[] }>('/api/native/status');
-      setAvailable(status.available); setHistory(status.history);
+      const status = await request<{ available: boolean; history: NativeMessageResult[]; syntheticOnly?: boolean }>('/api/native/status');
+      setAvailable(status.available); setHistory(status.history); setSyntheticOnly(status.syntheticOnly !== false);
       assessmentGate.refresh(status.history);
       if (requestId && status.history.some(item => item.requestId === requestId && item.status !== 'processing')) { setRequestId(null); setMessage(''); }
       if (status.available) setProfile(await request<NativeProfile>('/api/native/profile'));
@@ -73,7 +74,7 @@ export function NativeMemoryPanel({ request, onChanged, onAssessmentHold = noAss
   useEffect(() => { void refresh(); }, [request, assessmentGate]);
   async function send(event: FormEvent) {
     event.preventDefault();
-    if (!synthetic || !message.trim() || busy || !available || requestId) return;
+    if ((syntheticOnly && !synthetic) || !message.trim() || busy || !available || requestId) return;
     if (!nativeMessageTextSchema.safeParse(message).success) {
       setNotSent(true); setError('Keep each update to 5,000 characters or fewer. Shorten it and send it again.'); return;
     }
@@ -81,7 +82,7 @@ export function NativeMemoryPanel({ request, onChanged, onAssessmentHold = noAss
     setRequestId(id); setBusy(true); setError(''); setNotSent(false); setProfile(null);
     try {
       const result = await sendWithAssessmentHold(assessmentGate, id,
-        () => request<NativeMessageResult>('/api/native/messages', { requestId: id, message, syntheticTest: true }));
+        () => request<NativeMessageResult>('/api/native/messages', { requestId: id, message, syntheticTest: syntheticOnly }));
       setHistory(current => [result, ...current.filter(item => item.requestId !== id)]);
       setRequestId(null); setMessage(''); onChanged();
       setProfile(await request<NativeProfile>('/api/native/profile'));
@@ -110,13 +111,13 @@ export function NativeMemoryPanel({ request, onChanged, onAssessmentHold = noAss
     <NativeMemoryView profile={profile} history={history} loading={busy} />
     <form className="memory-composer" onSubmit={send}><h3>Share an update</h3>
       <p className="hint">Correct a detail or tell us what has changed, in your own words.</p>
-      <p className="memory-test-note">Test version: use fictional information only. Your messages may be stored.</p>
+      {syntheticOnly && <p className="memory-test-note">Test version: use fictional information only. Your messages may be stored.</p>}
       <fieldset disabled={!available || busy || unresolved || requestId !== null}>
       <legend className="visually-hidden">Update remembered information</legend>
       <label>What has changed?<textarea rows={3} maxLength={NATIVE_MESSAGE_MAX_LENGTH} aria-describedby="native-message-size" value={message} onChange={event => setMessage(event.target.value)} /></label>
       <p className="hint" id="native-message-size">Up to 5,000 characters per update.</p>
-      <label className="checkbox"><input type="checkbox" checked={synthetic} onChange={event => setSynthetic(event.target.checked)} /><span>This message contains fictional test information.</span></label>
-      <button type="submit" disabled={!synthetic || !message.trim() || busy}>{busy && requestId ? 'Sending…' : 'Send'}</button>
+      {syntheticOnly && <label className="checkbox"><input type="checkbox" checked={synthetic} onChange={event => setSynthetic(event.target.checked)} /><span>This message contains fictional test information.</span></label>}
+      <button type="submit" disabled={(syntheticOnly && !synthetic) || !message.trim() || busy}>{busy && requestId ? 'Sending…' : 'Send'}</button>
       <p className="hint">Sending stores your message. The assessment inputs below change only when you review and save them.</p>
     </fieldset><p className="hint memory-conversation-note">Conversational replies are not available yet.</p></form>
     </div>

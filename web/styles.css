@@ -262,7 +262,7 @@ code { overflow-wrap: anywhere; }
 
 /* The workspace leads with saved outcomes; editing stays close at hand. */
 .workspace-heading { margin-bottom:1rem; align-items:center; }
-.workspace-heading h1 { font-size:clamp(2rem,4vw,3rem); margin-bottom:.7rem; }
+.workspace-heading h1 { font-size:clamp(1.9rem,3vw,2.5rem); margin-bottom:0; }
 .workspace-heading > button { margin-top:0; }
 .workspace-heading .eyebrow { margin-bottom:.6rem; }
 .workspace-nav { display:flex; flex-wrap:wrap; gap:.4rem 1.6rem; margin:0 0 1.5rem; padding-bottom:.5rem; border-bottom:1px solid var(--line); font-size:.88rem; }
@@ -313,6 +313,10 @@ button.text-button:hover:not(:disabled) { background:var(--surface-subtle); }
 }
 
 main:has(.workspace-heading) { padding-top:1.5rem; }
+.workspace-heading { margin-bottom:.25rem; align-items:center; }
+.workspace-heading h1 { font-size:2.2rem; margin-bottom:0; }
+.workspace-heading>button { margin-top:0; background:transparent; border-color:transparent; font-size:.8rem; color:var(--muted); }
+.workspace-nav { margin-bottom:.75rem; border-bottom:0; }
 @media(max-width:520px) {
   .workspace-heading { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; }
   .workspace-heading .eyebrow { font-size:.65rem; letter-spacing:.08em; }
