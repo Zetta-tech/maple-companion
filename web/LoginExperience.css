@@ -1,19 +1,27 @@
 /* The user's reference informs composition, while Maple supplies the palette. */
 main:has(.login-experience) { max-width:none; padding:0; min-height:0; }
 body:has(.login-experience)::before { display:none; }
+body:has(.login-experience) {
+  background:linear-gradient(90deg,var(--surface-subtle) 0%,var(--surface-subtle) 46%,var(--paper) 54%,var(--paper) 100%);
+}
 .login-experience {
   position:relative;
   isolation:isolate;
   overflow:clip;
-  min-height:max(40rem,calc(100svh - 10.25rem));
-  padding:clamp(4rem,13svh,9rem) max(1.5rem,calc((100vw - 1440px)/2)) 6rem;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  align-items:center;
+  min-height:calc(100svh - 10.25rem);
+  padding:3rem 0;
 }
 .login-form-region {
   position:relative;
   z-index:1;
-  width:min(22rem,36%);
+  grid-column:2;
+  justify-self:center;
+  width:min(22rem,calc(100% - 4rem));
   max-width:100%;
-  margin-left:62%;
+  margin:0;
 }
 .login-form-region>* { max-width:100%; }
 .login-leaf-window {
@@ -36,7 +44,8 @@ body:has(.login-experience)::before { display:none; }
 }
 :root[data-theme="dark"] .login-leaf { opacity:.22; }
 @media(max-width:900px) {
-  .login-experience { min-height:max(38rem,calc(100svh - 10.25rem)); padding:3.5rem 1.5rem 14rem; }
+  body:has(.login-experience) { background:var(--paper); }
+  .login-experience { display:block; min-height:max(38rem,calc(100svh - 10.25rem)); padding:3.5rem 1.5rem 14rem; }
   .login-form-region { width:min(22rem,100%); margin-inline:auto; }
   .login-leaf-window { width:70%; height:22rem; bottom:-7rem; }
   .login-leaf { opacity:.18; }
