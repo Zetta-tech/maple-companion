@@ -33,4 +33,10 @@ describe('real SDK demo boundary with explicit test transport',()=>{
     });
     expect((await memory.explain(owner,randomUUID(),'Unchanged synthetic question')).reply).toBe('Synthetic answer');expect(seen).toEqual(['/api/v1/test/me','/api/v1/test/chat']);
   });
+  it('distinguishes read-only identity failure from a chat POST with unknown outcome',async()=>{
+    const methods:string[]=[];const memory=createDemoMemory(()=>binding,async(_input,init)=>{methods.push(init?.method??'GET');throw Error('fixture network failure');});
+    await expect(memory.explain(owner,randomUUID(),'fictional question')).rejects.toMatchObject({code:'GUIDE_NOT_SENT'});expect(methods).toEqual(['GET']);
+    const afterPost=createDemoMemory(()=>binding,async(input)=>{if(String(input).endsWith('/me'))return Response.json({principalId:'principalTest'});throw Error('POST response lost');});
+    await expect(afterPost.explain(owner,randomUUID(),'fictional question')).rejects.toMatchObject({code:'GUIDE_RESPONSE_UNCERTAIN'});
+  });
 });

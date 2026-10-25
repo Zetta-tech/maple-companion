@@ -74,9 +74,12 @@ export function createDemoMemory(resolve:(owner:string)=>Binding,transport:typeo
       }catch{throw new AppError(503,'DEMO_WRITE_UNCERTAIN','This demo save may have reached memory but could not be verified. Do not submit it again.');}
     },
     async explain(owner,requestId,message) {
-      const b=binding(owner);const sdk=client(owner,true,requestId);
-      const identity=await sdk.whoami();
-      if(identity.principalId?.replace(/^principal:/,'')!==b.nativePrincipalId||identity.delegatedPrincipalId)throw unavailable();
+      let sdk:AgentMemory;
+      try {
+        const b=binding(owner);sdk=client(owner,true,requestId);
+        const identity=await sdk.whoami();
+        if(identity.principalId?.replace(/^principal:/,'')!==b.nativePrincipalId||identity.delegatedPrincipalId)throw unavailable();
+      }catch { throw new AppError(503,'GUIDE_NOT_SENT','The guide could not verify its connection. No conversation request was sent. You may try again after checking the connection.'); }
       try {
         const result=await sdk.chat(message,{scopes:[['maple/conversation']],labels:['maple=fictional_demo','purpose=pathway_research'],suppressMarkers:true});
         if(!result.reply?.trim()||!result.sessionId||!result.traceId)throw unavailable();

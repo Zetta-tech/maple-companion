@@ -6,6 +6,8 @@ import {demoSeed} from '../shared/demo.js';
 import {DemoFixtureMemory,DemoFixtureStore,fixtureSources} from './support/demo-fixture.js';
 import {JourneyCard} from '../web/DemoJourneyPanel.js';
 import {businessDate} from '../shared/business-date.js';
+import {AppError} from '../server/errors.js';
+import {guideQuestionSchema,guideRequestNotSent} from '../shared/guide-request.js';
 
 function setup(){const store=new DemoFixtureStore(),memory=new DemoFixtureMemory();return {store,memory,service:new DemoJourney(store,memory,fixtureSources)};}
 async function save(service:DemoJourney,profile=demoSeed,revision=0){const p=await service.propose('user_fixture',{baseRevision:revision,profile});return service.confirm('user_fixture',p.id,{confirm:true});}
@@ -24,6 +26,7 @@ describe('offline demo workflow — explicit memory/store substitutes, not hoste
     await save(service,{...demoSeed,employer:'Different fictional employer',reciprocalProgramReported:'no'},1);const second=await discover(service);
     expect(second.discovery?.status).toBe('not_supported');expect(second.discovery?.score).toBeUndefined();
     const html=renderToStaticMarkup(<JourneyCard event={first} revision={2}/>);expect(html).toContain('historical item is not a current assessment');expect(html).toContain('<summary>View the dated result</summary>');
+    expect(html).toContain(first.reply);expect(html).toContain('Saved generated explanation');
     expect(renderToStaticMarkup(<JourneyCard event={second} revision={2}/>)).toContain('does not yet support');
   });
   it('holds missing evidence without inventing an eligibility answer',async()=>{
@@ -46,5 +49,26 @@ describe('offline demo workflow — explicit memory/store substitutes, not hoste
   it('renders yesterday’s completed result as historical after the business date advances',async()=>{
     const {service}=setup();await save(service);const event=await discover(service);
     expect(renderToStaticMarkup(<JourneyCard event={event} revision={1} date="2099-01-01"/>)).toContain('historical item is not a current assessment');
+  });
+  it('rejects an oversized question before event claim or provider use, then accepts a corrected question',async()=>{
+    const {service,memory}=setup();await save(service);
+    expect(guideQuestionSchema.safeParse('x'.repeat(2001)).success).toBe(false);
+    await expect(service.discover('user_fixture',{requestId:randomUUID(),question:'x'.repeat(2001),fictional:true})).rejects.toThrow();
+    expect((await service.history('user_fixture')).events).toEqual([]);expect(memory.explanations).toBe(0);
+    expect(guideRequestNotSent('VALIDATION_FAILED')).toBe(true);expect(guideRequestNotSent('GUIDE_RESPONSE_UNCERTAIN')).toBe(false);
+    expect((await discover(service)).status).toBe('completed');
+  });
+  it('records definitely-not-sent connection failure and permits a new explicit request after reload',async()=>{
+    const {store,memory,service}=setup();await save(service);
+    const explain=memory.explain.bind(memory);memory.explain=async()=>{throw new AppError(503,'GUIDE_NOT_SENT','Read-only identity check failed');};
+    await expect(discover(service)).rejects.toMatchObject({code:'GUIDE_NOT_SENT'});
+    expect((await service.history('user_fixture')).events[0]?.status).toBe('not_sent');expect(memory.explanations).toBe(0);
+    memory.explain=explain;expect((await discover(new DemoJourney(store,memory,fixtureSources))).status).toBe('completed');expect(memory.explanations).toBe(1);
+  });
+  it('withholds a contradictory explanation without replacing it with a canned reply or resending chat',async()=>{
+    const {service,memory}=setup();await save(service);
+    memory.explain=async()=>{memory.explanations++;return {reply:JSON.stringify({assessmentStatus:'potential_pathway',sourceUrls:['https://www.canada.ca/'],explanation:'You are eligible and your spouse will get a permit.'}),sessionId:'fixture',traceId:'fixture',raw:{fictional:true}};};
+    const event=await discover(service);expect(event.status).toBe('completed');expect(event.discovery?.status).toBe('potential_pathway');expect(event.reply).toBeUndefined();expect(event.explanationStatus).toBe('withheld');expect(memory.explanations).toBe(1);
+    const html=renderToStaticMarkup(<JourneyCard event={event} revision={1}/>);expect(html).toContain('not shown');expect(html).not.toContain('You are eligible');
   });
 });

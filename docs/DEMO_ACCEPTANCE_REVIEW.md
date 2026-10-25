@@ -62,6 +62,63 @@ reload does not prove survival of a database/server restart.
 
 This was a focused implementation review, not a separate human security review.
 
+## Follow-up findings and fixes
+
+- Historical cards now retain the actual saved explanation under the dated-result
+  disclosure. It remains visibly historical after profile or business-date changes.
+- Questions are validated before setting the UI wait state, and the input exposes
+  its 2,000-character bound. Known pre-provider validation/source/profile failures
+  release the composer. A failed read-only identity check records `not_sent` and
+  permits a new explicit request; an uncertain `/chat` outcome remains blocked.
+  There is no automated reconciliation/retry for an unknown provider write. An
+  operator must inspect the recorded outcome; this remains a live acceptance gap.
+- A work interval preceding the recorded arrival produces no score. The result asks
+  about earlier Canadian stays or corrected dates rather than assuming a later
+  re-entry makes earlier qualifying work impossible.
+- Native explanation output now has a small JSON contract for condition status,
+  exact reviewed source URLs and prose. Missing/foreign sources, contradictory
+  status and detected consequential authorization/guarantee claims withhold the
+  explanation. Raw provider output stays in private evidence. No substitute answer
+  is presented as generated. These checks do not certify every sentence; visible
+  generated prose is explicitly unverified advice, and live quality is untested.
+- The unchanged ordinary question about continuing work can initiate the C20-focused
+  flow; users need not name C20. Coverage remains explicitly one pathway, not an
+  exhaustive discovery engine.
+
+Follow-up verification: 670 unit/contract/HTTP tests passed across 35 files. The
+first sandbox run could not open loopback HTTP connections; the permitted local
+loopback run passed. Codex IAB also verified an oversized input shows "Nothing was
+sent" without locking the composer, a corrected ordinary question proceeds, and a
+historical saved explanation remains visible after a fixture profile revision.
+These browser actions used only the prominently labelled offline fixture. The
+native date input did not accept the automation fill, so the arrival-conflict
+regression is unit-tested, not claimed as browser-tested.
+
+Fresh-load provenance is separate: AM receipt readback verifies the confirmed
+demo profile; Surreal journey records hold derived results and the generated reply.
+Reloading a journey item alone does not establish native conversational retention.
+Full CRS completion is scoped in [CRS_COMPLETION_SCOPE.md](CRS_COMPLETION_SCOPE.md).
+
+## Shared AM context evidence for the pending decision
+
+Saved local test evidence identifies one shared authenticated principal for the
+named Rowan/Mira fixtures, current-time hours fixtures and later user-entered
+conversation. The native profile changed during those tests even while the older
+receipt-backed employment envelope remained unchanged. The later user-entered
+job-title message and ordinary employment edits are not certified fictional in the
+evidence. Therefore the Context cannot be represented as containing only disposable
+scripted data. An unverified fact readback also does not prove the source turn was
+never stored.
+
+Potentially affected memory includes native identity/name, job title, work schedule,
+hours and associated conversation/history. Direct demo triples target their own
+entity, but hosted `/chat` may extract or reconcile within the existing principal's
+Context. Labels, scope names and a prompt disclaimer are not a proven isolation
+boundary. No new provider request was used to produce this assessment. Exact IDs,
+artifact paths and timestamps remain in the ignored local boundary report, not
+this PR. Obtain a specific decision about affecting that shared memory, or an
+independent test Context, before live demo chat writes.
+
 ## Exact approval and remaining setup
 
 The denied operation was the command to run `scripts/apply-demo-schema.ts test`

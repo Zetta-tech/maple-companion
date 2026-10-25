@@ -25,7 +25,7 @@ export class DemoFixtureStore implements DemoStore {
   async reject(owner:string,id:string) {const p=await this.proposal(owner,id);if(p.status!=='pending')throw this.conflict();p.status='rejected';p.profile=null;this.operations.set(this.key(owner,id),p);}
   async claimEvent(owner:string,id:string,digest:string,revision:number) {
     const k=this.key(owner,id),existing=this.recorded.get(k);if(existing){if(existing.digest!==digest||existing.event.status==='processing')throw this.conflict();return structuredClone(existing.event);}
-    if((await this.head(owner)).revision!==revision||(await this.events(owner)).some(e=>e.status!=='completed'))throw this.conflict();
+    if((await this.head(owner)).revision!==revision||(await this.events(owner)).some(e=>['processing','uncertain'].includes(e.status)))throw this.conflict();
     this.recorded.set(k,{digest,event:{id,kind:'discovery',createdAt:new Date().toISOString(),status:'processing',profileRevision:revision}});return null;
   }
   async finishEvent(owner:string,event:JourneyEvent) {const current=this.recorded.get(this.key(owner,event.id));if(!current||current.event.status!=='processing')throw this.conflict();current.event=structuredClone(event);}
@@ -35,6 +35,6 @@ export class DemoFixtureMemory implements DemoMemory {
   envelopes=new Map<string,DemoEnvelope>(); writes=0; explanations=0; failExplanation=false;
   async read(owner:string,receipt:DemoReceipt) {const e=this.envelopes.get(owner);if(!e||demoDigest(e)!==receipt.digest)throw new AppError(503,'DEMO_MEMORY_UNVERIFIED','Fixture readback mismatch');return structuredClone(e);}
   async write(owner:string,envelope:DemoEnvelope) {if(envelope.ownerId!==owner)throw Error('fixture owner mismatch');this.writes++;this.envelopes.set(owner,structuredClone(envelope));return {factId:'offline-fixture-'+envelope.operationId,digest:demoDigest(envelope)};}
-  async explain() {this.explanations++;if(this.failExplanation)throw new AppError(503,'GUIDE_RESPONSE_UNCERTAIN','Offline fixture simulates an unverified response.');return {reply:'OFFLINE UI FIXTURE: this text verifies presentation only. It is not an AM-generated finding.',sessionId:'offline-fixture',traceId:'offline-fixture',raw:{offlineFixture:true}};}
+  async explain(_owner:string,_requestId:string,message:string):ReturnType<DemoMemory['explain']> {this.explanations++;if(this.failExplanation)throw new AppError(503,'GUIDE_RESPONSE_UNCERTAIN','Offline fixture simulates an unverified response.');const status=JSON.parse(message.split('CONDITION CHECKS (not an eligibility decision):\n')[1]!.split('\n\nOFFICIAL SOURCE MATERIAL:')[0]!).status;return {reply:JSON.stringify({assessmentStatus:status,sourceUrls:['https://www.canada.ca/'],explanation:'OFFLINE UI FIXTURE: this text verifies presentation only. It is not an AM-generated finding.'}),sessionId:'offline-fixture',traceId:'offline-fixture',raw:{offlineFixture:true}};}
 }
 export const fixtureSources={async retrieve(){return {evidence:[{id:'offline',title:'Offline source fixture — not live retrieval',url:'https://www.canada.ca/',bodySha256:'a'.repeat(64),retrievedAt:new Date().toISOString(),reviewedAt:new Date().toISOString()}],context:'OFFLINE TEST DATA: no official source fetch occurs.'};}};

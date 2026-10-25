@@ -33,6 +33,7 @@ export function projectExpressEntry(profile: DemoProfile, date: string, revision
   const knownConditions = profile.nocReviewed && ['21221','21223'].includes(profile.noc)
     && profile.physicallyCanada === 'yes' && profile.authorizedWork === 'yes' && profile.paidEmployee === 'yes'
     && profile.fullTimeStudy === 'no' && profile.selfEmployed === 'no' && profile.spouseAccompanying !== 'unknown';
+  if (profile.workStart < profile.arrivedInCanada) return { ...base, outstanding:['The work interval begins before the recorded arrival in Canada. Clarify whether this arrival is a later re-entry and document any earlier Canadian stay, or correct the dates. This single-interval calculation cannot resolve that history; no score was calculated.'] };
   if (!knownConditions || profile.workStart > date) return { ...base, outstanding:['Qualifying occupation, duties, Canadian work conditions, spouse status or dates still need review. No score delta was inferred.'] };
   const elapsed = days(profile.workStart, date);
   const calendarYears = Number(date.slice(0,4)) - Number(profile.workStart.slice(0,4)) - (date.slice(5) < profile.workStart.slice(5) ? 1 : 0);

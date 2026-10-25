@@ -26,7 +26,7 @@ export type Discovery = {
   sources: SourceEvidence[]; assessmentDate: string; profileRevision: number;
   score?: { scope: 'canadian_work_component'; before: number; after: number; delta: number; effectiveFrom: string; totalCrs: null; conditional: boolean };
 };
-export type JourneyEvent = { id: string; kind: 'discovery' | 'policy_update'; createdAt: string; status: 'completed' | 'processing' | 'uncertain'; profileRevision: number; discovery?: Discovery; reply?: string; sessionId?: string; traceId?: string; replay?: boolean };
+export type JourneyEvent = { id: string; kind: 'discovery' | 'policy_update'; createdAt: string; status: 'completed' | 'processing' | 'uncertain' | 'not_sent'; profileRevision: number; discovery?: Discovery; reply?: string; explanationStatus?: 'available' | 'withheld'; explanationReason?: string; sessionId?: string; traceId?: string; replay?: boolean };
 
 /** Deliberate, editable fictional seed; findings are calculated separately. */
 export const demoSeed: DemoProfile = {

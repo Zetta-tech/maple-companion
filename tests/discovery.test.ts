@@ -33,4 +33,8 @@ describe('source-reviewed personalized discovery',()=>{
     expect(projectExpressEntry({...demoSeed,weeklyHours:15},date,1,[]).score?.before).toBe(35);
     expect(projectExpressEntry({...demoSeed,weeklyHours:100},date,1,[]).score?.before).toBe(46);
   });
+  it('holds work preceding the recorded arrival without assuming a later re-entry disproves earlier stays',()=>{
+    const result=projectExpressEntry({...demoSeed,arrivedInCanada:'2026-10-01',workStart:'2024-01-15'},date,1,[]);
+    expect(result.status).toBe('needs_information');expect(result.score).toBeUndefined();expect(result.outstanding.join(' ')).toContain('later re-entry');expect(result.outstanding.join(' ')).toContain('earlier Canadian stay');
+  });
 });
