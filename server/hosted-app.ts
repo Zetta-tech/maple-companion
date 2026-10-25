@@ -1,7 +1,7 @@
 import express from 'express';
-import { buildRuntime } from './server/runtime.js';
+import { buildRuntime } from './runtime.js';
 
-// Vercel's recognized Express entrypoint. No port listener, background timer,
+// Hosted Express app. No port listener, background timer,
 // credential pull or provisioning. Authentication remains in the shared app.
 const app = express();
 app.disable('x-powered-by');
