@@ -1,0 +1,29 @@
+/* Original Build North character, adapted to the existing dashboard slot. */
+.maple-companion { width:100%; display:grid; grid-template-rows:minmax(0,1fr) auto; color:var(--muted); }
+.maple-companion-art { width:100%; height:auto; display:block; overflow:visible; }
+.companion-ground { fill:var(--ink); opacity:.12; transform-origin:120px 204px; }
+.companion-vein { fill:none; stroke:#e2edce; stroke-width:1.5; stroke-linecap:round; opacity:.55; }
+.companion-feature { fill:none; stroke:#263b25; stroke-width:3; stroke-linecap:round; }
+.companion-eye { fill:#263b25; }
+.companion-eye-light { fill:#f5ffe9; }
+.companion-eye-glint { fill:#d1e9ac; opacity:.65; }
+.companion-shell { stroke:#577a47; stroke-opacity:.16; stroke-width:.75; }
+.companion-brow { fill:none; stroke:#48663a; stroke-width:2.4; stroke-linecap:round; opacity:.48; }
+.companion-brow-left { transform-origin:98px 112px; }
+.companion-brow-right { transform-origin:142px 112px; }
+.companion-limb { fill:none; stroke:#8aaf6c; stroke-width:9; stroke-linecap:round; }
+.companion-sheen { fill:none; stroke:#f0ffdf; stroke-width:3; stroke-linecap:round; opacity:.3; }
+.companion-thinking,.companion-thought-hand,.companion-smile-ready,.companion-concerned,.companion-lids,.companion-ready,.companion-error { opacity:0; }
+.companion-ready { fill:none; stroke:var(--accent); stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
+.companion-error { fill:none; stroke:var(--ink); stroke-width:2.5; stroke-linecap:round; }
+.companion-body,.companion-breath { transform-origin:120px 190px; }
+.companion-leaves,.companion-leaf-left,.companion-leaf-right { transform-origin:121px 78px; }
+.companion-ready,.companion-error { transform-origin:195px 177px; }
+.companion-eyes { transform-origin:120px 127px; }
+.companion-wave { transform-origin:173px 150px; }
+.companion-controls { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:.25rem; }
+.companion-controls button,.companion-motion-label { display:inline-flex; align-items:center; justify-content:center; min-height:44px; font-size:.75rem; line-height:1.3; color:var(--muted); padding:.35rem .5rem; background:transparent; border:0; border-radius:4px; text-align:center; }
+.companion-controls button { text-decoration:underline; text-underline-offset:3px; }
+.companion-controls button:hover { color:var(--ink); background:var(--surface-subtle); }
+.companion-controls button:disabled { opacity:.7; cursor:default; text-decoration:none; }
+.companion-caption { text-align:center; font-size:.75rem; line-height:1.5; }

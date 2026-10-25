@@ -22,10 +22,7 @@ body:has(.dashboard-layout) .site-header { max-width:1440px; padding-inline:2rem
 .dashboard-welcome-actions>a.dashboard-primary-action:hover { background:var(--action-hover); }
 .dashboard-welcome-actions>button.dashboard-secondary-action { background:transparent; color:var(--ink); border-color:transparent; padding:.5rem 0; font-size:.875rem; gap:.5rem; }
 .dashboard-welcome-actions>button.dashboard-secondary-action:hover { background:transparent; text-decoration:underline; }
-.dashboard-companion { width:148px; min-height:168px; border:1px dashed var(--control-border); border-radius:48% 48% 20px 20px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--muted); background:var(--surface-subtle); font-size:.8rem; }
-.dashboard-companion-mark { font-family:var(--display); font-size:3rem; line-height:1.2; font-weight:600; color:var(--ink); margin-bottom:.5rem; }
-.dashboard-companion-mark>span { color:inherit; }
-.dashboard-companion small { font-size:.6875rem; margin-top:.25rem; }
+.dashboard-companion { width:148px; min-width:0; align-self:center; }
 .dashboard-overview-grid { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:1.25rem; margin-bottom:2.25rem; align-items:start; }
 .dashboard-next,.dashboard-snapshot { border:1px solid var(--line); border-radius:14px; padding:1.25rem; background:var(--surface); }
 .dashboard-next { background:var(--surface-subtle); }
@@ -68,9 +65,7 @@ body:has(.dashboard-layout) .site-header { max-width:1440px; padding-inline:2rem
  .dashboard-welcome-copy>p:not(.dashboard-kicker) { font-size:.875rem; }
  .dashboard-welcome-actions { grid-column:1/-1; gap:.75rem; margin-top:1rem; }
  .dashboard-welcome-actions>a { font-size:.8rem; }
- .dashboard-companion { width:72px; min-height:96px; border-radius:32px 32px 12px 12px; font-size:.625rem; align-self:start; margin-top:2.25rem; }
- .dashboard-companion-mark { font-size:2rem; margin:0; }
- .dashboard-companion small { display:none; }
+ .dashboard-companion { width:72px; align-self:start; margin-top:2.25rem; }
  .dashboard-overview-grid { grid-template-columns:minmax(0,1fr); gap:.875rem; margin-bottom:2rem; }
  .dashboard-next,.dashboard-snapshot { padding:1.25rem; }
 }

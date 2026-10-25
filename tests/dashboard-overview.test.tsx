@@ -6,6 +6,15 @@ import type { Employment } from '../shared/employment.js';
 const employment: Employment = { employer: 'Fictional employer', title: 'Analyst', duties: '', startDate: '2025-01-01', currentJob: true, endDate: null, hoursPerWeek: null, countryCode: 'CA', paid: 'unknown', authorizedToWork: 'unknown', nocCode: null, nocReviewed: false };
 const ready = { employment, available: true, loading: false, held: false, pending: 0, discoveries: true, guideState: 'saved' as const };
 describe('dashboard next steps preserve review and uncertainty boundaries', () => {
+  it('reuses the quiet companion without a result-approval state or placeholder', () => {
+    const saved = renderToStaticMarkup(<DashboardOverview {...ready} />);
+    expect(saved).toContain('data-state="idle"');
+    expect(saved).not.toContain('data-state="ready"');
+    expect(saved).not.toContain('Character placeholder');
+    expect(saved).toContain('Pause companion motion');
+    expect(renderToStaticMarkup(<DashboardOverview {...ready} loading />)).toContain('data-state="reviewing"');
+    expect(renderToStaticMarkup(<DashboardOverview {...ready} guideState="pending" />)).toContain('data-state="idle"');
+  });
   it('does not show a stale employment summary when readback is unavailable', () => {
     const html = renderToStaticMarkup(<DashboardOverview {...ready} available={false} />);
     expect(html).toContain('Reconnect to your saved information');
