@@ -8,13 +8,13 @@ merged or deployed by this task.
 
 | Experience | Verified now | Remaining acceptance |
 | --- | --- | --- |
-| C20 discovery | Real fictional profile confirmed and receipt-read from the dedicated AM Context; two live official sources; one native `/chat` response; private journey result reloaded | Actual signed-in browser interaction; Codex IAB currently shows Clerk sign-in |
-| Express Entry replay | Real five-source retrieval; complete fictional 528 → 568 calculation; same profile/date; future November 3 label; persistent event and duplicate replay reuse | Actual signed-in browser presentation/replay |
+| C20 discovery — Working | Real signed-in UI review/confirmation, AM receipt-read at revision 2, two live official sources, native `/chat` response and private journey fresh-load | Limited to C20 research and fictional data; not exhaustive pathway search or eligibility adjudication |
+| Express Entry replay — Working | Real signed-in UI five-source replay; complete fictional 528 → 568; same profile/date; future November 3 label; persistent event and duplicate replay reuse | Announced-policy projection within the documented supported subset, not a certified future score |
 | Ordinary memory | Current attributes unchanged against the preflight snapshot; all synthetic writes went to the separate demo Context | Existing mixed Context remains a production candidate, not clean or production-ready |
 
-These are live backend results, not substitutes for the authenticated UI test.
-The earlier offline browser tests exercised the actual component/coordinator with
-explicit test adapters. They do not establish Clerk or hosted-service acceptance.
+Both the live backend and authenticated UI acceptance now passed. The user signed
+into the existing Codex IAB tab; no Clerk session was minted or copied. Earlier
+offline browser tests remain separate evidence and are not presented as live tests.
 
 ## What ran live
 
@@ -30,7 +30,8 @@ and a separate-spouse-assessment caveat. The response was originally withheld fo
 a Markdown JSON fence. Local validation also mistook “cannot be guaranteed” for a
 guarantee. Both defects have targeted regressions. The existing recorded response
 was revalidated and its derived journey display conditionally repaired; no second
-model call, fact rewrite, or deletion was used. Before/after records are retained.
+model call, fact rewrite, or deletion was used for that recovery. Before/after
+records are retained.
 
 A native session read returned the persisted user and assistant turns without
 pagination. This separately verifies conversational persistence; merely reloading
@@ -46,10 +47,20 @@ and both journey events. The +40 is calculated, not a universal or hardcoded del
 
 ## User reproduction
 
+The browser acceptance then changed only the fictional employer label, reviewed
+the exact proposal, confirmed and receipt-read revision 2. One browser-triggered
+native C20 call completed with the generated explanation available. Real UI replay
+showed the full 528-to-568 comparison and the component breakdown. A repeated
+replay reused its original event. Full page reload preserved the authorized
+session, revision 2, both current results and both historical revision-1 results.
+Independent readback confirmed four events, no pending saves, two native turns for
+the browser request and unchanged ordinary attributes. Total live model calls:
+**two** (one backend check and one browser acceptance); no negative-case model batch.
+
 1. Sign in at localhost in Codex IAB with the existing account. No artificial Clerk
    session or copied Chrome cookies are used. The real sign-in tab is kept open.
 2. Find **Maple Guide — Fictional demonstration**. The saved Avery profile should
-   show verified demo revision 1. **Review or edit demonstration profile** exposes
+   show verified demo revision 2. **Review or edit demonstration profile** exposes
    its explicit invented facts and complete CRS assumptions.
 3. Inspect the saved C20 discovery: why it is a potential lead, outstanding evidence,
    next steps and official sources. Open **Saved generated explanation** for the
@@ -102,9 +113,11 @@ holds exact totals. Official source updates require reviewed hash promotion.
 
 Private evidence in the active worktree:
 `.local/demo-live-20261025/preflight.json`, `activation.json`, `live-backend.json`,
-`recorded-reply-review.json`, `recorded-reply-review-v2.json` and `guide-raw/`.
-The original checkout's `.local/preview-isolated-guide.process.json` records the
-owned local process. Do not commit these runtime artifacts.
+`recorded-reply-review.json`, `recorded-reply-review-v2.json`, `browser-readback.json`
+and `guide-raw/`. The browser's raw native request/response is also in the original
+checkout's ignored `.local/guide-diagnostics/`. Its
+`.local/preview-isolated-guide-v2.process.json` records the owned process running
+the tested `3a412d4` build. Do not commit these runtime artifacts.
 
 Existing-memory cleanup inventory is at
 `.local/production-memory-inventory/REPORT.md` with a private exact-ID manifest.
