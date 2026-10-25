@@ -2,15 +2,18 @@ import type { Employment } from '../shared/employment.js';
 import { MapleCompanion } from './MapleCompanion.js';
 import './DashboardOverview.css';
 import { openProfile, profileSectionFromHash } from './profile-navigation.js';
+import { openPathways, pathwaysRouteFromHash } from './pathways-navigation.js';
 
 export type GuideOverviewState = 'checking' | 'review' | 'saved' | 'empty' | 'unavailable' | 'pending';
 type Props = { employment: Employment | null; available: boolean; loading: boolean; held: boolean; pending: number; discoveries: boolean; guideState: GuideOverviewState };
 
 export function openWorkspaceSection(href: string) {
+  const pathway = pathwaysRouteFromHash(href);
+  if(pathway !== null) { openPathways(pathway); return; }
   const section = profileSectionFromHash(href);
   if(section) { openProfile(section); return; }
   if(document.querySelector('[data-profile-routing]') && /^#(?:employment-|cec-work-|changes-heading|review-heading)/.test(href)) { openProfile('employment',href.slice(1)); return; }
-  if(profileSectionFromHash(window.location.hash)) { window.location.hash=href; requestAnimationFrame(() => openWorkspaceSection(href)); return; }
+  if(profileSectionFromHash(window.location.hash) || pathwaysRouteFromHash(window.location.hash)!==null) { window.location.hash=href; requestAnimationFrame(() => openWorkspaceSection(href)); return; }
   const target = document.getElementById(href.slice(1));
   if (!target) return;
   let parent: HTMLElement | null = target;
