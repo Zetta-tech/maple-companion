@@ -9,9 +9,21 @@ import { CrsEvidenceEditor } from '../web/CrsEvidenceEditor.js';
 import { JourneyCard } from '../web/DemoJourneyPanel.js';
 import { GuideReviewNotice, normalizePersonalIntakeEndDate, PersonalInputReview } from '../web/PersonalGuidePanel.js';
 import { GuideSaveActions } from '../web/GuideSaveActions.js';
+import { GuideEmploymentSetup } from '../web/GuideEmploymentSetup.js';
 import { guidePendingAfterFailure, nativePendingAfterFailure, readResponse, RequestError } from '../web/request.js';
 
 describe('personal Guide frontend boundaries', () => {
+  it('routes missing employment to setup and unresolved employment to review, without offering research', () => {
+    const firstUse = renderToStaticMarkup(<GuideEmploymentSetup />);
+    expect(firstUse).toContain('href="#employment-employer"');
+    expect(firstUse).toContain('aria-controls="employment-editor"');
+    expect(firstUse).toContain('employer, job title, start date and work country');
+    expect(firstUse).not.toContain('<textarea');
+    const pending = renderToStaticMarkup(<GuideEmploymentSetup pending />);
+    expect(pending).toContain('href="#changes-heading"');
+    expect(pending).not.toContain('Add employment details');
+    expect(pending).not.toContain('href="#employment-employer"');
+  });
   it('offers a named recovery action linked to the existing editor, unavailable until inputs are ready', () => {
     const ready = renderToStaticMarkup(<GuideReviewNotice disabled={false} onReview={() => {}} />);
     expect(ready).toContain('>Review Guide details</button>');
