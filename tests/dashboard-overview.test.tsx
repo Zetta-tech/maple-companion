@@ -15,6 +15,14 @@ describe('dashboard next steps preserve review and uncertainty boundaries', () =
     expect(renderToStaticMarkup(<DashboardOverview {...ready} loading />)).toContain('data-state="reviewing"');
     expect(renderToStaticMarkup(<DashboardOverview {...ready} guideState="pending" />)).toContain('data-state="idle"');
   });
+  it('targets the first employment field only for confirmed missing employment, not failed readback', () => {
+    const firstUse = renderToStaticMarkup(<DashboardOverview {...ready} employment={null} guideState="review" />);
+    expect(firstUse).toContain('href="#employment-employer"');
+    expect(firstUse).toContain('Add employment details');
+    const unavailable = renderToStaticMarkup(<DashboardOverview {...ready} employment={null} available={false} guideState="review" />);
+    expect(unavailable).not.toContain('href="#employment-employer"');
+    expect(unavailable).toContain('Check saved information');
+  });
   it('does not show a stale employment summary when readback is unavailable', () => {
     const html = renderToStaticMarkup(<DashboardOverview {...ready} available={false} />);
     expect(html).toContain('Reconnect to your saved information');

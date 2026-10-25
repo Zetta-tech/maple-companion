@@ -30,7 +30,7 @@ export function DashboardOverview({ employment, available, loading, held, pendin
       : !available
         ? { label: 'Connection needs checking', title: 'Reconnect to your saved information', body: 'Maple cannot verify your employment record right now. Check its status before editing or relying on a result.', href: '#employment-heading', action: 'Check saved information' }
         : !employment
-          ? { label: 'Start here', title: 'Tell Maple about your work', body: 'Add the employment details you know. You will review every change before it is saved; unknown details can stay unknown.', href: '#employment-heading', action: 'Add employment details' }
+          ? { label: 'Start here', title: 'Tell Maple about your work', body: 'Start with your employer, job title, start date and work country. Review before saving; other details can stay unknown.', href: '#employment-employer', action: 'Add employment details' }
           : held
             ? { label: 'Update in progress', title: 'Your information is being checked', body: 'Review the update status before using a discovery or running a requirement check.', href: '#native-memory-heading', action: 'View update status' }
             : !discoveries

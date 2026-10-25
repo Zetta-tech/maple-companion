@@ -62,6 +62,12 @@
 .guide-prompt label { font-size:1.1rem; margin-bottom:.65rem; }
 .guide-prompt textarea { min-height:7rem; margin:0 0 .85rem; }
 .guide-prompt .hint { margin-top:.75rem; }
+.guide-employment-setup { max-width:36rem; grid-column:1 / -1; }
+.guide-employment-setup h3 { margin:0 0 .75rem; font-size:1.25rem; }
+.guide-employment-setup>p { margin:0 0 1.25rem; line-height:1.6; color:var(--muted); }
+.guide-employment-setup .guide-setup-action { display:inline-flex; align-items:center; min-height:44px; padding:.65rem 1rem; border-radius:8px; background:var(--action); color:var(--on-accent); font-weight:600; text-decoration:none; }
+.guide-employment-setup .guide-setup-action:hover { background:var(--action-hover); }
+.guide-employment-setup .hint { margin:1rem 0 0; }
 .demo-profile>p,.demo-replay>p { font-size:.85rem; color:var(--muted); }
 .demo-profile fieldset { padding:0; border:0; }
 .demo-profile[open] { grid-column:1 / -1; }
