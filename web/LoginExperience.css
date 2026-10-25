@@ -77,15 +77,16 @@ body:has(.login-experience) {
 }
 :root[data-theme="dark"] .login-leaf { opacity:.22; }
 @media(max-width:900px) {
-  .login-experience::before,
-  .login-form-region::after { display:none; }
+  /* Keep the mobile accents in the space above and below the form. */
+  .login-experience::before { width:80%; height:3rem; background-position:0 1.5rem; }
+  .login-form-region::after { right:calc(50% - 50vw); width:80vw; height:8rem; }
   .login-experience { display:block; min-height:max(38rem,calc(100svh - 10.25rem)); padding:3.5rem 1.5rem 14rem; }
   .login-form-region { width:min(22rem,100%); margin-inline:auto; }
-  .login-leaf-window { width:70%; height:22rem; bottom:-7rem; }
+  .login-leaf-window { width:70%; height:22rem; bottom:-5rem; }
   .login-leaf { opacity:.18; }
   :root[data-theme="dark"] .login-leaf { opacity:.16; }
 }
 @media(max-width:420px) {
   .login-experience { padding:3rem 1.25rem 13rem; }
-  .login-leaf-window { width:88%; height:19rem; bottom:-6.5rem; }
+  .login-leaf-window { width:88%; height:19rem; bottom:-4.5rem; }
 }
