@@ -1,0 +1,33 @@
+.demo-journey { margin-block: 2rem; padding-block: 1.5rem; border-block: 1px solid var(--line); }
+.journey-intro { max-width: 46rem; }
+.journey-intro h2 { font-size: clamp(1.9rem,4vw,3rem); line-height: 1.05; letter-spacing: -.035em; margin: .4rem 0 1rem; }
+.journey-intro p { line-height: 1.65; }
+.journey-toolbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:1.5rem 0; flex-wrap:wrap; }
+.demo-profile,.demo-replay { padding:1rem 0; border-top:1px solid var(--line); }
+.demo-profile summary,.demo-replay summary,.journey-card summary { cursor:pointer; padding:.7rem 0; font-weight:600; }
+.demo-profile fieldset { border:0; padding:0; }
+.guide-prompt { max-width:48rem; margin:1.5rem 0 2rem; }
+.guide-prompt textarea { width:100%; min-height:6rem; margin-block:.5rem 1rem; }
+.journey-results { display:grid; gap:1.5rem; }
+.journey-card { padding:clamp(1.2rem,3vw,2rem); border:1px solid var(--line); border-radius:1rem; background:var(--surface); max-width:62rem; }
+.journey-card h3 { font-size:clamp(1.4rem,2.6vw,2rem); line-height:1.2; margin:.5rem 0 1rem; }
+.journey-card p,.journey-card li { line-height:1.65; }
+.journey-card details { border-top:1px solid var(--line); }
+.journey-card li { margin-block:.55rem; }
+.journey-card a { overflow-wrap:anywhere; }
+.journey-score { display:flex; align-items:center; gap:1.4rem; margin:1.6rem 0; font-size:2.5rem; font-weight:650; flex-wrap:wrap; }
+.journey-score small { display:block; font-size:.78rem; font-weight:400; margin-bottom:.4rem; }
+.journey-score strong { font-size:1.5rem; color:var(--accent); }
+.guide-explanation p { white-space:pre-wrap; }
+.demo-review { display:grid; gap:.5rem; }
+.demo-review div { display:grid; grid-template-columns:minmax(8rem,1fr) 2fr; gap:1rem; padding:.5rem 0; border-bottom:1px solid var(--line); }
+.demo-review dd { margin:0; overflow-wrap:anywhere; }
+@media(max-width:540px) { .demo-review div { grid-template-columns:1fr; gap:.3rem; } .journey-score { gap:.8rem; } }
+.crs-evidence fieldset { margin-block: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: .75rem; }
+.crs-evidence legend { font-weight: 650; padding-inline: .35rem; }
+.crs-evidence details { margin-block: .75rem; }
+.crs-evidence label { margin-block: .6rem; }
+.crs-breakdown dl > div { display: flex; justify-content: space-between; gap: 1rem; padding-block: .35rem; border-bottom: 1px solid var(--border); }
+.crs-breakdown dd { margin: 0; font-variant-numeric: tabular-nums; }
+.crs-breakdown h4 { margin-block: 1rem .35rem; }
+.demo-review pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-width: 100%; }

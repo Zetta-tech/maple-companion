@@ -5,17 +5,19 @@ import type { Binding } from './am.js';
 import { AppError } from './errors.js';
 
 const authRequired = ['APP_ORIGIN', 'CLERK_PUBLISHABLE_KEY', 'CLERK_SECRET_KEY'] as const;
-const required = [...authRequired, 'MAPLE_AM_BINDINGS_FILE', 'MAPLE_JOURNAL_PATH'] as const;
+const required = [...authRequired, 'MAPLE_AM_BINDINGS_FILE'] as const;
 export type AuthConfig = { origin: string; publishableKey: string; secretKey: string; jwtKey?: string };
 export type AmAccessMode = 'restricted' | 'single-user-development';
-export type Config = AuthConfig & { amAccessMode: AmAccessMode; journalPath: string; policyFile?: string; bindings: Map<string, Binding> };
+export type Config = AuthConfig & { amAccessMode: AmAccessMode; journalPath?: string; policyFile?: string; bindings: Map<string, Binding> };
 const identityFields = {
   ownerId: z.string().regex(/^user_[a-zA-Z0-9]+$/), endpoint: z.string(), context: z.string().regex(/^[a-zA-Z0-9_-]+$/),
 };
 const bindingSchema = z.array(z.strictObject({
   ...identityFields,
   readKeyEnv: z.string().regex(/^AM_[A-Z0-9_]+_READ_KEY$/), writeKeyEnv: z.string().regex(/^AM_[A-Z0-9_]+_WRITE_KEY$/),
-})).min(1);
+  nativePrincipalId: z.string().regex(/^[a-zA-Z0-9_-]+$/).optional(),
+  nativeScope: z.string().regex(/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/).optional(),
+}).refine(value => Boolean(value.nativePrincipalId) === Boolean(value.nativeScope), 'Native principal and scope must be configured together.')).min(1);
 
 export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig {
   const missing = authRequired.filter(key => !env[key]?.trim());
@@ -55,7 +57,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, read = (path: s
         throw new AppError(503, 'DEVELOPMENT_MODE_REJECTED', 'Single-user AM development requires NODE_ENV=development, a loopback HTTP origin and Clerk test keys. No data was saved.');
       }
     }
-    // Runtime durability is mandatory; in-memory journals exist only in automated tests.
+    // Optional legacy source is retained only for migration verification, never runtime writes.
     if (env.MAPLE_JOURNAL_PATH === ':memory:' || /^file:/i.test(env.MAPLE_JOURNAL_PATH!)) throw new Error();
     const bindings = new Map<string, Binding>();
     const contexts = new Set<string>();
@@ -72,10 +74,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, read = (path: s
       if (bindings.has(entry.ownerId) || contexts.has(entry.context) || endpoints.has(endpoint.origin)
         || (amAccessMode === 'restricted' && readKey === writeKey) || keys.has(readKey) || keys.has(writeKey)) throw new Error();
       contexts.add(entry.context); endpoints.add(endpoint.origin); keys.add(readKey); keys.add(writeKey);
-      bindings.set(entry.ownerId, { ownerId: entry.ownerId, endpoint: endpoint.origin, context: entry.context, readKey, writeKey });
+      bindings.set(entry.ownerId, { ownerId: entry.ownerId, endpoint: endpoint.origin, context: entry.context, readKey, writeKey,
+        ...(entry.nativePrincipalId ? { nativePrincipalId: entry.nativePrincipalId, nativeScope: entry.nativeScope } : {}) });
     }
     return { ...auth, amAccessMode,
-      journalPath: env.MAPLE_JOURNAL_PATH!, policyFile: env.MAPLE_REVIEWED_POLICIES_FILE?.trim() || undefined, bindings };
+      journalPath: env.MAPLE_JOURNAL_PATH?.trim() || undefined, policyFile: env.MAPLE_REVIEWED_POLICIES_FILE?.trim() || undefined, bindings };
   } catch (error) {
     if (error instanceof AppError) throw error;
     throw new AppError(503, 'CONFIGURATION_INVALID', 'Server configuration is invalid. No data was saved.');

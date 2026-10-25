@@ -6,6 +6,7 @@ import {
   type PolicyVersion, type PolicySelection, type PolicySummary, type PolicyCriterionResult,
 } from '../shared/policy.js';
 import { AppError } from './errors.js';
+import { evaluateCecWork } from './cec-work.js';
 
 const unavailable = () => new AppError(503, 'POLICY_UNAVAILABLE', 'A single reviewed policy version could not be verified for this date.');
 const sha256 = (value: string) => createHash('sha256').update(value, 'utf8').digest('hex');
@@ -106,11 +107,15 @@ export class PolicyRegistry {
  * facts supplied by the application. Conversation text is not an input. Each result
  * describes one supported criterion, never a whole program or invitation outcome.
  */
-export function evaluatePolicy(selection: PolicySelection, employment: Employment | null): PolicyCriterionResult[] {
+export function evaluatePolicy(selection: PolicySelection, employment: Employment | null, asOfDate?: string): PolicyCriterionResult[] {
   const policy = verifiedRecord(selection.policy);
   if (policy.review.status !== 'reviewed' || policyDigest(policy) !== selection.digest) throw unavailable();
   const facts = employment === null ? null : employmentSchema.parse(employment);
   return policy.criteria.map((criterion) => {
+    if (criterion.kind === 'cec_work_experience') {
+      if (!policyDateSchema.safeParse(asOfDate).success) throw new AppError(503, 'ASSESSMENT_DATE_REQUIRED', 'A server-selected application date is required.');
+      return { criterionId: criterion.id, title: criterion.title, ...evaluateCecWork(facts, asOfDate!) };
+    }
     let status: PolicyCriterionResult['status'] = 'needs_information';
     if (facts !== null && criterion.kind === 'answer_equals') {
       const answer = facts[criterion.field];

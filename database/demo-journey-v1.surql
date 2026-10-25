@@ -1,0 +1,31 @@
+-- Additive, single-account fictional demo operational metadata; never run at startup.
+-- Profile values live in AM. Pending proposals are cleared after verified commit.
+BEGIN;
+DEFINE TABLE IF NOT EXISTS maple_demo_heads SCHEMAFULL PERMISSIONS NONE;
+DEFINE FIELD IF NOT EXISTS owner ON maple_demo_heads TYPE string;
+DEFINE FIELD IF NOT EXISTS revision ON maple_demo_heads TYPE int;
+DEFINE FIELD IF NOT EXISTS receipt_json ON maple_demo_heads TYPE string | null;
+DEFINE FIELD IF NOT EXISTS epoch ON maple_demo_heads TYPE int;
+DEFINE INDEX IF NOT EXISTS owner_unique ON maple_demo_heads FIELDS owner UNIQUE;
+DEFINE TABLE IF NOT EXISTS maple_demo_proposals SCHEMAFULL PERMISSIONS NONE;
+DEFINE FIELD IF NOT EXISTS owner ON maple_demo_proposals TYPE string;
+DEFINE FIELD IF NOT EXISTS key ON maple_demo_proposals TYPE string;
+DEFINE FIELD IF NOT EXISTS status ON maple_demo_proposals TYPE string;
+DEFINE FIELD IF NOT EXISTS base_revision ON maple_demo_proposals TYPE int;
+DEFINE FIELD IF NOT EXISTS profile_json ON maple_demo_proposals TYPE string | null;
+DEFINE FIELD IF NOT EXISTS digest ON maple_demo_proposals TYPE string;
+DEFINE FIELD IF NOT EXISTS created_at ON maple_demo_proposals TYPE string;
+DEFINE FIELD IF NOT EXISTS confirmed_at ON maple_demo_proposals TYPE string | null;
+DEFINE FIELD IF NOT EXISTS receipt_json ON maple_demo_proposals TYPE string | null;
+DEFINE INDEX IF NOT EXISTS owner_key ON maple_demo_proposals FIELDS owner,key UNIQUE;
+DEFINE TABLE IF NOT EXISTS maple_demo_events SCHEMAFULL PERMISSIONS NONE;
+DEFINE FIELD IF NOT EXISTS owner ON maple_demo_events TYPE string;
+DEFINE FIELD IF NOT EXISTS key ON maple_demo_events TYPE string;
+DEFINE FIELD IF NOT EXISTS digest ON maple_demo_events TYPE string;
+DEFINE FIELD IF NOT EXISTS status ON maple_demo_events TYPE string;
+DEFINE FIELD IF NOT EXISTS profile_revision ON maple_demo_events TYPE int;
+DEFINE FIELD IF NOT EXISTS created_at ON maple_demo_events TYPE string;
+DEFINE FIELD IF NOT EXISTS result_json ON maple_demo_events TYPE string | null;
+DEFINE INDEX IF NOT EXISTS owner_key ON maple_demo_events FIELDS owner,key UNIQUE;
+CREATE ONLY maple_schema:demo_journey_v1 CONTENT {version:1};
+COMMIT;

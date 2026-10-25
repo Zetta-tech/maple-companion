@@ -80,9 +80,6 @@ main { max-width: 1184px; padding: 3rem 2rem; margin: 0 auto; min-height: calc(1
 .notice.error { border-color: var(--error-ink); color: var(--error-ink); background: var(--error-wash); }
 .notice p:last-child { margin-bottom: 0; }
 .changes { margin-bottom: 2rem; border: 1px solid var(--line); background: var(--surface); padding: 1.5rem; }
-.hours-chat { max-width: 760px; margin: 0 0 2.5rem; border-top: 2px solid var(--accent); padding-top: 1.5rem; }
-.hours-chat > p { font-size: .9rem; }
-.hours-chat > .hint { font-size: .78rem; margin-top: 1rem; }
 .changes > p { font-size: .9rem; }
 .change-list li { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: .8rem 0; border-top: 1px solid var(--line); }
 .status-label { display: block; color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
@@ -228,8 +225,6 @@ button.theme-toggle { display: inline-flex; align-items: center; justify-content
 .review:last-child { margin-bottom: 0; }
 .review .comparison-head { color: var(--muted); }
 .comparison-row.changed { border-left: 3px solid var(--accent); padding-left: .7rem; }
-.hours-chat { border-top-width: 1px; }
-.hours-chat > .hint { font-size: .82rem; }
 .workspace-grid { margin-bottom: 3rem; }
 .sign-in { max-width: 27rem; }
 code { overflow-wrap: anywhere; }
@@ -250,26 +245,17 @@ code { overflow-wrap: anywhere; }
   button.theme-toggle { width: 44px; padding-inline: 0; }
   .theme-toggle span { display: none; }
 }
-.clarification-actions { display: flex; flex-wrap: wrap; gap: .65rem; }
-.clarification-actions button { white-space: normal; text-align: left; }
 
 /* Motion belongs to a deliberate step, never to background refreshes. */
-#review-heading, #hours-clarification-heading, #workspace-feedback,
-#workspace-error, #changes-heading, #chat-heading { scroll-margin-top: 1.5rem; }
-.clarification { padding: 1.35rem 1.5rem; margin-block: 1.5rem; }
-.clarification h3 { font-size: 1.15rem; line-height: 1.45; max-width: 36rem; }
-.clarification > p:not(.eyebrow) { max-width: 40rem; font-size: .9rem; }
-.clarification-actions { gap: .75rem; margin-top: 1.25rem; }
-.clarification-actions button { padding-block: .8rem; line-height: 1.45; }
+#review-heading, #workspace-feedback,
+#workspace-error, #changes-heading { scroll-margin-top: 1.5rem; }
 .work-progress { font-size: .85rem; color: var(--muted); margin: 1rem 0 0; }
 .review .actions { border-top: 1px solid var(--line); padding-top: 1.25rem; }
 @media (prefers-reduced-motion: no-preference) {
   button, input, textarea, select { transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; }
-  .clarification, .review { animation: step-appear 160ms ease-out; }
+  .review { animation: step-appear 160ms ease-out; }
   @keyframes step-appear { from { opacity: .65; } to { opacity: 1; } }
 }
 @media (max-width: 520px) {
-  .clarification { padding: 1rem; }
-  .clarification-actions { flex-direction: column; align-items: stretch; }
   .review .actions > button { width: 100%; white-space: normal; }
 }

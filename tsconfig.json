@@ -4,5 +4,5 @@
     "strict": true, "noUncheckedIndexedAccess": true, "esModuleInterop": true,
     "skipLibCheck": true, "types": ["node"], "outDir": "dist", "rootDir": ".", "jsx": "react-jsx"
   },
-  "include": ["server/**/*.ts", "shared/**/*.ts", "tests/**/*.ts", "web/**/*.tsx", "vite.config.ts"]
+  "include": ["server/**/*.ts", "shared/**/*.ts", "tests/**/*.ts", "tests/**/*.tsx", "integration/**/*.ts", "web/**/*.tsx", "vite.config.ts", "vitest.config.ts", "vitest.database.config.ts"]
 }

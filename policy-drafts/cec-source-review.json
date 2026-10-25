@@ -1,0 +1,81 @@
+{
+  "preparedAt": "2026-10-25T04:11:07.958Z",
+  "policyId": "cec-canadian-work-experience",
+  "version": "2026-10-25.single-interval.v1",
+  "candidateFile": "policy-drafts/cec-work-experience.candidate.json",
+  "contentDigest": "2a4a9f8790ab98edd3a4e743d319f3f02e021510d668a4ceda4076aa530ace21",
+  "reviewStatus": "draft",
+  "activated": false,
+  "operatorApprovalRecorded": false,
+  "dateBasis": {
+    "effectiveFrom": "2022-11-16",
+    "scope": "NOC 2021 / TEER amendment to IRPR 87.1(2)(a)",
+    "evidence": "SOR/2022-220 section 7 amends CEC; section 10 brings those amendments into force on 2022-11-16.",
+    "limitation": "This is not the start date of CEC, not the date every requirement was introduced, and not the page modification date. Review uses current requirements as if applying today; no historical replay is validated."
+  },
+  "sources": [
+    {
+      "id": "cec-guidance",
+      "url": "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/who-can-apply/canadian-experience-class.html",
+      "retrievedAt": "2026-10-25T04:08:03.412Z",
+      "status": 200,
+      "contentType": "text/html",
+      "charset": "utf-8",
+      "bytes": 34037,
+      "rawSha256": "018efc12e112c226903659579ae97f115eb6e4e68a26d61388357adf9499d8a1",
+      "bodySha256": "018efc12e112c226903659579ae97f115eb6e4e68a26d61388357adf9499d8a1",
+      "decodingIssue": null,
+      "privateSnapshot": ".local/cec-policy-review-20261025/cec-guidance.html"
+    },
+    {
+      "id": "irpr-87-1",
+      "url": "https://laws-lois.justice.gc.ca/eng/regulations/SOR-2002-227/section-87.1.html",
+      "retrievedAt": "2026-10-25T04:08:03.396Z",
+      "status": 200,
+      "contentType": "text/html",
+      "charset": "utf-8",
+      "bytes": 58365,
+      "rawSha256": "a09e5b9e74ca75bf53bc84a46040301f5a37a8295af1d302eca4e80876e3ddf7",
+      "bodySha256": "a09e5b9e74ca75bf53bc84a46040301f5a37a8295af1d302eca4e80876e3ddf7",
+      "decodingIssue": null,
+      "privateSnapshot": ".local/cec-policy-review-20261025/irpr-87-1.html"
+    },
+    {
+      "id": "irpr-73",
+      "url": "https://laws-lois.justice.gc.ca/eng/regulations/SOR-2002-227/section-73.html",
+      "retrievedAt": "2026-10-25T04:08:03.390Z",
+      "status": 200,
+      "contentType": "text/html",
+      "charset": "utf-8",
+      "bytes": 58390,
+      "rawSha256": "2e6162f241f438dcd85f33dfc04dba5e3ad2f9e5f97081863cf64c1df6eb5b33",
+      "bodySha256": "2e6162f241f438dcd85f33dfc04dba5e3ad2f9e5f97081863cf64c1df6eb5b33",
+      "decodingIssue": null,
+      "privateSnapshot": ".local/cec-policy-review-20261025/irpr-73.html"
+    },
+    {
+      "id": "noc-2021-commencement",
+      "url": "https://gazette.gc.ca/rp-pr/p2/2022/2022-11-09/html/sor-dors220-eng.html",
+      "retrievedAt": "2026-10-25T04:09:30.621Z",
+      "status": 200,
+      "contentType": "text/html; charset=UTF-8",
+      "charset": "UTF-8",
+      "bytes": 52466,
+      "rawSha256": "674238eb41c9896cc0edc2d93710f945bf0c9cfa22a4d282a92f42013cd4e417",
+      "bodySha256": null,
+      "decodingIssue": "Response bytes do not match declared encoding; raw snapshot retained without replacement or transcoding.",
+      "privateSnapshot": ".local/cec-policy-review-20261025/noc-2021-commencement.html"
+    }
+  ],
+  "pendingReviewDecisions": [
+    "Approve this exact current-guidance candidate for a single-user local trial only; record reviewer and timestamp, then add its content digest to the operator-owned allowlist.",
+    "Accept only the stated single-interval calculation scope. Gaps, concurrent jobs, variable conditions and physician exceptions remain needs-information/review cases.",
+    "Keep calendar/partial-week boundary uncertainty visible. Do not interpret met as full CEC eligibility, an occupational restriction clearance, language/admissibility approval, CRS or an invitation."
+  ],
+  "operationalStepsAfterApproval": [
+    "Write a separate approved local policy bundle without changing the draft.",
+    "Point the local process at that bundle and coordinate a restart.",
+    "User reviews and saves interval evidence; assessment and notification use that receipt-backed evidence."
+  ],
+  "unrelatedActions": "No credentials, grants, database schema, AM ingestion, public publishing or deployment required."
+}

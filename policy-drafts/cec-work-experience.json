@@ -1,0 +1,47 @@
+{
+  "status": "draft_not_activated",
+  "runtimeBundle": { "versions": [], "approvedDigests": [] },
+  "proposal": {
+    "id": "cec-canadian-work-experience",
+    "version": "draft-single-interval-v1",
+    "program": "Canadian Experience Class — work experience only",
+    "effectiveFrom": null,
+    "reviewed": false,
+    "activated": false,
+    "criterion": {
+      "id": "cec-work-interval",
+      "title": "Qualifying Canadian work experience for the recorded interval",
+      "kind": "cec_work_experience",
+      "calculation": "single-interval-v1",
+      "minimumCalendarMonths": 12,
+      "minimumHours": 1560,
+      "weeklyCap": 30,
+      "lookbackYears": 3
+    }
+  },
+  "sources": [
+    {
+      "url": "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/who-can-apply/canadian-experience-class.html",
+      "pageModifiedOn": "2026-10-16",
+      "checkedOn": "2026-10-25",
+      "exactBodySnapshot": null,
+      "bodySha256": null
+    },
+    {
+      "url": "https://www.ircc.canada.ca/english/helpcentre/answer.asp?qnum=394&top=29",
+      "pageModifiedOn": "2026-09-28",
+      "checkedOn": "2026-10-25"
+    },
+    {
+      "url": "https://www.statcan.gc.ca/en/subjects/standard/noc/2021/introductionV1",
+      "checkedOn": "2026-10-25"
+    }
+  ],
+  "promotionRequired": [
+    "Capture and review the exact official source body and its hash.",
+    "Establish rule applicability/effective dates from governing evidence; page modification is not an effective date.",
+    "Review calendar boundaries, partial weeks and this conservative single-interval scope.",
+    "Confirm treatment of duties review, conflicting evidence and unsupported physician/complex-history cases.",
+    "Record reviewer and review timestamp; approve the final complete policy digest separately."
+  ]
+}

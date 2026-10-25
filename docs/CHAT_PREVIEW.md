@@ -1,9 +1,10 @@
 # Chat correction contract checkpoint
 
-Status: **native weekly-hours prototype enabled only in the explicit single-user
-synthetic development trial; production chat remains disabled**. This is a narrow
-correction flow, not a general conversational agent. The employment form and its
-confirmed save path remain available.
+Status: **retired experiment, retained as decision history**. The preview interpreter,
+hours-only composer, request endpoints and request writers have been removed. This
+document records earlier observations; it is not a description of the current app.
+Native AM now owns conversation. The employment form and exact confirmation path
+remain available. See `CODE_CLEANUP.md` for the retained historical-record support.
 
 ## Initial hosted probe, 2026-10-24
 

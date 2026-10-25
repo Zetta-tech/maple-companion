@@ -49,6 +49,17 @@ afterEach(() => {
 function statuses(result: { results: { status: string }[] }) { return result.results.map(criterion => criterion.status); }
 
 describe('private assessments of approved evidence', () => {
+  it('withholds current judgments after newer native memory requires input review', async () => {
+    const { journal, workflow, policies, policy, commit } = setup();
+    let reviewed = true;
+    const assessments = new Assessments(journal, workflow, policies, () => new Date(initialTime), async () => reviewed);
+    await commit();
+    const prior = await assessments.run(alice, { policyId: policy.id });
+    reviewed = false;
+    await expect(assessments.run(alice, { policyId: policy.id })).rejects.toMatchObject({ code: 'ASSESSMENT_INPUT_REVIEW_REQUIRED' });
+    expect(await assessments.get(alice, prior.id)).toMatchObject({ freshness: 'unverified', results: [] });
+    expect(await assessments.list(alice)).toEqual([expect.objectContaining({ freshness: 'unverified', results: [] })]);
+  });
   it('runs, lists and reads a private result with the reviewed source and effective date', async () => {
     const { assessments, policy, commit, journal } = setup();
     await commit();

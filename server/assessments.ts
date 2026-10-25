@@ -4,7 +4,7 @@ import type { AssessmentRecord, AssessmentView } from '../shared/assessment.js';
 import { businessDate as assessmentDate } from '../shared/business-date.js';
 import { validateEmployment } from '../shared/employment.js';
 import { AppError } from './errors.js';
-import type { Journal } from './journal.js';
+import type { JournalStore } from './journal-store.js';
 import type { Workflow } from './workflow.js';
 import { PolicyRegistry, evaluatePolicy } from './policies.js';
 
@@ -12,13 +12,15 @@ const requestSchema = z.strictObject({ policyId: z.string().min(1).max(120) });
 export { assessmentDate };
 
 export class Assessments {
-  constructor(private journal: Journal, private workflow: Workflow, readonly policies: PolicyRegistry = new PolicyRegistry(), private now = () => new Date()) {}
+  constructor(private journal: JournalStore, private workflow: Workflow, readonly policies: PolicyRegistry = new PolicyRegistry(), private now = () => new Date(),
+    private evidenceStillReviewed: (owner: string) => Promise<boolean> = async () => true) {}
   available() { return this.policies.available(assessmentDate(this.now())); }
   async run(owner: string, body: unknown): Promise<AssessmentView> {
     const { policyId } = requestSchema.parse(body);
     const now = this.now();
     const date = assessmentDate(now);
     const selected = this.policies.active(policyId, date);
+    if (!await this.evidenceStillReviewed(owner)) throw new AppError(409, 'ASSESSMENT_INPUT_REVIEW_REQUIRED', 'Review and save your assessment inputs after conversation updates, then run this check. Any unfinished update must be checked first.');
     // Every run, including a deduplication hit, verifies the current approved AM evidence.
     const snapshot = await this.workflow.read(owner);
     const verifiedAt = this.now();
@@ -26,25 +28,26 @@ export class Assessments {
     let employment;
     try { employment = snapshot.employment === null ? null : validateEmployment(snapshot.employment, date); }
     catch { throw new AppError(503, 'ASSESSMENT_EVIDENCE_INVALID', 'Saved employment dates could not be verified for this assessment date.'); }
-    const head = this.journal.head(owner);
-    if (head.revision !== snapshot.revision || this.journal.active(owner)) throw new AppError(409, 'STALE_REVISION', 'Your information changed. Run the check again.');
+    const head = await this.journal.head(owner);
+    if (head.revision !== snapshot.revision || await this.journal.active(owner) || !await this.evidenceStillReviewed(owner)) throw new AppError(409, 'STALE_REVISION', 'Your information changed. Run the check again.');
     const policy = selected.policy;
     const record: AssessmentRecord = {
       id: randomUUID(), ownerId: owner, profileRevision: snapshot.revision, evidence: head.receipt,
       assessmentDate: date, createdAt: verifiedAt.toISOString(),
       policy: { id: policy.id, version: policy.version, program: policy.program, title: policy.title, digest: selected.digest,
         sourceUrl: policy.source.url, sourceBodySha256: policy.source.bodySha256, effectiveFrom: policy.effectiveFrom, effectiveTo: policy.effectiveTo },
-      results: evaluatePolicy(selected, employment),
+      results: evaluatePolicy(selected, employment, date),
     };
-    const stored = this.journal.saveAssessment(owner, record);
-    return this.view(stored, 'current');
+    const stored = await this.journal.saveAssessment(owner, record);
+    // A network-backed save can cross Toronto midnight after the earlier check.
+    return this.view(stored, assessmentDate(this.now()) === date && await this.evidenceStillReviewed(owner) ? 'current' : 'stale');
   }
   async list(owner: string): Promise<AssessmentView[]> {
-    return this.verify(owner, this.journal.assessments(owner));
+    return this.verify(owner, await this.journal.assessments(owner));
   }
   async get(owner: string, id: string): Promise<AssessmentView> {
     // Owner check precedes provider access and returns the same 404 for absent/foreign IDs.
-    const record = this.journal.assessment(owner, id);
+    const record = await this.journal.assessment(owner, id);
     return (await this.verify(owner, [record]))[0]!;
   }
   private async verify(owner: string, records: AssessmentRecord[]): Promise<AssessmentView[]> {
@@ -52,18 +55,22 @@ export class Assessments {
     let currentRevision: number;
     let date: string;
     try {
+      if (!await this.evidenceStillReviewed(owner)) return records.map(record => this.view(record, 'unverified'));
       const snapshot = await this.workflow.read(owner);
       date = assessmentDate(this.now());
       if (snapshot.employment !== null) validateEmployment(snapshot.employment, date);
       currentRevision = snapshot.revision;
     }
     catch { return records.map(record => this.view(record, 'unverified')); }
-    const head = this.journal.head(owner);
+    const head = await this.journal.head(owner);
+    const active = await this.journal.active(owner);
+    if (!await this.evidenceStillReviewed(owner)) return records.map(record => this.view(record, 'unverified'));
+    date = assessmentDate(this.now());
     return records.map(record => {
       let currentPolicy = false;
       try { currentPolicy = this.policies.active(record.policy.id, date).digest === record.policy.digest; } catch { /* No approved current rule => stale. */ }
       const current = currentPolicy && record.assessmentDate === date && record.profileRevision === currentRevision
-        && head.revision === currentRevision && !this.journal.active(owner)
+        && head.revision === currentRevision && !active
         && JSON.stringify(record.evidence) === JSON.stringify(head.receipt);
       return this.view(record, current ? 'current' : 'stale');
     });

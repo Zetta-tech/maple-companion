@@ -1,0 +1,51 @@
+/* Maple memory: current facts first, one quiet composer, history on demand. */
+.native-memory { margin-bottom: 3rem; }
+.native-memory .section-heading { align-items: center; margin-bottom: .75rem; }
+.native-memory .section-heading h2 { margin-bottom: 0; }
+.native-memory .memory-intro { color: var(--muted); margin-bottom: 1.75rem; }
+.native-memory .memory-layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 2.5rem; align-items: start; }
+.memory-overview, .memory-current, .memory-composer { min-width: 0; }
+.native-memory h3 { font-size: 1.05rem; font-weight: 650; line-height: 1.4; margin-bottom: .5rem; }
+.native-memory .memory-source { color: var(--muted); font-size: .78rem; line-height: 1.5; margin-bottom: 1.25rem; }
+.memory-facts { margin: 0 0 1rem; }
+.memory-facts > div { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.35fr); gap: 1rem; padding: .9rem 0; border-bottom: 1px solid var(--line); }
+.memory-facts > div:first-child { border-top: 1px solid var(--line); }
+.memory-facts dt { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.memory-facts dt::first-letter { text-transform: uppercase; }
+.memory-facts dd { margin: 0; color: var(--ink); font-size: .95rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.native-memory .memory-composer { background: var(--surface-subtle); border: 1px solid var(--line); border-radius: 10px; padding: 1.5rem; }
+.memory-composer > .hint { margin-bottom: 1rem; }
+.memory-composer label { font-size: .9rem; }
+.memory-composer .checkbox { font-size: .82rem; line-height: 1.5; }
+.memory-composer textarea { min-height: 110px; }
+.native-memory .memory-test-note { color: var(--muted); font-size: .8rem; line-height: 1.5; margin: 1rem 0; }
+.memory-composer fieldset > .hint { margin-top: .75rem; }
+.memory-composer > .memory-conversation-note { margin: .75rem 0 0; font-size: .78rem; }
+.memory-update { border-left: 3px solid var(--line); padding: .85rem 1rem; margin-bottom: 1.5rem; border-radius: 0 7px 7px 0; overflow-wrap: anywhere; }
+.memory-update--success { background: var(--success-wash); border-color: var(--success-ink); color: var(--success-ink); }
+.memory-update--warning { background: var(--warning-wash); border-color: var(--warning-ink); color: var(--warning-ink); }
+.memory-update--pending { background: var(--surface-subtle); border-color: var(--control-border); color: var(--ink); }
+.memory-update-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .3rem 1rem; }
+.memory-update-heading strong { font-size: .9rem; }
+.memory-update time { font-size: .72rem; }
+.memory-update > p { font-size: .85rem; line-height: 1.55; margin: .35rem 0 0; }
+.native-memory details { font-size: .85rem; overflow-wrap: anywhere; }
+.native-memory summary { cursor: pointer; min-height: 44px; align-content: center; font-weight: 600; }
+.native-memory details p { margin: .4rem 0 .75rem; }
+.memory-disclosure { border-bottom: 1px solid var(--line); margin-bottom: 1rem; }
+.memory-disclosure summary { color: var(--accent); }
+.memory-disclosure ul { padding-left: 1.2rem; }
+.memory-history { margin-top: 1.25rem; }
+.memory-history .memory-update { margin-block: .5rem 1rem; }
+.native-memory .memory-caution { background: var(--warning-wash); color: var(--warning-ink); border-left: 3px solid var(--warning-ink); border-radius: 0 7px 7px 0; padding: .8rem 1rem; margin-bottom: 1rem; font-size: .85rem; overflow-wrap: anywhere; }
+.native-memory .memory-placeholder { border-block: 1px solid var(--line); padding: 1.25rem 0; color: var(--muted); font-size: .9rem; }
+.memory-placeholder strong { color: var(--ink); }
+.memory-placeholder p { margin: .35rem 0 0; }
+@media (max-width: 800px) {
+  .native-memory .memory-layout { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+}
+@media (max-width: 520px) {
+  .native-memory .section-heading { align-items: flex-start; gap: .75rem; }
+  .native-memory .memory-composer { padding: 1rem; }
+  .memory-facts > div { grid-template-columns: minmax(0, 1fr); gap: .25rem; }
+}

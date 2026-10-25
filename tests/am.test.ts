@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createAgentMemory, digestEnvelope, MemoryStorageError, type Binding, type Envelope } from '../server/am.js';
+import { testCecEmployment } from './support/test-cec.js';
 
 // The real alpha.11 SDK runs in every test. Only its HTTP transport is replaced.
 const endpoint = 'https://memory.example.test';
@@ -58,6 +59,24 @@ function writeResult(value: string, extra: Record<string, unknown> = {}) {
 }
 
 describe('real Agent Memory SDK adapter', () => {
+  it('preserves the pre-CEC envelope digest and does not inject evidence defaults before receipt verification', async () => {
+    const canonical = (value: unknown): string => {
+      if (value === null || typeof value !== 'object') return JSON.stringify(value);
+      const object = value as Record<string, unknown>;
+      return '{' + Object.keys(object).sort().map(key => JSON.stringify(key) + ':' + canonical(object[key])).join(',') + '}';
+    };
+    const legacyDigest = createHash('sha256').update(canonical(envelope)).digest('hex');
+    const fake = transport(() => json(page([row()])));
+    const saved = await createAgentMemory(fake.fetchImpl).read(binding, { factId: receipt.factId, digest: legacyDigest });
+    expect(saved).toEqual(envelope);
+    expect(saved.employment).not.toHaveProperty('cecWork');
+    expect(digestEnvelope(saved)).toBe(legacyDigest);
+    const changed = { ...envelope, employment: { ...envelope.employment, cecWork: testCecEmployment().cecWork } };
+    expect(digestEnvelope(changed)).not.toBe(legacyDigest);
+    const tampered = transport(() => json(page([row(changed)])));
+    await expect(createAgentMemory(tampered.fetchImpl).read(binding, { factId: receipt.factId, digest: legacyDigest })).rejects.toMatchObject({ code: 'integrity' });
+    expect([...fake.calls, ...tampered.calls].every(call => call.method === 'GET')).toBe(true);
+  });
   it('keeps concurrent owners on their own hosted endpoints and credentials for writes and reads', async () => {
     const bob: Binding = { ownerId: 'user_bob', endpoint: 'https://bob.memory.example.test', context: 'ctx_bob', readKey: 'test-bob-read', writeKey: 'test-bob-write' };
     const bobEnvelope: Envelope = { ...envelope, ownerId: bob.ownerId, operationId: 'bob-operation' };

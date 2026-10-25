@@ -1,0 +1,150 @@
+# Maple demo handoff — October 25, 2026
+
+## Current result
+
+Local URL: **http://localhost:3000**. Use the existing authorized Clerk account.
+Draft PR: https://github.com/Zetta-tech/maple-companion/pull/8. Nothing has been
+merged or deployed by this task.
+
+| Experience | Verified now | Remaining acceptance |
+| --- | --- | --- |
+| C20 discovery — Working | Real signed-in UI review/confirmation, AM receipt-read at revision 2, two live official sources, native `/chat` response and private journey fresh-load | Limited to C20 research and fictional data; not exhaustive pathway search or eligibility adjudication |
+| Express Entry replay — Working | Real signed-in UI five-source replay; complete fictional 528 → 568; same profile/date; future November 3 label; persistent event and duplicate replay reuse | Announced-policy projection within the documented supported subset, not a certified future score |
+| Ordinary memory | Current attributes unchanged against the preflight snapshot; all synthetic writes went to the separate demo Context | Existing mixed Context remains a production candidate, not clean or production-ready |
+
+Both the live backend and authenticated UI acceptance now passed. The user signed
+into the existing Codex IAB tab; no Clerk session was minted or copied. Earlier
+offline browser tests remain separate evidence and are not presented as live tests.
+
+## What ran live
+
+On October 25 around 11:58 UTC, the authorized fictional Avery profile was proposed
+and explicitly confirmed through the same `DemoJourney` coordinator used by HTTP.
+Its complete CRS evidence was explicitly marked reviewed for October 25. The exact
+profile is held only in ignored private evidence and AM; the operational database
+keeps its receipt pointer. AM readback verified revision 1 and the envelope digest.
+
+C20 retrieval checked both reviewed official source body hashes. One native AM
+chat request generated a reciprocal-employment lead, HR evidence requests, unknowns
+and a separate-spouse-assessment caveat. The response was originally withheld for
+a Markdown JSON fence. Local validation also mistook “cannot be guaranteed” for a
+guarantee. Both defects have targeted regressions. The existing recorded response
+was revalidated and its derived journey display conditionally repaired; no second
+model call, fact rewrite, or deletion was used for that recovery. Before/after
+records are retained.
+
+A native session read returned the persisted user and assistant turns without
+pagination. This separately verifies conversational persistence; merely reloading
+the app-owned journey would not prove AM retained the exchange. Provider token
+usage/cost was not returned, so no cost estimate is claimed.
+
+The EE replay retrieved five actual official sources and calculated **528 → 568
+(+40)** for this fully specified fictional profile. It is an announced-policy
+projection effective **November 3, 2026**, not an active increase on October 25.
+Both versions use identical facts and assessment date. A second replay returned
+the original event, and a fresh database connection reloaded the profile receipt
+and both journey events. The +40 is calculated, not a universal or hardcoded delta.
+
+## User reproduction
+
+The browser acceptance then changed only the fictional employer label, reviewed
+the exact proposal, confirmed and receipt-read revision 2. One browser-triggered
+native C20 call completed with the generated explanation available. Real UI replay
+showed the full 528-to-568 comparison and the component breakdown. A repeated
+replay reused its original event. Full page reload preserved the authorized
+session, revision 2, both current results and both historical revision-1 results.
+Independent readback confirmed four events, no pending saves, two native turns for
+the browser request and unchanged ordinary attributes. Total live model calls:
+**two** (one backend check and one browser acceptance); no negative-case model batch.
+
+1. Sign in at localhost in Codex IAB with the existing account. No artificial Clerk
+   session or copied Chrome cookies are used. The real sign-in tab is kept open.
+2. Find **Maple Guide — Fictional demonstration**. The saved Avery profile should
+   show verified demo revision 2. **Review or edit demonstration profile** exposes
+   its explicit invented facts and complete CRS assumptions.
+3. Inspect the saved C20 discovery: why it is a potential lead, outstanding evidence,
+   next steps and official sources. Open **Saved generated explanation** for the
+   actual native response, clearly distinguished from reviewed condition checks.
+4. Inspect the saved policy update and the full points breakdown. Its future date,
+   replay provenance and fictional assumptions must remain visible.
+5. Use **Refresh journey**, then reload. Both saved items should remain. Under
+   **Demo controls: official policy replay**, repeat the update; the same result
+   should be reused rather than creating another event or model request.
+6. Additional profile edits require exact review/confirmation. Do not regenerate
+   the C20 answer just to prove reload. The existing normal employment record is
+   separate and must not be edited as part of this demo.
+
+## Architecture and safety boundaries
+
+The Guide uses its own Context/key binding for the same single authorized Clerk
+owner. It cannot fall back to ordinary memory. Missing configuration disables it;
+matching ordinary Context/key or a different owner is rejected. Full-access keys
+remain a server-only development exception, not restricted reader/writer grants.
+
+Confirmed fictional facts live in AM as an explicit `demo_profile` triple. The
+Surreal operational store holds pending proposals, receipt/revision metadata and
+derived journey results, not a second canonical profile. Native `/chat` persists
+conversation/extraction in the isolated Context. No additional interpreter or
+reflection fallback is active. Historical legacy proposal parsers remain only
+where existing records still need them.
+
+C20 is the supported discovery coverage, not an exhaustive immigration search.
+Employer brand or permit expiry alone never establishes the pathway. The August 13
+update removed the prior-employed-abroad requirement; reciprocity evidence remains
+necessary. A reported program is only a lead. No work authorization, spouse permit,
+eligibility or approval is promised. Native text receives format/source/status and
+known-dangerous-claim checks; those checks are not semantic or legal certification.
+
+CRS scope and unresolved future cap edge cases are documented in
+[CRS_COMPLETION_SCOPE.md](CRS_COMPLETION_SCOPE.md). Missing or conflicting evidence
+holds exact totals. Official source updates require reviewed hash promotion.
+
+## Validation and private evidence
+
+- **774 local tests / 38 files**, typecheck and production build pass after the live
+  formatting/disclaimer fixes. Bundle 521.32 kB / 149.86 kB gzip; size warning remains.
+- Two earlier real Surreal integration tests passed against `maple/test`; AM was
+  explicitly substituted in those tests. Ten synthetic records are retained there.
+- The live run used the real scoped development DB credentials and real demo AM key.
+  It did not bypass HTTP authentication or claim authenticated UI execution.
+- Additive demo schema/marker is present in test and development. No existing records,
+  users, grants or credentials were changed by schema application.
+- Secrets, raw messages/session identifiers and provider payloads remain ignored.
+
+Private evidence in the active worktree:
+`.local/demo-live-20261025/preflight.json`, `activation.json`, `live-backend.json`,
+`recorded-reply-review.json`, `recorded-reply-review-v2.json`, `browser-readback.json`
+and `guide-raw/`. The browser's raw native request/response is also in the original
+checkout's ignored `.local/guide-diagnostics/`. Its
+`.local/preview-isolated-guide-v2.process.json` records the owned process running
+the tested `3a412d4` build. Do not commit these runtime artifacts.
+
+Existing-memory cleanup inventory is at
+`.local/production-memory-inventory/REPORT.md` with a private exact-ID manifest.
+No forget, purge or session deletion has run. Mixed user-entered details must be
+preserved until a precise cleanup action is approved; labels are not isolation.
+
+Source cleanup follow-up: the unused hours composer, mapper, preview transport,
+legacy request writers and `/api/chat/*` endpoints are removed. Historical record
+readback, provenance, expiry and migration remain. The current offline suite has
+578 passing tests across 30 files (the retired interpreter tests were removed),
+with typecheck/build/hygiene passing. See `CODE_CLEANUP.md`. Hosted tests were not
+rerun for this source-only cleanup; no provider or database mutation was needed.
+The verified localhost process remains on frozen code `3a412d4`, independently of
+the newer source/PR cleanup commit. It has not been restarted for this change.
+
+The private `RESET_OPTIONS.md` beside the inventory records complete Context
+delete/recreate implications. Partial session deletion is withdrawn. No cleanup
+approval or production-clean claim is implied by that decision document.
+
+Native-composer review correction: definitive API rejections before native dispatch
+now carry an explicit `nativeRequestState: not_started` receipt. The client releases
+its pending ID only with that receipt, preserving the message for editing. A status
+code alone, lost/unreadable response, or any claim/send uncertainty retains the hold.
+Shared 5,000-character validation fits the existing 32 KiB JSON body limit even with
+escaped characters; it is not a usage quota. Offline HTTP regressions cover actual
+Express body rejection, the existing rate limiter, no-claim history, subsequent
+edited submission and provider/claim uncertainty. No model calls or live browser
+actions were used for this fix; the verified running build remains unchanged.
+After this correction, all 585 offline tests across 30 files, typecheck, build and
+tracked-file hygiene pass. The current bundle is 522.12 kB and retains its size warning.

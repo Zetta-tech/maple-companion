@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import { RequestError, readResponse } from './request.js';
 import { ClerkProvider, SignIn, UserButton, useAuth } from '@clerk/react';
 import { StrictMode, useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -6,10 +7,11 @@ import { ThemeProvider, ThemeToggle, clerkAppearance } from './Theme.js';
 import { employmentSchema, type Employment } from '../shared/employment.js';
 import './styles.css';
 import { AssessmentPanel } from './AssessmentPanel.js';
-import { HoursChat } from './HoursChat.js';
+import { DemoJourneyPanel } from './DemoJourneyPanel.js';
+import { CecWorkFields, CecWorkReview } from './CecWorkFields.js';
 import { HoursReviewNote } from './HoursReviewNote.js';
+import { NativeMemoryPanel } from './NativeMemoryPanel.js';
 import { useFlowNavigation } from './useFlowNavigation.js';
-import type { HoursAnswer, HoursClarification } from '../shared/chat.js';
 
 type Snapshot = { revision: number; employment: Employment | null };
 type Proposal = {
@@ -19,26 +21,9 @@ type Proposal = {
   status: string;
   oldValue: Employment | null;
   newValue: Employment;
-  chat?: { utterance: string; expiresAt: string; periodSource: 'message' | 'interpretation'; clarificationAnswer?: 'actual_weekly_work' };
+  chat?: { utterance: string; expiresAt: string; periodSource: 'message' | 'interpretation'; clarificationAnswer?: 'actual_weekly_work'; clarificationSource?: 'user_entered' };
 };
 type Notification = { id: string; operationId: string | null; assessmentId: string | null; kind: 'saved' | 'assessed'; createdAt: string; revision: number };
-type ApiErrorBody = { error?: { code?: string; message?: string } };
-
-class RequestError extends Error {
-  constructor(message: string, readonly code: string) { super(message); }
-}
-
-async function readResponse<T>(response: Response): Promise<T> {
-  let body: unknown;
-  try { body = await response.json(); }
-  catch { throw new RequestError('The server returned an unreadable response. Check your connection and try again.', 'INVALID_RESPONSE'); }
-  if (!response.ok) {
-    const failure = body as ApiErrorBody;
-    throw new RequestError(failure.error?.message ?? 'The request could not be completed.', failure.error?.code ?? 'REQUEST_FAILED');
-  }
-  return body as T;
-}
-
 const blankEmployment: Employment = {
   employer: '', title: '', duties: '', startDate: '', currentJob: true, endDate: null,
   hoursPerWeek: null, countryCode: '', paid: 'unknown', authorizedToWork: 'unknown',
@@ -101,7 +86,7 @@ function Bootstrap() {
 function AuthenticatedApp() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   if (!isLoaded) return <Shell><p className="loading" role="status">Loading secure sign-in…</p></Shell>;
-  if (!isSignedIn) return <Shell><div className="sign-in-layout"><section className="intro"><p className="eyebrow">A little clarity for your next step</p><h1>Your story.<br />Your say.</h1><p>Keep your employment information up to date. You will review every change before it is saved.</p><p className="muted">Sign in to continue to your private workspace.</p></section><section className="sign-in" aria-label="Sign in"><SignIn routing="hash" /></section></div></Shell>;
+  if (!isSignedIn) return <Shell><div className="sign-in-layout"><section className="intro"><p className="eyebrow">A little clarity for your next step</p><h1>Your story.<br />Your say.</h1><p>Review what Maple remembers and keep your employment information up to date.</p><p className="muted">Sign in to continue to your private workspace.</p></section><section className="sign-in" aria-label="Sign in"><SignIn routing="hash" /></section></div></Shell>;
   return <SessionGate key={userId} />;
 }
 
@@ -142,26 +127,24 @@ function Workspace() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activity, setActivity] = useState<'refresh' | 'propose' | 'chat' | 'clarify' | 'confirm' | 'reject' | 'reconcile' | null>(null);
+  const [activity, setActivity] = useState<'refresh' | 'propose' | 'confirm' | 'reject' | 'reconcile' | null>(null);
   const busy = activity !== null;
   const beginNavigation = useFlowNavigation();
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [reviewId, setReviewId] = useState<string | null>(null);
-  const [chatAvailable, setChatAvailable] = useState(false);
-  const [chatFallback, setChatFallback] = useState(false);
-  const [chatClarification, setChatClarification] = useState<HoursClarification | null>(null);
+  const [memoryEpoch, setMemoryEpoch] = useState(0);
 
   const request = useCallback(async <T,>(path: string, body?: unknown): Promise<T> => {
     const token = await getToken();
-    if (!token) throw new RequestError('Your session has ended. Sign in again before continuing.', 'UNAUTHENTICATED');
+    if (!token) throw new RequestError('Your session has ended. Sign in again before continuing.', 'UNAUTHENTICATED', path === '/api/native/messages' ? 'not_started' : undefined);
     let response: Response;
     try {
       response = await fetch(path, {
         method: body === undefined ? 'GET' : 'POST',
         headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(path === '/api/chat/proposals' ? 45_000 : 25_000),
+        cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(path === '/api/demo/discover' ? 90_000 : path === '/api/native/messages' ? 60_000 : 25_000),
       });
     } catch { throw new RequestError('The connection was interrupted. Refresh the change status before trying again.', 'CONNECTION_INTERRUPTED'); }
     return readResponse<T>(response);
@@ -171,14 +154,11 @@ function Workspace() {
     // An uncertain write deliberately blocks the authoritative snapshot. Operational
     // statuses must still load so a restarted client can reach reconciliation.
     setSnapshot(null);
-    const [nextSnapshot, changes, inbox, chat] = await Promise.allSettled([
+    const [nextSnapshot, changes, inbox] = await Promise.allSettled([
       request<Snapshot>('/api/employment'),
       request<{ proposals: Proposal[] }>('/api/proposals'),
       request<{ notifications: Notification[] }>('/api/notifications'),
-      request<{ available: boolean; clarification: HoursClarification | null }>('/api/chat/status'),
     ]);
-    setChatAvailable(chat.status === 'fulfilled' && chat.value.available);
-    setChatClarification(chat.status === 'fulfilled' ? chat.value.clarification : null);
     if (changes.status === 'fulfilled') setProposals(changes.value.proposals);
     if (inbox.status === 'fulfilled') setNotifications(inbox.value.notifications);
 
@@ -244,60 +224,6 @@ function Workspace() {
     } finally { setActivity(null); navigation.complete(destination); }
   }
 
-  async function proposeChat(text: string): Promise<boolean> {
-    if (!snapshot || !canEdit) return false;
-    const navigation = beginNavigation();
-    let destination = 'workspace-error';
-    setActivity('chat'); setError(''); setMessage(''); setChatFallback(false);
-    try {
-      const result = await request<{ kind: string; proposal?: Proposal; message?: string; formHref?: string; clarification?: HoursClarification }>('/api/chat/proposals', {
-        baseRevision: snapshot.revision, message: text, syntheticTest: true,
-      });
-      setChatClarification(result.clarification ?? null);
-      if (result.kind === 'proposal' && result.proposal) {
-        const proposal = result.proposal;
-        setProposals(current => [proposal, ...current.filter(item => item.id !== proposal.id)]);
-        setReviewId(proposal.id);
-        setMessage('Your chat correction is ready for review. Your employment record has not changed.');
-        destination = 'review-heading';
-        return true;
-      }
-      setMessage(result.message ?? 'No change was proposed. Please use the employment form.');
-      setChatFallback(result.kind === 'unavailable' && result.formHref === '#employment-heading');
-      destination = result.clarification ? 'hours-clarification-heading' : 'workspace-feedback';
-      return false;
-    } catch (reason) {
-      setError(`Your employment record was not changed by this chat request. ${reason instanceof Error ? reason.message : 'The preview could not be completed.'}`);
-      // Refresh possible pending state after a lost response; never replay.
-      try { await load(); } catch { /* Existing load applies successful status reads. */ }
-      return false;
-    } finally { setActivity(null); navigation.complete(destination); }
-  }
-
-  async function answerChat(answer: HoursAnswer) {
-    if (!chatClarification || !canEdit) return;
-    const navigation = beginNavigation();
-    let destination = 'workspace-error';
-    setActivity('clarify'); setError(''); setMessage('');
-    try {
-      const result = await request<{ kind: string; proposal?: Proposal; message?: string }>(`/api/chat/clarifications/${encodeURIComponent(chatClarification.id)}`, { answer });
-      setChatClarification(null);
-      if (result.kind === 'proposal' && result.proposal) {
-        const proposal = result.proposal;
-        setProposals(current => [proposal, ...current.filter(item => item.id !== proposal.id)]);
-        setReviewId(proposal.id);
-        setMessage('Your clarification prepared a change for review. Your employment record has not changed.');
-        destination = 'review-heading';
-      } else {
-        setMessage(result.message ?? 'Your employment record is unchanged.');
-        destination = 'workspace-feedback';
-      }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Your answer could not be processed. Refresh status before trying again.');
-      try { await load(); } catch { /* Recover pending state without replaying. */ }
-    } finally { setActivity(null); navigation.complete(destination); }
-  }
-
   async function decide(proposal: Proposal, decision: 'confirm' | 'reject') {
     const navigation = beginNavigation();
     let destination = 'workspace-error';
@@ -350,23 +276,23 @@ function Workspace() {
   }, [request]);
 
   return <Shell account={<div className="account"><UserButton /></div>}>
-    <div className="page-heading"><div><p className="eyebrow">Your information</p><h1>Let’s start with your work.</h1><p>Record one job, then review the details before saving.</p></div><button type="button" className="secondary" disabled={busy || loading} onClick={refresh}>{activity === 'refresh' ? 'Refreshing…' : 'Refresh status'}</button></div>
+    <div className="page-heading"><div><p className="eyebrow">Your information</p><h1>Your memory and next steps.</h1><p>Review remembered information and the evidence used for your private requirement checks.</p></div><button type="button" className="secondary" disabled={busy || loading} onClick={refresh}>{activity === 'refresh' ? 'Refreshing…' : 'Refresh status'}</button></div>
     {error && <div id="workspace-error" tabIndex={-1} className="notice error" role="alert">{error}</div>}
-    {message && <div id="workspace-feedback" tabIndex={-1} className="notice" role="status">{message}{chatFallback && <> <a href="#employment-heading">Employment form</a></>}</div>}
-    <HoursChat available={chatAvailable} disabled={!canEdit} busy={busy} activity={activity === 'chat' ? 'preview' : activity === 'clarify' ? 'clarification' : undefined} onPropose={proposeChat} clarification={chatClarification} onAnswer={answerChat}
-      blockedBy={unresolved.some(proposal => ['applying', 'uncertain'].includes(proposal.status)) ? 'save' : unresolved.length ? 'pending' : !loading && snapshot === null ? 'unavailable' : undefined} />
+    {message && <div id="workspace-feedback" tabIndex={-1} className="notice" role="status">{message}</div>}
+    <DemoJourneyPanel request={request} />
+    <NativeMemoryPanel request={request} onChanged={() => setMemoryEpoch(value => value + 1)} />
     {review?.chat && review.newValue?.hoursPerWeek !== null && <HoursReviewNote {...review.chat} oldHours={review.oldValue?.hoursPerWeek ?? null} newHours={review.newValue.hoursPerWeek} />}
     {loading && <p role="status">Loading your saved information…</p>}
     {!loading && !snapshot && <p className="muted">Your saved information is unavailable. Use Refresh status to reconnect before editing.</p>}
 
     {unresolved.length > 0 && <section className="changes" aria-labelledby="changes-heading"><h2 id="changes-heading" tabIndex={-1}>Changes to review</h2><p className="muted">Finish or discard the current change before starting another.</p><ul className="change-list">{unresolved.map((proposal) => <li key={proposal.id}><div><strong>{proposal.newValue.title} · {proposal.newValue.employer}</strong><span className="status-label">{proposal.status === 'pending' ? 'Awaiting your confirmation' : `${proposal.status} — save not confirmed`}</span></div>{proposal.status === 'pending' && <button className="secondary" type="button" disabled={busy} onClick={() => { const navigation = beginNavigation(); setReviewId(proposal.id); navigation.complete('review-heading'); }}>Review change</button>}{['applying', 'uncertain'].includes(proposal.status) && <button className="secondary" type="button" disabled={busy} onClick={() => reconcile(proposal)}>Check save status</button>}</li>)}</ul></section>}
 
-    {review && <section className="review" aria-labelledby="review-heading"><p className="eyebrow">Nothing changes until you confirm</p><h2 id="review-heading" tabIndex={-1}>Review this exact change</h2><p>Confirmation applies only to the values below. If your saved information has changed since this proposal was made, Maple will ask you to review again.</p><div className="comparison"><div className="comparison-head" aria-hidden="true"><span>Detail</span><span>Currently saved</span><span>Proposed</span></div>{fields.map(([key, label]) => <div className={`comparison-row${displayValue(review.oldValue, key) !== displayValue(review.newValue, key) ? ' changed' : ''}`} key={key}><strong>{label}</strong><div><span className="mobile-label">Currently saved</span>{displayValue(review.oldValue, key)}</div><div><span className="mobile-label">Proposed</span>{displayValue(review.newValue, key)}</div></div>)}</div><div className="actions"><button type="button" disabled={busy} onClick={() => decide(review, 'confirm')}>{activity === 'confirm' ? 'Saving confirmed change…' : 'Confirm and save'}</button><button type="button" className="secondary" disabled={busy} onClick={() => decide(review, 'reject')}>{activity === 'reject' ? 'Discarding…' : 'Discard change'}</button></div></section>}
+    {review && <section className="review" aria-labelledby="review-heading"><p className="eyebrow">Nothing changes until you confirm</p><h2 id="review-heading" tabIndex={-1}>Review this exact change</h2><p>Confirmation applies only to the values below. If your saved information has changed since this proposal was made, Maple will ask you to review again.</p><div className="comparison"><div className="comparison-head" aria-hidden="true"><span>Detail</span><span>Currently saved</span><span>Proposed</span></div>{fields.map(([key, label]) => <div className={`comparison-row${displayValue(review.oldValue, key) !== displayValue(review.newValue, key) ? ' changed' : ''}`} key={key}><strong>{label}</strong><div><span className="mobile-label">Currently saved</span>{displayValue(review.oldValue, key)}</div><div><span className="mobile-label">Proposed</span>{displayValue(review.newValue, key)}</div></div>)}</div><CecWorkReview oldValue={review.oldValue?.cecWork} newValue={review.newValue.cecWork} /><div className="actions"><button type="button" disabled={busy} onClick={() => decide(review, 'confirm')}>{activity === 'confirm' ? 'Saving confirmed change…' : 'Confirm and save'}</button><button type="button" className="secondary" disabled={busy} onClick={() => decide(review, 'reject')}>{activity === 'reject' ? 'Discarding…' : 'Discard change'}</button></div></section>}
 
-    <div className="workspace-grid"><section className="form-panel" aria-labelledby="employment-heading"><div className="section-heading"><h2 id="employment-heading">Employment details</h2><span className="muted">{snapshot ? (snapshot.employment ? `Saved revision ${snapshot.revision}` : 'No saved record') : 'Saved record unavailable'}</span></div><p className="muted">Enter what you know. Leave hours blank if you are unsure; keep other unknown answers as “Unknown”.</p><form onSubmit={propose}><fieldset disabled={!canEdit}><legend className="visually-hidden">Your employment record</legend><div className="field-grid"><label>Employer<input name="employer" autoComplete="organization" value={form.employer} maxLength={200} required onChange={(event) => update('employer', event.target.value)} /></label><label>Job title<input name="title" autoComplete="organization-title" value={form.title} maxLength={200} required onChange={(event) => update('title', event.target.value)} /></label></div><div className="field-grid"><label>Start date<input type="date" name="startDate" value={form.startDate} required onChange={(event) => update('startDate', event.target.value)} /></label><label>Country code<input name="countryCode" value={form.countryCode} placeholder="For example, CA" minLength={2} maxLength={2} pattern="[A-Z]{2}" required onChange={(event) => update('countryCode', event.target.value.toUpperCase())} /><span className="hint">Two-letter country code for where you worked.</span></label></div><label className="checkbox"><input type="checkbox" checked={form.currentJob} onChange={(event) => setForm((current) => ({ ...current, currentJob: event.target.checked, endDate: null }))} /><span>I currently work in this job</span></label>{!form.currentJob && <label>Actual end date<input type="date" name="endDate" value={form.endDate ?? ''} required onChange={(event) => update('endDate', event.target.value || null)} /></label>}<label>Hours per week <span className="optional">(optional)</span><input name="hoursPerWeek" type="number" min="0.01" max="168" step="any" value={form.hoursPerWeek ?? ''} onChange={(event) => update('hoursPerWeek', event.target.value === '' ? null : Number(event.target.value))} /><span className="hint">Leave blank if unknown.</span></label><div className="field-grid"><AnswerField label="Was this paid work?" value={form.paid} onChange={(value) => update('paid', value)} /><AnswerField label="Were you authorized to work?" value={form.authorizedToWork} onChange={(value) => update('authorizedToWork', value)} /></div><label>What were your main duties? <span className="optional">(optional)</span><textarea name="duties" rows={4} value={form.duties} maxLength={10_000} onChange={(event) => update('duties', event.target.value)} /><span className="hint">Describe your actual work. Duties are needed before recording a NOC code.</span></label><details className="noc-details"><summary>Add a NOC code you have reviewed</summary><p className="hint">A job title alone is not enough to choose a NOC code. Review its description against your duties before adding it.</p><label>NOC code<input name="nocCode" inputMode="numeric" pattern="[0-9]{5}" maxLength={5} value={form.nocCode ?? ''} onChange={(event) => setForm((current) => ({ ...current, nocCode: event.target.value || null, nocReviewed: false }))} /></label><label className="checkbox"><input type="checkbox" disabled={!form.nocCode || !canEdit} checked={form.nocReviewed} onChange={(event) => update('nocReviewed', event.target.checked)} /><span>I reviewed this NOC code against my job duties.</span></label></details><div className="form-actions"><button type="submit">{activity === 'propose' ? 'Preparing review…' : 'Review change'}</button><p className="hint">You will see the exact change before confirming.</p></div></fieldset></form></section>
+    <div className="workspace-grid"><section className="form-panel" aria-labelledby="employment-heading"><div className="section-heading"><h2 id="employment-heading">Reviewed assessment inputs</h2><span className="muted">{snapshot ? (snapshot.employment ? `Saved revision ${snapshot.revision}` : 'No saved record') : 'Saved record unavailable'}</span></div><p className="muted">These are the explicitly reviewed inputs for requirement checks, not a second live profile. Review them after conversation changes. Leave unknown details unknown.</p><form onSubmit={propose}><fieldset disabled={!canEdit}><legend className="visually-hidden">Your employment record</legend><div className="field-grid"><label>Employer<input name="employer" autoComplete="organization" value={form.employer} maxLength={200} required onChange={(event) => update('employer', event.target.value)} /></label><label>Job title<input name="title" autoComplete="organization-title" value={form.title} maxLength={200} required onChange={(event) => update('title', event.target.value)} /></label></div><div className="field-grid"><label>Start date<input type="date" name="startDate" value={form.startDate} required onChange={(event) => update('startDate', event.target.value)} /></label><label>Country code<input name="countryCode" value={form.countryCode} placeholder="For example, CA" minLength={2} maxLength={2} pattern="[A-Z]{2}" required onChange={(event) => update('countryCode', event.target.value.toUpperCase())} /><span className="hint">Two-letter country code for where you worked.</span></label></div><label className="checkbox"><input type="checkbox" checked={form.currentJob} onChange={(event) => setForm((current) => ({ ...current, currentJob: event.target.checked, endDate: null }))} /><span>I currently work in this job</span></label>{!form.currentJob && <label>Actual end date<input type="date" name="endDate" value={form.endDate ?? ''} required onChange={(event) => update('endDate', event.target.value || null)} /></label>}<label>Hours per week <span className="optional">(optional)</span><input name="hoursPerWeek" type="number" min="0.01" max="168" step="any" value={form.hoursPerWeek ?? ''} onChange={(event) => update('hoursPerWeek', event.target.value === '' ? null : Number(event.target.value))} /><span className="hint">Leave blank if unknown.</span></label><div className="field-grid"><AnswerField label="Was this paid work?" value={form.paid} onChange={(value) => update('paid', value)} /><AnswerField label="Were you authorized to work?" value={form.authorizedToWork} onChange={(value) => update('authorizedToWork', value)} /></div><label>What were your main duties? <span className="optional">(optional)</span><textarea name="duties" rows={4} value={form.duties} maxLength={10_000} onChange={(event) => update('duties', event.target.value)} /><span className="hint">Describe your actual work. Duties are needed before recording a NOC code.</span></label><details className="noc-details"><summary>Add a NOC code you have reviewed</summary><p className="hint">A job title alone is not enough to choose a NOC code. Review its description against your duties before adding it.</p><label>NOC code<input name="nocCode" inputMode="numeric" pattern="[0-9]{5}" maxLength={5} value={form.nocCode ?? ''} onChange={(event) => setForm((current) => ({ ...current, nocCode: event.target.value || null, nocReviewed: false }))} /></label><label className="checkbox"><input type="checkbox" disabled={!form.nocCode || !canEdit} checked={form.nocReviewed} onChange={(event) => update('nocReviewed', event.target.checked)} /><span>I reviewed this NOC code against my job duties.</span></label></details><CecWorkFields value={form.cecWork} jobStartDate={form.startDate} onChange={value => update('cecWork', value)} /><div className="form-actions"><button type="submit">{activity === 'propose' ? 'Preparing review…' : 'Review change'}</button><p className="hint">You will see the exact change before confirming.</p></div></fieldset></form></section>
       <aside className="inbox" aria-labelledby="notifications-heading"><p className="eyebrow">Notification centre</p><h2 id="notifications-heading">Your updates</h2>{notifications.length === 0 ? <p className="muted">No updates yet.</p> : <ul>{notifications.map((notification) => <li key={notification.id}><strong>{notification.kind === 'assessed' ? 'Private requirement check completed' : 'Employment information saved'}</strong><p>Revision {notification.revision}</p><time dateTime={notification.createdAt}>{new Date(notification.createdAt).toLocaleString()}</time></li>)}</ul>}<p className="inbox-note">Confirmed saves and completed private checks appear here. Pending changes remain in your review list.</p></aside>
     </div>
-    <AssessmentPanel request={request} revision={snapshot?.revision ?? null} onAssessed={refreshNotifications} />
+    <AssessmentPanel key={memoryEpoch} request={request} revision={snapshot?.revision ?? null} onAssessed={refreshNotifications} />
   </Shell>;
 }
 
