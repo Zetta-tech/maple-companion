@@ -12,7 +12,7 @@ function Education({label,value,onChange}:{label:string;value:EducationEvidence;
     <AnswerField label={`${label}: qualifying category/equivalency reviewed`} value={value.qualificationReviewed} onChange={qualificationReviewed=>onChange({...value,qualificationReviewed})}/>
     <p className="hint">Review all credentials needed for the category, designated immigration ECA and any professional-degree requirements. An ECA must be less than five years old.</p></fieldset>;
 }
-function Language({label,name,value,onChange}:{label:string;name:'english'|'french';value:LanguageEvidence;onChange:(v:LanguageEvidence)=>void}){
+export function Language({label,name,value,onChange}:{label:string;name:'english'|'french';value:LanguageEvidence;onChange:(v:LanguageEvidence)=>void}){
   const tests=name==='english'?['CELPIP-General','IELTS-General','PTE-Core']:['TEF-Canada','TCF-Canada'];
   return <fieldset><legend>{label}</legend><label>{label}: evidence<select value={value.status} onChange={e=>onChange(e.target.value==='tested'?{...value,status:'tested'}:{...noLanguage,status:e.target.value as 'not_taken'|'unknown'})}><option value="unknown">Unknown</option><option value="not_taken">No test taken / no points claimed</option><option value="tested">Accepted test results recorded</option></select></label>
     {value.status==='tested'&&<><div className="field-grid"><label>{label}: test<select value={value.test??''} onChange={e=>onChange({...value,test:(e.target.value||null) as LanguageEvidence['test']})}><option value="">Select a test</option>{tests.map(v=><option key={v}>{v}</option>)}</select></label><label>{label}: test date<input type="date" value={value.date??''} onChange={e=>onChange({...value,date:e.target.value||null})}/></label></div>

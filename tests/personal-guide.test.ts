@@ -8,7 +8,8 @@ import { createApp } from '../server/app.js';
 import { AppError } from '../server/errors.js';
 import { TestMemory } from './support/test-memory.js';
 import { DemoFixtureMemory,DemoFixtureStore,fixtureSources } from './support/demo-fixture.js';
-import { emptyPersonalIntake } from '../shared/personal-guide.js';
+import { emptyPersonalIntake, personalProfileSchema } from '../shared/personal-guide.js';
+import type { ProfileHistory } from '../shared/profile-history.js';
 import type { Employment } from '../shared/employment.js';
 import type { Config } from '../server/config.js';
 import {fictionalCrsEvidence} from '../shared/crs.js';
@@ -34,6 +35,35 @@ function setup(){
   return {guide,make,workflow,store,memory,ordinary,evidence,http,saveEmployment,saveInputs,setReviewed:(value:boolean)=>{reviewed=value;}};
 }
 describe('personal Guide reuses research with receipt-bound inputs, not a second employment truth',()=>{
+  it('keeps legacy profile receipts verified without adding a history default',async()=>{
+    const t=setup();await t.saveEmployment();await t.saveInputs();
+    const saved=await t.make().profile(owner);
+    expect(saved.verified).toBe(true);
+    expect(saved.profile).not.toHaveProperty('history');
+    expect(JSON.stringify(personalProfileSchema.parse(saved.profile))).toBe(JSON.stringify(saved.profile));
+  });
+  it('persists named history only after confirmation, with unknown scores intact on reload',async()=>{
+    const t=setup();await t.saveEmployment();
+    const history:ProfileHistory={version:1,education:[{id:randomUUID(),institution:'Example University',program:'Engineering',credential:'Bachelor degree',startDate:null,endDate:null,notes:''}],languageTests:[{id:randomUUID(),language:'english',status:'tested',test:'CELPIP-General',date:'2026-07-01',reading:null,writing:null,listening:null,speaking:null,benchmarkConversionReviewed:'unknown',notes:'Reported highest benchmark; component values not supplied.'}]};
+    const p=await t.guide.propose(owner,{baseRevision:0,employmentRevision:1,intake:{...emptyPersonalIntake,history}});
+    expect(p.profile).toMatchObject({history});
+    expect((await t.make().profile(owner)).profile).toBeNull();expect(t.memory.writes).toBe(0);
+    await t.guide.confirm(owner,p.id,{confirm:true});
+    const read=await t.make().profile(owner);
+    expect(read.verified).toBe(true);expect(read.intake.history).toEqual(history);
+    expect(read.intake.crsEvidence).toBeUndefined();expect(t.memory.writes).toBe(1);
+    const result=await t.make().replay(owner,{requestId:randomUUID(),fictional:false});
+    expect(result.discovery?.crs).toBeUndefined();expect(result.discovery?.score).toBeUndefined();
+    expect((await t.workflow.read(owner)).employment).toEqual(employment);
+  });
+  it('keeps named history behind the existing stale-employment confirmation fence',async()=>{
+    const t=setup();await t.saveEmployment();
+    const history:ProfileHistory={version:1,education:[{id:randomUUID(),institution:'Example college',program:'Management',credential:'',startDate:null,endDate:null,notes:''}],languageTests:[]};
+    const p=await t.guide.propose(owner,{baseRevision:0,employmentRevision:1,intake:{...emptyPersonalIntake,history}});
+    await t.saveEmployment(40);
+    await expect(t.guide.confirm(owner,p.id,{confirm:true})).rejects.toBeDefined();
+    expect(t.memory.writes).toBe(0);
+  });
   it.each([false,true])('holds conflicting work location through confirmation, reload and replay (full CRS: %s)',async(fullCrs)=>{
     const t=setup();const e:Employment={...employment,countryCode:'US',cecWork:{startDate:employment.startDate,ongoing:true,endDate:null,hoursPerWeek:38,singleIntervalComplete:'yes',conditionsConsistent:'yes',physicallyInCanada:'yes',authorizedTemporaryResident:'yes',paid:'yes',relationship:'employee',physicianException:'no',fullTimeStudy:'no',workArrangement:'onsite',canadianEmployer:'yes',nocDutiesMatch:'yes',nocEssentialDutiesMatch:'yes'}};
     const ep=await t.workflow.propose(owner,{baseRevision:0,employment:e});await t.workflow.confirm(owner,ep.id,{proposalRevision:1});

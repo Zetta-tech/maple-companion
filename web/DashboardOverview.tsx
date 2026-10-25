@@ -1,11 +1,16 @@
 import type { Employment } from '../shared/employment.js';
 import { MapleCompanion } from './MapleCompanion.js';
 import './DashboardOverview.css';
+import { openProfile, profileSectionFromHash } from './profile-navigation.js';
 
 export type GuideOverviewState = 'checking' | 'review' | 'saved' | 'empty' | 'unavailable' | 'pending';
 type Props = { employment: Employment | null; available: boolean; loading: boolean; held: boolean; pending: number; discoveries: boolean; guideState: GuideOverviewState };
 
 export function openWorkspaceSection(href: string) {
+  const section = profileSectionFromHash(href);
+  if(section) { openProfile(section); return; }
+  if(document.querySelector('[data-profile-routing]') && /^#(?:employment-|cec-work-|changes-heading|review-heading)/.test(href)) { openProfile('employment',href.slice(1)); return; }
+  if(profileSectionFromHash(window.location.hash)) { window.location.hash=href; requestAnimationFrame(() => openWorkspaceSection(href)); return; }
   const target = document.getElementById(href.slice(1));
   if (!target) return;
   let parent: HTMLElement | null = target;
@@ -63,7 +68,7 @@ export function DashboardOverview({ employment, available, loading, held, pendin
       <section className="dashboard-next" aria-labelledby="dashboard-next-title"><p className="dashboard-kicker">{next.label}</p><h2 id="dashboard-next-title">{next.title}</h2><p>{next.body}</p></section>
       <section className="dashboard-snapshot" aria-labelledby="dashboard-snapshot-title"><div className="dashboard-card-heading"><h2 id="dashboard-snapshot-title">Your working picture</h2><span className="dashboard-status">{loading ? 'Checking' : !available ? 'Unavailable' : employment ? 'Saved' : 'Not added'}</span></div>
         {employment && available ? <><p className="dashboard-job">{employment.title || 'Job title not recorded'}</p><p>{employment.employer || 'Employer not recorded'}</p><dl><div><dt>Work schedule</dt><dd>{employment.hoursPerWeek === null ? 'Unknown' : `${employment.hoursPerWeek} hours / week`}</dd></div><div><dt>Employment</dt><dd>{employment.currentJob ? 'Current role' : employment.endDate ? `Ended ${employment.endDate}` : 'End date unknown'}</dd></div></dl></> : <p>{loading ? 'Loading your employment summary.' : available ? 'Add your employment details to build a useful starting point.' : 'A current summary is unavailable until your saved record can be checked.'}</p>}
-        <a href="#employment-heading" onClick={event => { event.preventDefault(); openWorkspaceSection('#employment-heading'); }}>Review employment <span aria-hidden="true">↗</span></a>
+        <a href="#profile" onClick={event => { event.preventDefault(); openProfile(); }}>Review your profile <span aria-hidden="true">↗</span></a>
       </section>
     </div>
   </section>;

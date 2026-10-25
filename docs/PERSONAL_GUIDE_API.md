@@ -14,6 +14,8 @@ New intake has null names/dates and explicit unknown answers. It never imports t
 
 For optional real CRS intake use `emptyCrsEvidence(asOf, confirmedEmploymentEndDate)` from `shared/crs.ts`, never `fictionalCrsEvidence`. The calculator version is now `2026-11-03.reviewed-evidence.v3`; older stored comparisons remain historical, not silently current.
 
+Optional `intake.history` stores named education records and repeated language-test evidence in this same envelope. It does not infer scoring inputs or add a separate profile store. Existing receipts without this field remain byte-compatible. See [Profile page and history](PROFILE_PAGE.md) and `shared/profile-history.ts` for its versioned shape and limits.
+
 `POST /api/guide/proposals` accepts exactly:
 
 ```json

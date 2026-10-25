@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { demoProfileSchema, type DemoProfile, type DemoReceipt } from './demo.js';
 import { policyDateSchema } from './policy.js';
+import { profileHistorySchema } from './profile-history.js';
 
 const answer = z.enum(['yes', 'no', 'unknown']);
 /** Supplemental assessment evidence only. Employment is read from its existing receipt. */
@@ -12,6 +13,8 @@ export const personalIntakeSchema = demoProfileSchema.pick({
   fictional:z.literal(false), name:z.string().trim().min(1).max(80).nullable(),
   arrivedInCanada:policyDateSchema.nullable(), permitExpiry:policyDateSchema.nullable(),
   spousePermitExpiry:policyDateSchema.nullable(),
+  // Absence stays absent so existing receipt digests remain compatible.
+  history:profileHistorySchema.optional(),
 });
 export type PersonalIntake = z.infer<typeof personalIntakeSchema>;
 export const emptyPersonalIntake:PersonalIntake = {
