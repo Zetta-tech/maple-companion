@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cecWorkEvidenceSchema } from './cec-evidence.js';
 
 /** An explicit answer; an unknown answer must never become a negative answer. */
 const answerSchema = z.enum(['yes', 'no', 'unknown', 'not_applicable']);
@@ -31,7 +32,15 @@ export const employmentSchema = z.strictObject({
   authorizedToWork: answerSchema,
   nocCode: z.string().regex(/^\d{5}$/, 'Use a five-digit NOC code.').nullable(),
   nocReviewed: z.boolean(),
+  // Absence remains absence: adding defaults here would alter legacy receipt hashes.
+  cecWork: cecWorkEvidenceSchema.optional(),
 }).superRefine((employment, context) => {
+  const interval = employment.cecWork;
+  if (interval) {
+    if (interval.startDate < employment.startDate) context.addIssue({ code: 'custom', path: ['cecWork', 'startDate'], message: 'The interval cannot start before this job.' });
+    if (interval.ongoing && !employment.currentJob) context.addIssue({ code: 'custom', path: ['cecWork', 'ongoing'], message: 'A past job cannot have an ongoing interval.' });
+    if (employment.endDate !== null && interval.endDate !== null && interval.endDate > employment.endDate) context.addIssue({ code: 'custom', path: ['cecWork', 'endDate'], message: 'The interval cannot end after this job.' });
+  }
   if (employment.currentJob && employment.endDate !== null) {
     context.addIssue({ code: 'custom', path: ['endDate'], message: 'An ongoing job must not have an end date.' });
   }
@@ -65,6 +74,8 @@ export function validateEmployment(input: unknown, assessmentDate: string): Empl
     if (employment.endDate !== null && employment.endDate > assessment) {
       context.addIssue({ code: 'custom', path: ['endDate'], message: 'End date cannot be after the assessment date.' });
     }
+    if (employment.cecWork?.startDate && employment.cecWork.startDate > assessment) context.addIssue({ code: 'custom', path: ['cecWork', 'startDate'], message: 'The interval cannot start after the assessment date.' });
+    if (employment.cecWork?.endDate && employment.cecWork.endDate > assessment) context.addIssue({ code: 'custom', path: ['cecWork', 'endDate'], message: 'The interval cannot end after the assessment date.' });
   }).parse(input);
 }
 

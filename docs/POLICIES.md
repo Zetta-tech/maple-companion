@@ -1,9 +1,11 @@
 # Reviewed policy interface and private checks
 
-No real policy content ships in the runtime. The default registry is empty and
+The default registry is empty without an operator-configured reviewed bundle and
 returns `POLICY_UNAVAILABLE` for assessment requests. Synthetic records exist only
 under `tests/` and are never imported by application code or fetched from their
-fixture URLs. This increment does not claim a complete immigration assessment.
+fixture URLs. The single-user localhost trial now loads the explicitly approved
+CEC work-interval version described in [the source review](CEC_SOURCE_REVIEW.md).
+This increment does not claim a complete immigration assessment.
 
 ## Records and approval
 
@@ -25,7 +27,8 @@ procedure: inspect the official source and effective dates, check each supported
 criterion against it, record reviewer/time, approve that exact digest, and resolve
 overlap/held conflicts before placing the public bundle in trusted configuration.
 This documents the conservative initial mechanism; a broader editorial promotion
-workflow still requires product review. No real bundle has been approved.
+workflow still requires product review. Approval of the local CEC bundle does not
+authorize production activation or automatic promotion of later versions.
 
 The optional `MAPLE_REVIEWED_POLICIES_FILE` reads a JSON object containing
 `versions` (policy records) and `approvedDigests` (approved content hashes). The file
@@ -35,10 +38,12 @@ This local reviewed-policy interface does not configure a shared AM policy Conte
 
 ## Supported checks
 
-Two deterministic operators are currently supported: `answer_equals` for paid work
-or work authorization, and `number_gte` for hours per week. All expected answers and
-thresholds must come from an explicitly reviewed policy record; none is hardcoded
-as immigration law. Unknown, missing and not-applicable answers return
+The generic deterministic operators are `answer_equals` for paid work or work
+authorization and `number_gte` for weekly hours. The local CEC slice also implements
+the explicitly versioned `cec_work_experience` / `single-interval-v1` calculation;
+its first source-backed version is approved only for the configured localhost trial.
+Thresholds and applicability must match the explicitly reviewed policy record.
+Unknown, missing and not-applicable answers return
 `needs_information`, never an invented negative or positive. Unsupported operators
 are rejected. Completed calendar duration is not treated as qualifying experience.
 
@@ -56,9 +61,9 @@ reads approved AM evidence and selects the reviewed policy for the server's Toro
 date. A date rollover during the remote read rejects the run rather than returning
 yesterday's result as current.
 
-The local journal stores derived statuses and source/evidence references, not
+The SurrealDB operational journal stores derived statuses and source/evidence references, not
 canonical personal values. Deduplication is private to owner + fact revision +
-policy digest + assessment date. A single SQLite transaction rechecks revision and
+policy digest + assessment date. A single SurrealDB transaction rechecks revision and
 pending-write state, inserts the result, and creates one private notification.
 No shared user-result cache exists.
 
@@ -70,5 +75,5 @@ judgments and retain metadata for refresh. Pending chat/form proposals never
 establish approved evidence. No assessment executes a memory write.
 
 Live Clerk/AM grant, tenant-isolation, consent and background-processing validation
-remain prerequisites for use with real personal information. No service setup,
-credential configuration or legal-rule promotion happened in this increment.
+remain prerequisites for use with real personal information. Local policy activation
+did not change service access, credentials or the production gate.

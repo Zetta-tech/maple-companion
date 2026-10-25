@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { CecReason } from './cec-evidence.js';
 
 function isCalendarDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith('0000-')) return false;
@@ -23,6 +24,12 @@ function isOfficialSource(value: string): boolean {
 }
 
 const criterionSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    id: identifier, title, kind: z.literal('cec_work_experience'),
+    calculation: z.literal('single-interval-v1'),
+    minimumCalendarMonths: z.literal(12), minimumHours: z.literal(1560),
+    weeklyCap: z.literal(30), lookbackYears: z.literal(3),
+  }),
   z.strictObject({
     id: identifier,
     title,
@@ -88,6 +95,8 @@ export type PolicyCriterionResult = {
   criterionId: string;
   title: string;
   status: 'met' | 'not_met' | 'needs_information';
+  scope?: 'recorded_work_interval';
+  reasonCodes?: CecReason[];
 };
 export type PolicySummary = {
   id: string;

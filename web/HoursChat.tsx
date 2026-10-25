@@ -3,7 +3,7 @@ import { clarificationQuestion, type HoursAnswer, type HoursClarification } from
 
 export function HoursChat({ available, disabled, busy, onPropose, clarification, onAnswer, blockedBy, activity }: {
   available: boolean; disabled: boolean; busy: boolean; onPropose: (message: string) => Promise<boolean>;
-  clarification?: HoursClarification | null; onAnswer?: (answer: HoursAnswer) => Promise<void>;
+  clarification?: HoursClarification | null; onAnswer?: (answer: HoursAnswer, hours?: number) => Promise<void>;
   blockedBy?: 'pending' | 'save' | 'unavailable';
   activity?: 'preview' | 'clarification';
 }) {
@@ -25,7 +25,7 @@ export function HoursChat({ available, disabled, busy, onPropose, clarification,
           : 'Chat is paused because your saved information could not be verified. Use Refresh status before entering a correction.'}
       {blockedBy !== 'unavailable' && <a href="#changes-heading">Go to Changes to review</a>}
     </p>}
-    {clarification && onAnswer && <HoursClarificationCard value={clarification} disabled={disabled || busy} onAnswer={onAnswer} preparing={activity === 'clarification'} />}
+    {clarification && onAnswer && <HoursClarificationCard key={clarification.id} value={clarification} disabled={disabled || busy} onAnswer={onAnswer} preparing={activity === 'clarification'} />}
     <form onSubmit={submit}><fieldset disabled={disabled || !!clarification} aria-describedby={blockedBy ? 'chat-blocked-reason' : clarification ? 'hours-clarification-heading' : undefined}>
       <legend className="visually-hidden">A fictional weekly-hours correction</legend>
       <label>Your correction<textarea name="chatMessage" rows={2} maxLength={500} value={message} required
@@ -41,15 +41,21 @@ export function HoursChat({ available, disabled, busy, onPropose, clarification,
 }
 
 export function HoursClarificationCard({ value, disabled, onAnswer, preparing = false }: {
-  value: HoursClarification; disabled: boolean; onAnswer: (answer: HoursAnswer) => Promise<void>;
+  value: HoursClarification; disabled: boolean; onAnswer: (answer: HoursAnswer, hours?: number) => Promise<void>;
   preparing?: boolean;
 }) {
+  const [enteredHours, setEnteredHours] = useState('');
+  const needsEntry = value.issue === 'field';
+  const hours = needsEntry ? Number(enteredHours) : value.hours;
+  const valid = hours !== null && Number.isFinite(hours) && hours > 0 && hours <= 168;
   return <div className="notice clarification" role="group" aria-labelledby="hours-clarification-heading">
     <p className="eyebrow">One detail to clarify</p>
     <h3 id="hours-clarification-heading" tabIndex={-1}>{clarificationQuestion(value)}</h3>
     <p>Choose what you mean. This answer does not save a fact. Actual weekly hours will still need a separate review and confirmation.</p>
+    {needsEntry && <><p>AM returned a field Maple could not map. No value was adopted. You can enter a fresh answer here, or leave your record unchanged.</p>
+      <label>My actual weekly working hours<input name="clarifiedWeeklyHours" type="number" min="0.01" max="168" step="any" value={enteredHours} disabled={disabled} onChange={event => setEnteredHours(event.target.value)} /></label></>}
     <div className="clarification-actions">
-      <button type="button" disabled={disabled} onClick={() => void onAnswer('actual_weekly_work')}>{value.hours} is my actual weekly work total — prepare review</button>
+      <button type="button" disabled={disabled || !valid} onClick={() => void onAnswer('actual_weekly_work', needsEntry && valid ? hours! : undefined)}>{needsEntry ? 'Use my entered actual weekly hours - prepare review' : `${value.hours} is my actual weekly work total - prepare review`}</button>
       <button type="button" className="secondary" disabled={disabled} onClick={() => void onAnswer('availability_only')}>Availability only — leave my record unchanged</button>
       <button type="button" className="secondary" disabled={disabled} onClick={() => void onAnswer('different_period')}>Different period or unclear — start again</button>
     </div>

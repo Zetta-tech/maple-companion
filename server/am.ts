@@ -3,7 +3,8 @@ import { AgentMemory } from '@surrealdb/memory';
 import { z } from 'zod';
 import { employmentSchema, type Employment } from '../shared/employment.js';
 
-export type Binding = { ownerId: string; endpoint: string; context: string; readKey: string; writeKey: string };
+export type Binding = { ownerId: string; endpoint: string; context: string; readKey: string; writeKey: string;
+  nativePrincipalId?: string; nativeScope?: string };
 export type Envelope = {
   schema: 1;
   ownerId: string;

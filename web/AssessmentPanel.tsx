@@ -3,6 +3,7 @@ import type { AssessmentView } from '../shared/assessment.js';
 import type { PolicySummary } from '../shared/policy.js';
 import { businessDate } from '../shared/business-date.js';
 import { watchAssessmentRefresh } from './assessment-refresh.js';
+import { cecReasonMessages } from '../shared/cec-evidence.js';
 
 type ApiRequest = <T>(path: string, body?: unknown) => Promise<T>;
 const labels = { met: 'Met', not_met: 'Not met', needs_information: 'Needs information' };
@@ -44,6 +45,7 @@ export function AssessmentPanel({ request, revision, onAssessed }: { request: Ap
   return <section className="changes" aria-labelledby="assessment-heading">
     <p className="eyebrow">Private to you</p><h2 id="assessment-heading">Reviewed requirement checks</h2>
     <p className="muted">These checks cover only the listed requirements. They do not establish program eligibility, an FSW selection score or a CRS score.</p>
+    <p className="hint">Application basis: as if applying today, using the Toronto calendar date. A work-interval result covers only the recorded interval.</p>
     {loading && <p role="status">Loading reviewed checks.</p>}
     {error && <p className="notice error" role="alert">{error}</p>}
     {!loading && !error && policies.length === 0 && <p>No reviewed requirement checks are available yet.</p>}
@@ -61,6 +63,9 @@ export function AssessmentConclusion({ assessment, revision }: { assessment: Ass
   const current = assessment.freshness === 'current' && revision === assessment.profileRevision
     && assessment.assessmentDate === businessDate(new Date());
   return current
-    ? <ul>{assessment.results.map(result => <li key={result.criterionId}><strong>{labels[result.status]}</strong> - {result.title}</li>)}</ul>
+    ? <ul>{assessment.results.map(result => <li key={result.criterionId}><strong>{labels[result.status]}</strong> - {result.title}
+      {result.scope === 'recorded_work_interval' && <span className="status-label">Recorded work interval only</span>}
+      {result.reasonCodes?.map(reason => <p key={reason}>{cecReasonMessages[reason]}</p>)}
+    </li>)}</ul>
     : <p className="notice">{assessment.freshness === 'unverified' || revision === null ? 'Saved facts could not be verified. These results are temporarily unavailable.' : 'Facts, policy or assessment date changed. Run a new check for current results.'}</p>;
 }

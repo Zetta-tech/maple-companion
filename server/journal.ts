@@ -9,11 +9,12 @@ import type { AssessmentRecord } from '../shared/assessment.js';
 import { weeklyPeriodWasStated } from './hours-evidence.js';
 import { previewEvidenceSchema, previewReasonSchema, type PreviewEvidence, type PreviewReason } from './preview-diagnostics.js';
 import type { HoursClarification, HoursAnswer } from '../shared/chat.js';
+import { validHoursQuestion } from '../shared/chat.js';
 
 export type OperationStatus = 'pending' | 'applying' | 'uncertain' | 'committed' | 'rejected' | 'stale';
 export type Operation = { id: string; ownerId: string; proposalRevision: 1; baseRevision: number; status: OperationStatus;
   oldValue: Employment | null; newValue: Employment | null; createdAt: string; confirmedAt: string | null;
-  previousFactId: string | null; receipt: Receipt | null; chat?: { utterance: string; expiresAt: string; periodSource: 'message' | 'interpretation'; clarificationAnswer?: 'actual_weekly_work' } };
+  previousFactId: string | null; receipt: Receipt | null; chat?: { utterance: string; expiresAt: string; periodSource: 'message' | 'interpretation'; clarificationAnswer?: 'actual_weekly_work'; clarificationSource?: 'user_entered' } };
 export type Head = { revision: number; receipt: Receipt | null };
 export type ChatPreviewRecord = { id: string; owner: string; base_revision: number; utterance: string | null; created_at: string; expires_at: string;
   status: string; endpoint: string | null; context: string | null; session_id: string | null; proposal_id: string | null };
@@ -74,6 +75,7 @@ export class Journal {
       if (chat) result.chat = { utterance: chat.utterance, expiresAt: chat.expires_at,
         periodSource: weeklyPeriodWasStated(chat.utterance, result.newValue?.hoursPerWeek ?? null) ? 'message' : 'interpretation' };
       if (result.chat && this.db.prepare("SELECT 1 FROM chat_clarifications c JOIN chat_previews p ON p.id=c.id AND p.owner=c.owner WHERE c.owner=? AND p.proposal_id=? AND c.answer='actual_weekly_work'").get(owner, id)) result.chat.clarificationAnswer = 'actual_weekly_work';
+      if (result.chat?.clarificationAnswer && this.db.prepare("SELECT 1 FROM chat_clarifications c JOIN chat_previews p ON p.id=c.id AND p.owner=c.owner WHERE c.owner=? AND p.proposal_id=? AND c.issue='field'").get(owner, id)) result.chat.clarificationSource = 'user_entered';
     }
     return result;
   }
@@ -91,7 +93,7 @@ export class Journal {
         if (chat.status !== (clarified ? 'clarifying' : 'interpreting') || chat.base_revision !== baseRevision || chat.expires_at <= now) throw new AppError(409, 'CHAT_EXPIRED', 'This chat request can no longer create a proposal.');
         if (clarified) {
           const question = this.hoursClarification(owner, chatRequestId, now);
-          if (question.hours !== newValue.hoursPerWeek || this.db.prepare("SELECT 1 FROM operations WHERE owner=? AND status='pending'").get(owner)) throw new AppError(409, 'CHANGE_PENDING', 'Your pending changes need review first.');
+          if ((question.issue !== 'field' && question.hours !== newValue.hoursPerWeek) || newValue.hoursPerWeek === null || this.db.prepare("SELECT 1 FROM operations WHERE owner=? AND status='pending'").get(owner)) throw new AppError(409, 'CHANGE_PENDING', 'Your pending changes need review first.');
           this.db.prepare("UPDATE chat_clarifications SET hours=NULL,answer='actual_weekly_work',answered_at=? WHERE owner=? AND id=?").run(now, owner, chatRequestId);
         }
         this.db.prepare("UPDATE chat_previews SET status='proposed',proposal_id=? WHERE owner=? AND id=?").run(id, owner, chatRequestId);
@@ -173,7 +175,7 @@ export class Journal {
     // update whenever another journal handle is opened.
     this.db.prepare("UPDATE chat_previews SET status='uncertain' WHERE owner=? AND status='interpreting'").run(owner);
   }
-  beginChat(owner: string, baseRevision: number, utterance: string, now: string) {
+  beginChat(owner: string, baseRevision: number, utterance: string, now: string): string {
     return this.transaction(() => {
       this.expireChat(owner, now);
       if (this.db.prepare("SELECT 1 FROM chat_previews WHERE owner=? AND status IN ('blocked','uncertain')").get(owner)) throw new AppError(503, 'CHAT_REVIEW_REQUIRED', 'A previous preview needs review. No new preview was sent. You can use the employment form.');
@@ -192,11 +194,11 @@ export class Journal {
       || (record.session_id && record.session_id !== sessionId)) throw new AppError(409, 'CHAT_REMOTE_CONFLICT', 'The preview metadata needs review.');
     this.db.prepare('UPDATE chat_previews SET endpoint=?,context=?,session_id=? WHERE owner=? AND id=?').run(endpoint, context, sessionId, owner, id);
   }
-  askHours(owner: string, id: string, hours: number, issue: HoursClarification['issue'], now: string): HoursClarification {
+  askHours(owner: string, id: string, hours: number | null, issue: HoursClarification['issue'], now: string): HoursClarification {
     return this.transaction(() => {
       const chat = this.chatPreview(owner, id);
       if (chat.status !== 'interpreting' || chat.expires_at <= now || this.head(owner).revision !== chat.base_revision || this.active(owner)) throw new AppError(409, 'CHAT_EXPIRED', 'This clarification is no longer current.');
-      if (!Number.isFinite(hours) || hours <= 0 || hours > 168 || !['period', 'intent'].includes(issue)) throw new Error('Invalid clarification');
+      if (!validHoursQuestion(hours, issue)) throw new Error('Invalid clarification');
       this.db.prepare('INSERT INTO chat_clarifications VALUES (?, ?, ?, ?, NULL, NULL)').run(id, owner, hours, issue);
       this.db.prepare("UPDATE chat_previews SET status='clarifying' WHERE owner=? AND id=?").run(owner, id);
       return this.hoursClarification(owner, id, now);
@@ -205,8 +207,8 @@ export class Journal {
   hoursClarification(owner: string, id: string, now: string): HoursClarification {
     const row = this.db.prepare(`SELECT c.id,c.hours,c.issue,p.expires_at AS expiresAt FROM chat_clarifications c
       JOIN chat_previews p ON p.id=c.id AND p.owner=c.owner WHERE c.owner=? AND c.id=?
-      AND p.status='clarifying' AND c.hours IS NOT NULL AND p.expires_at>?`).get(owner, id, now) as HoursClarification | undefined;
-    if (!row) throw new AppError(404, 'CLARIFICATION_NOT_FOUND', 'This clarification is unavailable or has expired.');
+      AND p.status='clarifying' AND p.expires_at>?`).get(owner, id, now) as HoursClarification | undefined;
+    if (!row || !validHoursQuestion(row.hours, row.issue)) throw new AppError(404, 'CLARIFICATION_NOT_FOUND', 'This clarification is unavailable or has expired.');
     return row;
   }
   pendingHoursClarification(owner: string, now: string): HoursClarification | null {

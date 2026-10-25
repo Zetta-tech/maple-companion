@@ -23,7 +23,7 @@ export class PreviewUnavailable extends Error {
 
 /** Constructed only in the explicit synthetic development trial; see docs/CHAT_PREVIEW.md. */
 export function createMemoryPreview(fetchImpl: typeof fetch = globalThis.fetch) {
-  return async (binding: Binding, text: string, onSession: (sessionId: string) => void = () => {}): Promise<MemoryPreview> => {
+  return async (binding: Binding, text: string, onSession: (sessionId: string) => void | Promise<void> = () => {}): Promise<MemoryPreview> => {
     let sent = false; let received = false; let httpStatus: number | null = null;
     try {
       const message = textSchema.parse(text);
@@ -61,7 +61,7 @@ export function createMemoryPreview(fetchImpl: typeof fetch = globalThis.fetch) 
       const wire: unknown = await client.remember(message, { infer: 'preview', scopes: [['maple/approved']] });
       received = true;
       const metadata = z.object({ sessionId: z.string().max(128).regex(/^[A-Za-z0-9:_-]*$/) }).safeParse(wire);
-      if (metadata.success && metadata.data.sessionId) onSession(metadata.data.sessionId);
+      if (metadata.success && metadata.data.sessionId) await onSession(metadata.data.sessionId);
       return responseSchema.parse(wire);
     } catch { throw new PreviewUnavailable(received ? 'blocked' : sent ? 'uncertain' : 'failed', httpStatus); }
   };

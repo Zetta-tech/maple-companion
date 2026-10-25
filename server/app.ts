@@ -9,6 +9,9 @@ import { bindingFor, type AuthConfig, type Config } from './config.js';
 import { Workflow, confirmationSchema } from './workflow.js';
 import { Assessments } from './assessments.js';
 import type { ChatProposals } from './chat-proposals.js';
+import type { NativeChat } from './native-chat.js';
+import type { DemoJourney } from './demo-journey.js';
+import { demoSeed } from '../shared/demo.js';
 
 export type Authentication = { middleware: RequestHandler; owner: (req: express.Request) => string | null };
 export function clerkAuthentication(config: AuthConfig): Authentication {
@@ -22,7 +25,7 @@ export function clerkAuthentication(config: AuthConfig): Authentication {
 }
 
 /** Dependency injection exists for unit tests; index.ts always constructs the real Clerk/AM adapters. */
-export function createApp(options: { config?: Config; authConfig?: AuthConfig; configurationError?: AppError; workflow?: Workflow; assessments?: Assessments; chatProposals?: ChatProposals; authentication?: Authentication; webRoot?: string }) {
+export function createApp(options: { config?: Config; authConfig?: AuthConfig; configurationError?: AppError; workflow?: Workflow; assessments?: Assessments; chatProposals?: ChatProposals; nativeChat?: NativeChat; demoJourney?: DemoJourney; authentication?: Authentication; webRoot?: string; operationalStore?: 'surrealdb'; operationalReady?: () => boolean }) {
   const app = express();
   const authConfig = options.authConfig ?? options.config;
   app.disable('x-powered-by');
@@ -30,9 +33,11 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   app.get('/health/ready', (_req, res) => {
-    const configured = !!options.config && !!options.workflow;
+    const configured = !!options.config && !!options.workflow && (options.operationalReady?.() ?? true);
     res.status(configured ? 200 : 503).json({ configured, authConfigured: !!authConfig,
-      memoryAccessMode: options.config?.amAccessMode ?? null, liveIntegrationsVerified: false });
+      memoryAccessMode: options.config?.amAccessMode ?? null, operationalStore: options.operationalStore ?? null,
+      nativeMemoryAvailable: !!options.nativeChat && options.config?.amAccessMode === 'single-user-development',
+      nativeMemoryMode: 'remember-profile', liveIntegrationsVerified: false });
   });
   app.get('/api/config', (_req, res, next) => {
     if (!authConfig) return next(options.configurationError ?? new AppError(503, 'CONFIGURATION_REQUIRED', 'Maple is not configured yet. No data was saved.'));
@@ -61,23 +66,46 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
   // provisioning occurs during first sign-in, even if a Context is not ready.
   app.get('/api/session', (_req, res) => res.json({ ownerId: res.locals.owner,
     workspaceReady: !!options.config && !!options.workflow && options.config.bindings.has(res.locals.owner) }));
-  app.use('/api', (_req, res, next) => {
+  app.use('/api', async (_req, res, next) => {
     if (!options.config || !options.workflow) return next(options.configurationError ?? new AppError(503, 'CONFIGURATION_REQUIRED', 'Your private workspace is not configured yet. No data was saved.'));
     // Binding removal closes every workspace route, including journal-only history.
     bindingFor(options.config, res.locals.owner);
-    options.workflow.journal.expireChat(res.locals.owner, new Date().toISOString());
+    await options.workflow.journal.expireChat(res.locals.owner, new Date().toISOString());
     next();
   });
   app.use('/api', express.json({ limit: '32kb', strict: true }));
   const workflow = () => options.workflow!;
   const chatProposals = options.config?.amAccessMode === 'single-user-development' ? options.chatProposals : undefined;
+  const nativeChat = options.config?.amAccessMode === 'single-user-development' ? options.nativeChat : undefined;
+  const native = () => {
+    if (!nativeChat) throw new AppError(503, 'NATIVE_CHAT_NOT_READY', 'Native memory setup is pending. Reviewed assessment inputs remain available.');
+    return nativeChat;
+  };
   const assessments = options.assessments ?? (options.workflow ? new Assessments(options.workflow.journal, options.workflow) : undefined);
   const id = (value: unknown) => z.uuid().parse(value);
+  const demo = () => {
+    if (!options.demoJourney || options.config?.amAccessMode !== 'single-user-development') throw new AppError(503,'DEMO_NOT_READY','The fictional demonstration workspace is not ready. Your existing workspace remains available.');
+    return options.demoJourney;
+  };
+  app.get('/api/demo/status', (_req,res)=>res.json({available:!!options.demoJourney && options.config?.amAccessMode==='single-user-development',fictionalOnly:true}));
+  app.get('/api/demo/seed', (_req,res)=>{demo();res.json({profile:demoSeed});});
+  app.get('/api/demo/profile', async(_req,res)=>res.json(await demo().profile(res.locals.owner)));
+  app.get('/api/demo/proposals', async(_req,res)=>res.json({proposals:await demo().store.proposals(res.locals.owner)}));
+  app.post('/api/demo/proposals', async(req,res)=>res.status(201).json(await demo().propose(res.locals.owner,req.body)));
+  app.post('/api/demo/proposals/:id/confirm', async(req,res)=>res.json(await demo().confirm(res.locals.owner,id(req.params.id),req.body)));
+  app.post('/api/demo/proposals/:id/reject', async(req,res)=>{z.strictObject({}).parse(req.body);await demo().store.reject(res.locals.owner,id(req.params.id));res.json({status:'rejected'});});
+  app.get('/api/demo/journey', async(_req,res)=>res.json(await demo().history(res.locals.owner)));
+  app.post('/api/demo/discover', async(req,res)=>res.json(await demo().discover(res.locals.owner,req.body)));
+  app.post('/api/demo/policy-replay', async(req,res)=>res.json(await demo().replay(res.locals.owner,req.body)));
   app.get('/api/employment', async (_req, res) => res.json(await workflow().read(res.locals.owner)));
-  app.get('/api/proposals', (_req, res) => res.json({ proposals: workflow().journal.list(res.locals.owner) }));
+  app.get('/api/native/status', async (_req, res) => res.json({ available: !!nativeChat, syntheticOnly: true,
+    history: nativeChat ? await nativeChat.history(res.locals.owner) : [] }));
+  app.get('/api/native/profile', async (_req, res) => res.json(await native().profile(res.locals.owner)));
+  app.post('/api/native/messages', async (req, res) => res.json(await native().send(res.locals.owner, req.body)));
+  app.get('/api/proposals', async (_req, res) => res.json({ proposals: await workflow().journal.list(res.locals.owner) }));
   app.post('/api/proposals', async (req, res) => res.status(201).json(await workflow().propose(res.locals.owner, req.body)));
-  app.get('/api/chat/status', (_req, res) => res.json({ available: !!chatProposals, syntheticOnly: true,
-    fields: ['hoursPerWeek'], pendingRetentionHours: 24, clarification: chatProposals?.pending(res.locals.owner) ?? null }));
+  app.get('/api/chat/status', async (_req, res) => res.json({ available: !!chatProposals, syntheticOnly: true,
+    fields: ['hoursPerWeek'], pendingRetentionHours: 24, clarification: await chatProposals?.pending(res.locals.owner) ?? null }));
   // index.ts only supplies an interpreter for the explicit development trial.
   app.post('/api/chat/proposals', async (req, res) => {
     if (!chatProposals) throw new AppError(503, 'CHAT_NOT_AVAILABLE', 'Chat corrections are not available yet. No change was saved.');
@@ -90,15 +118,15 @@ export function createApp(options: { config?: Config; authConfig?: AuthConfig; c
     res.status(result.kind === 'proposal' ? 201 : 200).json(result);
   });
   app.post('/api/proposals/:id/confirm', async (req, res) => res.json(await workflow().confirm(res.locals.owner, id(req.params.id), req.body)));
-  app.post('/api/proposals/:id/reject', (req, res) => {
+  app.post('/api/proposals/:id/reject', async (req, res) => {
     confirmationSchema.parse(req.body);
-    res.json(workflow().journal.reject(res.locals.owner, id(req.params.id)));
+    res.json(await workflow().journal.reject(res.locals.owner, id(req.params.id)));
   });
   app.post('/api/proposals/:id/reconcile', async (req, res) => {
     z.strictObject({}).parse(req.body);
     res.json(await workflow().reconcile(res.locals.owner, id(req.params.id)));
   });
-  app.get('/api/notifications', (_req, res) => res.json({ notifications: workflow().journal.notifications(res.locals.owner) }));
+  app.get('/api/notifications', async (_req, res) => res.json({ notifications: await workflow().journal.notifications(res.locals.owner) }));
   app.get('/api/policies', (_req, res) => res.json({ policies: assessments!.available() }));
   app.post('/api/assessments', async (req, res) => res.json(await assessments!.run(res.locals.owner, req.body)));
   app.get('/api/assessments', async (_req, res) => res.json({ assessments: await assessments!.list(res.locals.owner) }));

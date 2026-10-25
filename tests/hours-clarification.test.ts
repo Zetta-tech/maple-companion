@@ -44,7 +44,7 @@ describe('native candidate clarification, not automatic fact approval', () => {
   ])('asks before proposing the captured candidate for %s', async (message, value, key, issue) => {
     const { ask, chat, transport, memory, journal } = await setup(value, key);
     const question = await ask(message!);
-    expect(question.issue).toBe(issue); expect(chat.pending(owner)).toEqual(question);
+    expect(question.issue).toBe(issue); expect(await chat.pending(owner)).toEqual(question);
     expect(JSON.parse(String(transport.mock.calls[0]![1]?.body)).text.endsWith(message!)).toBe(true);
     expect(transport).toHaveBeenCalledTimes(1); expect(memory.writes).toHaveLength(1); expect(journal.list(owner)).toHaveLength(1);
   });
@@ -64,12 +64,12 @@ describe('native candidate clarification, not automatic fact approval', () => {
   it.each(['availability_only', 'different_period'])('leaves facts unchanged for %s without another model call', async answer => {
     const { ask, chat, memory, journal, transport } = await setup(); const question = await ask();
     expect(await chat.answer(owner, question.id, { answer })).toMatchObject({ kind: 'unchanged' });
-    expect(chat.pending(owner)).toBeNull(); expect(journal.list(owner)).toHaveLength(1); expect(memory.writes).toHaveLength(1); expect(transport).toHaveBeenCalledTimes(1);
+    expect(await chat.pending(owner)).toBeNull(); expect(journal.list(owner)).toHaveLength(1); expect(memory.writes).toHaveLength(1); expect(transport).toHaveBeenCalledTimes(1);
     expect(journal.chatPreview(owner, question.id).utterance).toBeNull();
   });
   it('denies another owner and holds new previews while a clarification is outstanding', async () => {
     const { ask, chat, transport } = await setup(); const question = await ask();
-    expect(chat.pending('user_other')).toBeNull();
+    expect(await chat.pending('user_other')).toBeNull();
     await expect(chat.answer('user_other', question.id, { answer: 'actual_weekly_work' })).rejects.toMatchObject({ status: 404 });
     await expect(ask()).rejects.toMatchObject({ code: 'CHANGE_PENDING' }); expect(transport).toHaveBeenCalledTimes(1);
   });
@@ -83,7 +83,7 @@ describe('native candidate clarification, not automatic fact approval', () => {
     const { ask, chat, workflow, journal, memory } = await setup(); const question = await ask();
     const form = await workflow.propose(owner, { baseRevision: 1, employment: { ...employment, hoursPerWeek: 39 } });
     await expect(chat.answer(owner, question.id, { answer: 'actual_weekly_work' })).rejects.toMatchObject({ code: 'CHANGE_PENDING' });
-    expect(journal.get(owner, form.id)).toEqual(form); expect(chat.pending(owner)).toEqual(question); expect(memory.writes).toHaveLength(1);
+    expect(journal.get(owner, form.id)).toEqual(form); expect(await chat.pending(owner)).toEqual(question); expect(memory.writes).toHaveLength(1);
   });
   it('expires an answer that crosses the deadline during its evidence read', async () => {
     const { ask, chat, workflow, journal, memory, setTime } = await setup(); const question = await ask();
@@ -97,5 +97,62 @@ describe('native candidate clarification, not automatic fact approval', () => {
     const { ask } = await setup(); const question = await ask();
     const html = renderToStaticMarkup(createElement(HoursClarificationCard, { value: question, disabled: false, onAnswer: async () => {} }));
     expect(html).toContain('40 hours per week of actual work'); expect(html).toContain('Availability only'); expect(html).toContain('Different period'); expect(html).toContain('separate review and confirmation'); expect(html).not.toContain('Confirm and save');
+  });
+});
+
+describe('unmapped-field recovery is a fresh user answer', () => {
+  it('never adopts the unknown candidate, reloads an empty question, and requires an explicit valid number', async () => {
+    const { ask, chat, journal, memory } = await setup('99 hours per week', 'unfamiliar_field');
+    const question = await ask('now I work 39 hours');
+    expect(question).toMatchObject({ issue: 'field', hours: null });
+    expect(await chat.pending(owner)).toEqual(question);
+    for (const body of [{ answer: 'actual_weekly_work' }, ...[0, 169, '39'].map(hours => ({ answer: 'actual_weekly_work', hours })),
+      { answer: 'actual_weekly_work', hours: 39, owner: 'user_other' }, { answer: 'availability_only', hours: 39 }]) {
+      await expect(chat.answer(owner, question.id, body)).rejects.toMatchObject({ name: 'ZodError' });
+    }
+    expect(journal.list(owner)).toHaveLength(1); expect(memory.writes).toHaveLength(1);
+    const html = renderToStaticMarkup(createElement(HoursClarificationCard, { value: question, disabled: false, onAnswer: async () => {} }));
+    expect(html).toContain('No value was adopted'); expect(html).toContain('value=""');
+    expect(html).toContain('disabled=""'); expect(html).not.toContain('99');
+  });
+  it('uses only the entered value, reloads its provenance, and writes only after separate confirmation', async () => {
+    const { ask, chat, workflow, memory, journal, transport } = await setup('99 hours per week', 'unfamiliar_field');
+    const question = await ask('now I work 39 hours');
+    const answer = await chat.answer(owner, question.id, { answer: 'actual_weekly_work', hours: 39 });
+    if (answer.kind !== 'proposal') throw new Error('proposal expected');
+    const loaded = journal.get(owner, answer.proposal.id);
+    expect(loaded).toMatchObject({ status: 'pending', oldValue: { hoursPerWeek: 38 }, newValue: { hoursPerWeek: 39 },
+      chat: { clarificationAnswer: 'actual_weekly_work', clarificationSource: 'user_entered' } });
+    const html = renderToStaticMarkup(createElement(HoursReviewNote, { ...loaded.chat!, oldHours: 38, newHours: 39 }));
+    expect(html).toContain('not a successful AM interpretation'); expect(html).toContain('has not saved');
+    expect(memory.writes).toHaveLength(1); expect(transport).toHaveBeenCalledTimes(1);
+    await expect(chat.answer(owner, question.id, { answer: 'actual_weekly_work', hours: 40 })).rejects.toMatchObject({ code: 'CLARIFICATION_NOT_FOUND' });
+    await workflow.confirm(owner, loaded.id, { proposalRevision: 1 });
+    await workflow.confirm(owner, loaded.id, { proposalRevision: 1 });
+    expect(memory.writes).toHaveLength(2); expect(journal.notifications(owner)).toHaveLength(2);
+    expect((await workflow.read(owner)).employment?.hoursPerWeek).toBe(39);
+  });
+  it('denies another owner and preserves a competing pending proposal', async () => {
+    const { ask, chat, workflow, journal, memory } = await setup('99', 'unfamiliar_field'); const question = await ask();
+    await expect(chat.answer('user_other', question.id, { answer: 'actual_weekly_work', hours: 39 })).rejects.toMatchObject({ status: 404 });
+    const form = await workflow.propose(owner, { baseRevision: 1, employment: { ...employment, hoursPerWeek: 41 } });
+    await expect(chat.answer(owner, question.id, { answer: 'actual_weekly_work', hours: 39 })).rejects.toMatchObject({ code: 'CHANGE_PENDING' });
+    expect(journal.get(owner, form.id)).toEqual(form); expect(await chat.pending(owner)).toEqual(question); expect(memory.writes).toHaveLength(1);
+  });
+  it('rejects stale and expired fresh answers, including expiry during a read', async () => {
+    const stale = await setup('99', 'unfamiliar_field'); const old = await stale.ask();
+    const form = await stale.workflow.propose(owner, { baseRevision: 1, employment: { ...employment, hoursPerWeek: 41 } });
+    await stale.workflow.confirm(owner, form.id, { proposalRevision: 1 });
+    await expect(stale.chat.answer(owner, old.id, { answer: 'actual_weekly_work', hours: 39 })).rejects.toMatchObject({ code: 'STALE_REVISION' });
+    const trial = await setup('99', 'unfamiliar_field'); const question = await trial.ask();
+    trial.setTime('2026-10-25T19:59:59Z'); const read = trial.workflow.read.bind(trial.workflow);
+    vi.spyOn(trial.workflow, 'read').mockImplementationOnce(async target => { const result = await read(target); trial.setTime('2026-10-25T20:00:01Z'); return result; });
+    await expect(trial.chat.answer(owner, question.id, { answer: 'actual_weekly_work', hours: 39 })).rejects.toThrow();
+    expect(trial.memory.writes).toHaveLength(1); expect(trial.journal.list(owner)).toHaveLength(1);
+  });
+  it.each(['availability_only', 'different_period'])('lets the user decline %s without adopting any candidate', async answer => {
+    const { ask, chat, memory, transport } = await setup('99', 'unfamiliar_field'); const question = await ask();
+    expect(await chat.answer(owner, question.id, { answer })).toMatchObject({ kind: 'unchanged' });
+    expect(await chat.pending(owner)).toBeNull(); expect(memory.writes).toHaveLength(1); expect(transport).toHaveBeenCalledTimes(1);
   });
 });

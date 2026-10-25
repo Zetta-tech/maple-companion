@@ -11,6 +11,9 @@ import { Assessments } from '../server/assessments.js';
 import { PolicyRegistry, policyDigest } from '../server/policies.js';
 import { syntheticPolicy } from './support/test-policy.js';
 import { ChatProposals } from '../server/chat-proposals.js';
+import { DemoJourney } from '../server/demo-journey.js';
+import { DemoFixtureStore, DemoFixtureMemory, fixtureSources } from './support/demo-fixture.js';
+import { demoSeed } from '../shared/demo.js';
 
 const origin = 'http://localhost:3000';
 const keys = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -39,6 +42,30 @@ function app() {
 }
 
 describe('real Clerk verification and HTTP boundaries, with locally generated test JWTs', () => {
+  it('binds demo confirmation and history to Clerk owner and refuses client owner injection', async()=>{
+    const journal=new Journal(':memory:');journals.push(journal);
+    const dev={...config,amAccessMode:'single-user-development' as const};
+    const workflow=new Workflow(journal,new TestMemory(),owner=>bindingFor(dev,owner));
+    const memory=new DemoFixtureMemory(),store=new DemoFixtureStore();
+    const application=createApp({config:dev,workflow,demoJourney:new DemoJourney(store,memory,fixtureSources)});
+    expect((await request(application).get('/api/demo/journey')).status).toBe(401);
+    expect((await request(application).post('/api/demo/proposals').set('Origin',origin).auth(token(),{type:'bearer'}).send({baseRevision:0,profile:demoSeed,ownerId:'user_B'})).status).toBe(400);
+    const proposed=await request(application).post('/api/demo/proposals').set('Origin',origin).auth(token(),{type:'bearer'}).send({baseRevision:0,profile:demoSeed});
+    expect(proposed.status).toBe(201);expect(memory.writes).toBe(0);
+    const foreign=await request(application).post(`/api/demo/proposals/${proposed.body.id}/confirm`).set('Origin',origin).auth(token({sub:'user_B'}),{type:'bearer'}).send({confirm:true});
+    expect(foreign.status).toBe(404);expect(memory.writes).toBe(0);
+    const saved=await request(application).post(`/api/demo/proposals/${proposed.body.id}/confirm`).set('Origin',origin).auth(token(),{type:'bearer'}).send({confirm:true});
+    expect(saved.status).toBe(200);expect(saved.body.revision).toBe(1);expect(memory.writes).toBe(1);
+    dev.bindings=new Map(config.bindings);dev.bindings.delete('user_A');
+    for(const path of ['/api/demo/profile','/api/demo/proposals','/api/demo/journey'])expect((await request(application).get(path).auth(token(),{type:'bearer'})).body.error.code).toBe('CONTEXT_NOT_PROVISIONED');
+  });
+  it('keeps the demo unavailable in restricted production-style composition',async()=>{
+    const journal=new Journal(':memory:');journals.push(journal);
+    const workflow=new Workflow(journal,new TestMemory(),owner=>bindingFor(config,owner));
+    const application=createApp({config,workflow,demoJourney:new DemoJourney(new DemoFixtureStore(),new DemoFixtureMemory(),fixtureSources)});
+    expect((await request(application).get('/api/demo/status').auth(token(),{type:'bearer'})).body.available).toBe(false);
+    expect((await request(application).get('/api/demo/profile').auth(token(),{type:'bearer'})).body.error.code).toBe('DEMO_NOT_READY');
+  });
   it('refuses a supplied chat interpreter in restricted/production composition', async () => {
     const journal = new Journal(':memory:'); journals.push(journal);
     const workflow = new Workflow(journal, new TestMemory(), owner => bindingFor(config, owner));

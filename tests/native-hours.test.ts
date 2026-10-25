@@ -48,7 +48,7 @@ describe('native preview candidate normalization', () => {
   });
   it('holds multiple candidates and unknown keys', () => {
     expect(normalizeHoursPreview({ ...preview, extraction: { ...preview.extraction, attributes: [attribute('36'), attribute('38')] } })).toEqual({ kind: 'clarify' });
-    expect(normalizeHoursPreview({ ...preview, extraction: { ...preview.extraction, attributes: [attribute('36', 'age')] } })).toEqual({ kind: 'clarify' });
+    expect(normalizeHoursPreview({ ...preview, extraction: { ...preview.extraction, attributes: [attribute('36', 'age')] } })).toEqual({ kind: 'clarify_field' });
     expect(normalizeHoursPreview({ ...preview, extraction: { ...preview.extraction, entities: [{ id: '', name: 'manager', entityType: 'person' }] } })).toEqual({ kind: 'clarify' });
   });
 });

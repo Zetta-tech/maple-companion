@@ -13,7 +13,8 @@
     "build": "tsc -p tsconfig.build.json && vite build",
     "start": "node --env-file-if-exists=.env dist/server/index.js",
     "test": "vitest run",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build",
+    "test:db": "node --env-file-if-exists=.env.test node_modules/vitest/vitest.mjs run --config vitest.database.config.ts"
   },
   "dependencies": {
     "@clerk/express": "2.1.83",
@@ -24,6 +25,7 @@
     "helmet": "8.3.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "surrealdb": "2.1.1",
     "zod": "4.6.7"
   },
   "devDependencies": {

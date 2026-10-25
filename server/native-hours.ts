@@ -2,16 +2,16 @@ import { z } from 'zod';
 import { createMemoryPreview, PreviewUnavailable, type MemoryPreview } from './am-preview.js';
 import { type HoursInterpretation, type HoursInterpreter } from './chat-proposals.js';
 import type { Binding } from './am.js';
-import type { Journal } from './journal.js';
+import type { JournalStore } from './journal-store.js';
 import type { Config } from './config.js';
 import { bindingFor } from './config.js';
 import { ChatProposals } from './chat-proposals.js';
 import type { Workflow } from './workflow.js';
 import { previewEvidence, type PreviewReason } from './preview-diagnostics.js';
+import { recognizedHoursField } from './hours-field.js';
 
 const attributeSchema = z.object({ id: z.literal(''), entityId: z.literal(''),
-  key: z.enum(['employment_record', 'hours_per_week', 'weekly_hours', 'hoursPerWeek', 'working_hours', 'work_hours']),
-  value: z.string().max(500), memoryCategory: z.enum(['identity', 'context']) });
+  key: z.string().min(1).max(500), value: z.string().max(500), memoryCategory: z.string() });
 
 export function hoursPreviewText(message: string, currentHoursPerWeek: number | null) {
   const currentHours = z.number().finite().gt(0).lte(168).nullable().parse(currentHoursPerWeek);
@@ -35,8 +35,11 @@ export function analyzeHoursPreview(preview: MemoryPreview): { interpretation: H
   // with this one-job trial. It is never an authenticated ID or routing authority.
   if (e.entities.length !== 1 || !z.object({ entityType: z.literal('person'), name: z.string().regex(/^(?:self|user|the user)$/i) }).safeParse(e.entities[0]).success) return held('NATIVE_SUBJECT_UNSUPPORTED');
   const attribute = attributeSchema.safeParse(e.attributes[0]);
-  if (!attribute.success) return held('NATIVE_FIELD_UNSUPPORTED');
-  const { key, value } = attribute.data;
+  if (!attribute.success) return held('NATIVE_ATTRIBUTE_INVALID');
+  if (!['identity', 'context'].includes(attribute.data.memoryCategory)) return held('NATIVE_CATEGORY_UNSUPPORTED');
+  const key = recognizedHoursField(attribute.data.key);
+  if (!key) return { interpretation: { kind: 'clarify_field' }, reason: 'NATIVE_KEY_UNMAPPED', evidence };
+  const { value } = attribute.data;
   // The whole value must be one supported assertion. Never pick a number from
   // explanatory prose, uncertainty, multiple values, conditions or other fields.
   const numeric = '(\\d{1,3}(?:\\.\\d{1,2})?)';
@@ -57,27 +60,27 @@ export function analyzeHoursPreview(preview: MemoryPreview): { interpretation: H
 }
 
 export class NativeHoursInterpreter implements HoursInterpreter {
-  constructor(private resolve: (owner: string) => Binding, private journal: Journal,
+  constructor(private resolve: (owner: string) => Binding, private journal: JournalStore,
     private preview = createMemoryPreview()) {}
   async interpret(owner: string, message: string, requestId: string, currentHoursPerWeek: number | null = null): Promise<HoursInterpretation> {
     const binding = this.resolve(owner);
     if (binding.ownerId !== owner) throw new PreviewUnavailable();
-    const record = this.journal.chatPreview(owner, requestId);
+    const record = await this.journal.chatPreview(owner, requestId);
     if (record.utterance !== message || record.status !== 'interpreting') throw new PreviewUnavailable();
-    this.journal.recordChatRemote(owner, requestId, binding.endpoint, binding.context, null);
+    await this.journal.recordChatRemote(owner, requestId, binding.endpoint, binding.context, null);
     try {
       // Context comes only from the receipt-verified snapshot. Preserve the
       // original bounded message, without a desired answer or phrase rewrite.
       const tagged = hoursPreviewText(message, currentHoursPerWeek);
-      const preview = await this.preview(binding, tagged, session => this.journal.recordChatRemote(owner, requestId, binding.endpoint, binding.context, session));
+      const preview = await this.preview(binding, tagged, async session => await this.journal.recordChatRemote(owner, requestId, binding.endpoint, binding.context, session));
       const result = analyzeHoursPreview(preview);
-      this.journal.recordChatDiagnostic(owner, requestId, result.reason, result.evidence);
+      await this.journal.recordChatDiagnostic(owner, requestId, result.reason, result.evidence);
       return result.interpretation;
     } catch (error) {
       const reason: PreviewReason = error instanceof PreviewUnavailable ? error.httpStatus !== null && error.httpStatus >= 400 ? 'PROVIDER_HTTP_ERROR'
         : error.state === 'blocked' || error.httpStatus !== null ? 'PROVIDER_RESPONSE_INVALID' : error.state === 'uncertain' ? 'PROVIDER_TRANSPORT_UNCERTAIN' : 'LOCAL_PREVIEW_REJECTED' : 'INTERPRETER_FAILED';
-      this.journal.recordChatDiagnostic(owner, requestId, reason, undefined, error instanceof PreviewUnavailable ? error.httpStatus : null);
-      this.journal.finishChat(owner, requestId, error instanceof PreviewUnavailable ? error.state : 'uncertain');
+      await this.journal.recordChatDiagnostic(owner, requestId, reason, undefined, error instanceof PreviewUnavailable ? error.httpStatus : null);
+      await this.journal.finishChat(owner, requestId, error instanceof PreviewUnavailable ? error.state : 'uncertain');
       throw new PreviewUnavailable();
     }
   }
