@@ -2,13 +2,7 @@
 main:has(.login-experience) { max-width:none; padding:0; min-height:0; }
 body:has(.login-experience)::before { display:none; }
 body:has(.login-experience) {
-  --login-left-tone:#ececec;
-  --login-right-tone:#ffffff;
-  background:linear-gradient(90deg,var(--login-left-tone) 0%,var(--login-left-tone) 46%,var(--login-right-tone) 54%,var(--login-right-tone) 100%);
-}
-:root[data-theme="dark"] body:has(.login-experience) {
-  --login-left-tone:var(--surface-elevated);
-  --login-right-tone:var(--paper);
+  background:var(--paper);
 }
 .login-experience {
   position:relative;
@@ -19,6 +13,22 @@ body:has(.login-experience) {
   align-items:center;
   min-height:calc(100svh - 10.25rem);
   padding:3rem 0;
+}
+/* Post-ITA's 84px Maple-red grid, static and limited to left negative space.
+ * Its bounds end before the form, and the mask fades toward every edge. */
+.login-experience::before {
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  width:54%;
+  height:52%;
+  pointer-events:none;
+  z-index:-2;
+  background-image:linear-gradient(90deg,rgba(220,38,38,.095) 1px,transparent 1px),linear-gradient(180deg,rgba(220,38,38,.073) 1px,transparent 1px);
+  background-size:84px 84px;
+  mask-image:linear-gradient(90deg,transparent,#000 18%,#000 68%,transparent 100%),linear-gradient(180deg,transparent,#000 20%,#000 50%,transparent 100%);
+  mask-composite:intersect;
 }
 .login-form-region {
   position:relative;
@@ -50,7 +60,7 @@ body:has(.login-experience) {
 }
 :root[data-theme="dark"] .login-leaf { opacity:.22; }
 @media(max-width:900px) {
-  body:has(.login-experience) { background:var(--paper); }
+  .login-experience::before { display:none; }
   .login-experience { display:block; min-height:max(38rem,calc(100svh - 10.25rem)); padding:3.5rem 1.5rem 14rem; }
   .login-form-region { width:min(22rem,100%); margin-inline:auto; }
   .login-leaf-window { width:70%; height:22rem; bottom:-7rem; }
