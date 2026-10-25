@@ -38,5 +38,10 @@ jobs:
         run: npm run check
       - name: Verify compiled hosted entry and public asset packaging
         run: node scripts/package-vercel.mjs
+      - name: Verify the actual Vercel Express framework build
+        run: |
+          node scripts/smoke-hosted-entry.mjs
+          npm install --prefix "${RUNNER_TEMP}/maple-vercel-builder" --no-save --ignore-scripts --no-audit --no-fund @vercel/express@22.0.2
+          node scripts/verify-vercel-express.mjs "${RUNNER_TEMP}/maple-vercel-builder"
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
