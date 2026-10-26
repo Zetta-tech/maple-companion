@@ -18,6 +18,8 @@ import { LoginExperience } from './LoginExperience.js';
 import { DashboardOverview, type GuideOverviewState } from './DashboardOverview.js';
 import { ProfilePage, type ProfileGuideReadback } from './ProfilePage.js';
 import { useProfileRoute, useUnsavedProfile } from './profile-navigation.js';
+import { PathwaysPage } from './PathwaysPage.js';
+import { usePathwaysRoute } from './pathways-navigation.js';
 
 type Snapshot = { revision: number; employment: Employment | null };
 type Proposal = {
@@ -132,6 +134,8 @@ function Workspace() {
   const [form, setForm] = useState<Employment>({ ...blankEmployment });
   const [formBaseline, setFormBaseline] = useState(() => JSON.stringify(blankEmployment));
   const profileSection = useProfileRoute();
+  const pathwaysSelection = usePathwaysRoute();
+  const pathwaysVisible = pathwaysSelection !== null;
   const [guideReadback,setGuideReadback] = useState<ProfileGuideReadback>({snapshot:null,loading:true,error:'',dirty:false});
   const profileDirty = JSON.stringify(form) !== formBaseline || guideReadback.dirty;
   useUnsavedProfile(profileDirty);
@@ -299,14 +303,15 @@ function Workspace() {
   }, [request]);
 
   return <Shell account={<div className="account"><UserButton /></div>} updates={<NotificationCenter notifications={notifications} status={notificationStatus} />}>
-    <div className={`dashboard-layout${profileSection ? ' profile-route' : ''}`} data-profile-routing><aside className="dashboard-sidebar"><p className="dashboard-sidebar-label">Workspace</p><WorkspaceNavigation discoveries={journeyAvailable} /><p className="dashboard-sidebar-note">Your information.<br />Your decisions.<br />Evidence you can inspect.</p></aside><div className="dashboard-content">
-    <div hidden={!!profileSection}><DashboardOverview employment={snapshot?.employment ?? null} available={snapshot !== null} loading={loading} held={assessmentHold} pending={unresolved.length} discoveries={journeyAvailable} guideState={guideState} /></div>
+    <div className={`dashboard-layout${profileSection ? ' profile-route' : pathwaysVisible ? ' pathways-route' : ''}`} data-profile-routing><aside className="dashboard-sidebar"><p className="dashboard-sidebar-label">Workspace</p><WorkspaceNavigation discoveries={journeyAvailable} /><p className="dashboard-sidebar-note">Your information.<br />Your decisions.<br />Evidence you can inspect.</p></aside><div className="dashboard-content">
+    <div hidden={!!profileSection || pathwaysVisible}><DashboardOverview employment={snapshot?.employment ?? null} available={snapshot !== null} loading={loading} held={assessmentHold} pending={unresolved.length} discoveries={journeyAvailable} guideState={guideState} /></div>
     {profileSection && <ProfilePage section={profileSection} employment={snapshot?.employment ?? null} available={snapshot !== null} loading={loading} guide={guideReadback} dirty={profileDirty}/>}
+    {pathwaysVisible && <PathwaysPage request={request} employmentRevision={snapshot?.revision ?? null} blocked={assessmentHold} refreshKey={memoryEpoch} selected={pathwaysSelection}/>}
     {error && <div id="workspace-error" tabIndex={-1} className="notice error" role="alert">{error}</div>}
     {message && <div id="workspace-feedback" tabIndex={-1} className="notice" role="status">{message}</div>}
 
-    <GuideWorkspace request={request} employmentAvailable={snapshot !== null} employmentPending={unresolved.length > 0} employment={snapshot?.employment ?? null} employmentRevision={snapshot?.revision ?? null} blocked={assessmentHold} refreshKey={memoryEpoch} onAvailabilityChange={setJourneyAvailable} onOverviewChange={setGuideState} profileSection={profileSection} onProfileReadback={setGuideReadback} />
-    <div id="profile-workspace" className="profile-workspace" hidden={!!profileSection && profileSection !== 'employment'}>
+    <div hidden={pathwaysVisible}><GuideWorkspace request={request} employmentAvailable={snapshot !== null} employmentPending={unresolved.length > 0} employment={snapshot?.employment ?? null} employmentRevision={snapshot?.revision ?? null} blocked={assessmentHold} refreshKey={memoryEpoch} onAvailabilityChange={setJourneyAvailable} onOverviewChange={setGuideState} profileSection={profileSection} onProfileReadback={setGuideReadback} /></div>
+    <div id="profile-workspace" className="profile-workspace" hidden={pathwaysVisible || !!profileSection && profileSection !== 'employment'}>
     <div hidden={!!profileSection}><NativeMemoryPanel request={request} onChanged={() => setMemoryEpoch(value => value + 1)} onAssessmentHold={updateAssessmentHold} /></div>
     {review?.chat && review.newValue?.hoursPerWeek !== null && <HoursReviewNote {...review.chat} oldHours={review.oldValue?.hoursPerWeek ?? null} newHours={review.newValue.hoursPerWeek} />}
     {loading && <p role="status">Loading your saved information…</p>}
