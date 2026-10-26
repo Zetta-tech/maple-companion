@@ -103,6 +103,9 @@ describe('personal Guide frontend boundaries', () => {
     expect(html).toContain('Example employer'); expect(html).toContain('Unknown');
     expect(html).toContain('Saved employment reference'); expect(html).toContain('b'.repeat(64));
     expect(html).not.toContain('Avery'); expect(html).not.toContain('fictional');
+    const withHistory = renderToStaticMarkup(<PersonalInputReview profile={{...profile,history:{version:1,education:[{id:'428b59b8-4a16-4fc4-a415-c0f1be80da39',institution:'Example college',program:'Engineering',credential:'',startDate:null,endDate:null,notes:'Credential category not reviewed.'}],languageTests:[]}}}/>);
+    expect(withHistory).toContain('Education history');expect(withHistory).toContain('Example college');expect(withHistory).toContain('Credential category not reviewed.');expect(withHistory).toContain('No test records will be kept.');
+    expect(withHistory).not.toContain('428b59b8-4a16-4fc4-a415-c0f1be80da39');expect(withHistory).not.toContain('Review history');
   });
   it('keeps personal totals distinct from demonstration wording and withholds stale personal results', async () => {
     const evidence = fictionalCrsEvidence('2026-10-25'); evidence.completeEvidenceReviewed = 'yes';
